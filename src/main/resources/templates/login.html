@@ -2,14 +2,33 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>로그인</title>
+
+  <!-- Tailwind CSS CDN 링크 -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h2>로그인</h2>
-  <form th:action="@{/login}" method="post">
-    <label>ID: <input type="text" name="empCode"/></label><br>
-    <label>PW: <input type="password" name="password"/></label><br>
-    <input type="submit" value="로그인"/>
+<body class="bg-blue-500 h-screen flex items-center justify-center">
+<div class="w-full max-w-sm p-8 bg-white rounded-2xl shadow-lg">
+  <h2 class="text-2xl font-bold text-center mb-6 text-blue-700">ESS 시스템</h2>
+  <form th:action="@{/login}" method="post" class="space-y-4">
+    <div>
+      <label for="empCode" class="block text-sm font-medium text-gray-700">사원번호</label>
+      <input type="text" name="empCode" id="empCode"
+             class="mt-1 w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+             placeholder="사원번호를 입력하세요">
+    </div>
+    <div>
+      <label for="password" class="block text-sm font-medium text-gray-700">비밀번호</label>
+      <input type="password" name="password" id="password"
+             class="mt-1 w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+             placeholder="비밀번호를 입력하세요">
+    </div>
+    <div>
+      <input type="submit" value="로그인"
+             class="w-full bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 transition">
+    </div>
   </form>
+</div>
 </body>
 </html>
