@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>사용자 페이지</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+
+<div class="bg-white p-10 rounded-lg shadow-lg w-full max-w-md">
+  <h1 class="text-3xl font-bold text-center mb-8 text-indigo-600">사용자 페이지</h1>
+
+  <div class="flex flex-col space-y-4">
+    <!-- 근태신청 이동 -->
+    <a th:href="@{/user/apply}"
+       class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg transition">
+      근태 신청
+    </a>
+
+    <!-- 근태신청 내역 이동 -->
+    <a th:href="@{/user/history}"
+       class="block w-full text-center bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 rounded-lg transition">
+      근태 신청 내역
+    </a>
+
+    <!-- 부서 근태 조회 이동 -->
+    <a th:href="@{/user/deptattendance}"
+       class="block w-full text-center bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 rounded-lg transition">
+      부서 근태 조회
+    </a>
+
+    <!-- 부서장 권한이 있을 경우에만 표시 -->
+    <div th:if="${isHead}">
+      <a th:href="@{/user/approval}"
+         class="block w-full text-center bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition">
+        부서원 근태 승인
+      </a>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
