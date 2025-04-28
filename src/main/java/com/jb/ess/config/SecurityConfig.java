@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .anyRequest().permitAll())
             .formLogin(login -> login
                 .loginPage("/login")
+                .defaultSuccessUrl("/home", true)
                 .usernameParameter("empCode")
                 .passwordParameter("password")
                 .successHandler(successHandler())

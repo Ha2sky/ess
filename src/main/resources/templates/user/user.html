@@ -5,7 +5,7 @@
   <title>사용자 페이지</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+<body class="bg-blue-700 min-h-screen flex items-center justify-center">
 
 <div class="bg-white p-10 rounded-lg shadow-lg w-full max-w-md">
   <h1 class="text-3xl font-bold text-center mb-8 text-indigo-600">사용자 페이지</h1>
@@ -30,13 +30,12 @@
     </a>
 
     <!-- 부서장 권한이 있을 경우에만 표시 -->
-    <div th:if="${isHead}">
+    <!--<div th:if="${isHead}">-->
       <a th:href="@{/user/approval}"
          class="block w-full text-center bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition">
         부서원 근태 승인
       </a>
-    </div>
-
+    <!--</div>-->
   </div>
 </div>
 
