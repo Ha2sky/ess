@@ -1,7 +1,8 @@
 package com.jb.ess.config;
 
+import com.jb.ess.security.CustomAuthenticationFailureHandler;
 import com.jb.ess.security.CustomUserDetailsService;
-import lombok.Data;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,8 +19,10 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 
 @Configuration
 @EnableWebSecurity
-@Data
 public class SecurityConfig {
+    @Autowired
+    private CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
+
     private final CustomUserDetailsService userDetailsService;
 
     public SecurityConfig(CustomUserDetailsService userDetailsService) {
@@ -45,7 +48,9 @@ public class SecurityConfig {
                 .passwordParameter("password")
                 .successHandler(successHandler())
                 .failureUrl("/login?error=true")
+                .failureHandler(customAuthenticationFailureHandler)
                 .permitAll())
+
             .logout(logout -> logout
                     .logoutUrl("/logout")
                     .logoutSuccessUrl("/login?logout=true")

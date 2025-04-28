@@ -1,10 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Title</title>
+  <title>관리자 페이지</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h2>Admin</h2>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+<div class="bg-white p-10 rounded-lg shadow-lg w-full max-w-md">
+  <h1 class="text-3xl font-bold text-center mb-8 text-blue-600">관리자 페이지</h1>
+
+  <div class="flex flex-col space-y-4">
+    <!-- 근태패턴 생성 이동 -->
+    <a th:href="@{/admin/pattern}"
+       class="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition">
+      근태패턴 생성
+    </a>
+
+    <!-- 부서관리 이동 -->
+    <a th:href="@{/admin/deptmanage}"
+       class="block w-full text-center bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition">
+      부서 관리
+    </a>
+  </div>
+</div>
+
 </body>
 </html>
