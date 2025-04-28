@@ -1,0 +1,96 @@
+@startuml
+class HriMaster {
+    - empCode: String
+    - password: String
+    - empName: String
+    - socialNum: String
+    - gender: String
+    - enterDate: String
+    - positionDate: String
+    - dutyDate: String
+    - empState: String
+    - retireDate: String
+    - retireReason: String
+}
+
+class HrtAnnualDetail {
+    - annualStartDate: String
+    - annualEndDate: String
+    - totalWorkDay: BigDecimal
+    - realWorkDay: BigDecimal
+    - totDay: BigDecimal
+    - useDay: BigDecimal
+    - balanceDay: BigDecimal
+}
+
+class HrtDutyInfo {
+    - dutyCode: String
+    - dutyName: String
+    - useYn: String
+}
+
+class HrtGradeInfo {
+    - positionCode: String
+    - positionName: String
+    - useYn: String
+}
+
+class HrtShiftMaster {
+    - shiftCode: String
+    - shiftName: String
+    - workOnDayType: String
+    - workOnHhmm: String
+    - workOffDayType: String
+    - workOffHhmm: String
+    - break1StartDayType: String
+    - break1StartHhmm: String
+    - break1EndDayType: String
+    - break1EndHhmm: String
+    - break2StartDayType: String
+    - break2StartHhmm: String
+    - break2EndDayType: String
+    - break2EndHhmm: String
+    - overStartDayType: String
+    - overStartHhmm: String
+    - overEndDayType: String
+    - overEndHhmm: String
+    - over2StartDayType: String
+    - over2StartHhmm: String
+    - over2EndDayType: String
+    - over2EndHhmm: String
+    - memo: String
+    - useYn: String
+    - workTypeCode: String
+    - workDayType: String
+}
+
+class HrtTimeItem {
+    - timeItemCode: String
+    - timeItemName: String
+    - memo: String
+    - useYn: String
+}
+
+class OrgDeptMaster {
+    - deptCode: String
+    - deptName: String
+    - deptLeader: String
+    - deptCategory: String
+    - startDate: String
+    - endDate: String
+    - useYn: String
+}
+
+HriMaster "1" -- "1" HrtAnnualDetail : hrtAnnualDetail
+HriMaster *-- "1" HrtGradeInfo : hrtGradeInfo
+HriMaster *-- "1" HrtDutyInfo : hrtDutyInfo
+HriMaster *-- "1" OrgDeptMaster : orgDeptMaster
+
+HrtAnnualDetail *-- "1" HrtGradeInfo : hrtGradeInfo
+HrtAnnualDetail *-- "1" OrgDeptMaster : orgDeptMaster
+
+HrtShiftMaster "1" -- "*" OrgDeptMaster : orgDeptMasters
+HrtTimeItem "1" -- "*" HrtShiftMaster : hrtShiftMasters
+OrgDeptMaster "*" -- "1" OrgDeptMaster : parentDeptMaster
+
+@enduml
