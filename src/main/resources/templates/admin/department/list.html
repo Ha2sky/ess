@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>부서 목록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-10 bg-gray-100">
+
+<div class="flex justify-between items-center mb-6">
+  <h1 class="text-2xl font-bold text-gray-800">부서 목록</h1>
+  <a href="/admin/department/create" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">부서 추가</a>
+</div>
+<table class="min-w-full bg-white rounded shadow">
+  <thead class="bg-gray-400">
+  <tr>
+    <th class="px-4 py-2 border">부서코드</th>
+    <th class="px-4 py-2 border">부서명</th>
+    <th class="px-4 py-2 border">사용여부</th>
+    <th class="px-4 py-2 border">부서장</th>
+    <th class="px-4 py-2 border">시작일</th>
+    <th class="px-4 py-2 border">종료일</th>
+    <th class="px-4 py-2 border">관리</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr
+      th:each="dept, stat : ${departments}"
+      th:classappend="${stat.index % 2 == 0} ? 'bg-white' : 'bg-gray-100'"
+      class="text-center"
+  >
+    <td class="border px-4 py-2" th:text="${dept.deptCode}"></td>
+    <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
+    <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
+    <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
+    <td class="border px-4 py-2" th:text="${dept.startDate}"></td>
+    <td class="border px-4 py-2" th:text="${dept.endDate}"></td>
+    <td class="border px-4 py-2 space-x-2">
+      <a th:href="@{'/admin/department/edit/' + ${dept.deptCode}}" class="text-blue-500 hover:underline">수정</a>
+      <form th:action="@{'/admin/department/delete/' + ${dept.deptCode}}" method="post" style="display:inline;">
+        <button type="submit" class="text-red-500 hover:underline">삭제</button>
+      </form>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+</body>
+</html>
