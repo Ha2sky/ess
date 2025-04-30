@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>부서 수정</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-10">
+<h1 class="text-2xl font-bold mb-4">부서 수정</h1>
+
+<form th:action="@{/admin/department/update}" th:object="${department}" method="post" class="space-y-4">
+  <input type="hidden" th:field="*{deptCode}" />
+
+  <div>
+    <label class="block mb-1">부서명</label>
+    <input type="text" th:field="*{deptName}" class="border px-4 py-2 w-full" placeholder="부서명을 입력하세요">
+  </div>
+
+  <div>
+    <label class="block mb-1">부서 카테고리</label>
+    <select th:field="*{deptCategory}" class="border px-4 py-2 w-full">
+      <option value="10" th:selected="${department.deptCategory == 10}">CEO</option>
+      <option value="20" th:selected="${department.deptCategory == 20}">COO</option>
+      <option value="21" th:selected="${department.deptCategory == 21}">위원회</option>
+      <option value="30" th:selected="${department.deptCategory == 30}">본부</option>
+      <option value="40" th:selected="${department.deptCategory == 40}">팀</option>
+      <option value="41" th:selected="${department.deptCategory == 41}">부</option>
+      <option value="50" th:selected="${department.deptCategory == 50}">과</option>
+      <option value="60" th:selected="${department.deptCategory == 60}">그룹</option>
+      <option value="70" th:selected="${department.deptCategory == 70}">파트</option>
+    </select>
+  </div>
+
+  <div>
+    <label class="block mb-1">상위부서</label>
+    <select th:field="*{parentDept}" class="border px-4 py-2 w-full">
+      <option value="">없음</option>
+      <option th:each="dept : ${departments}"
+              th:value="${dept.deptCode}"
+              th:text="${dept.deptName}"
+              th:selected="${dept.deptCode == department.parentDept}"></option>
+    </select>
+  </div>
+
+  <div>
+    <label class="block mb-1">부서장</label>
+    <input type="text" th:field="*{deptLeader}" class="border px-4 py-2 w-full" placeholder="부서장 사번 입력">
+  </div>
+
+  <div>
+    <label class="block mb-1">시작일</label>
+    <input type="date" th:field="*{startDate}" class="border px-4 py-2 w-full">
+  </div>
+
+  <div>
+    <label class="block mb-1">종료일</label>
+    <input type="date" th:field="*{endDate}" class="border px-4 py-2 w-full">
+  </div>
+
+  <div class="flex items-center">
+    <input type="checkbox" th:field="*{useYn}" value="Y" class="mr-2">
+    <label>사용 여부</label>
+  </div>
+
+  <div>
+    <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">수정</button>
+  </div>
+</form>
+
+</body>
+</html>

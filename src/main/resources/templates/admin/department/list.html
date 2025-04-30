@@ -7,43 +7,66 @@
 </head>
 <body class="p-10 bg-gray-100">
 
-<div class="flex justify-between items-center mb-6">
+<!-- 상단: 제목만 -->
+<div class="flex justify-center mb-6">
   <h1 class="text-2xl font-bold text-gray-800">부서 목록</h1>
-  <a href="/admin/department/create" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">부서 추가</a>
 </div>
-<table class="min-w-full bg-white rounded shadow">
-  <thead class="bg-gray-400">
-  <tr>
-    <th class="px-4 py-2 border">부서코드</th>
-    <th class="px-4 py-2 border">부서명</th>
-    <th class="px-4 py-2 border">사용여부</th>
-    <th class="px-4 py-2 border">부서장</th>
-    <th class="px-4 py-2 border">시작일</th>
-    <th class="px-4 py-2 border">종료일</th>
-    <th class="px-4 py-2 border">관리</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr
-      th:each="dept, stat : ${departments}"
-      th:classappend="${stat.index % 2 == 0} ? 'bg-white' : 'bg-gray-100'"
-      class="text-center"
-  >
-    <td class="border px-4 py-2" th:text="${dept.deptCode}"></td>
-    <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
-    <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
-    <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
-    <td class="border px-4 py-2" th:text="${dept.startDate}"></td>
-    <td class="border px-4 py-2" th:text="${dept.endDate}"></td>
-    <td class="border px-4 py-2 space-x-2">
-      <a th:href="@{'/admin/department/edit/' + ${dept.deptCode}}" class="text-blue-500 hover:underline">수정</a>
-      <form th:action="@{'/admin/department/delete/' + ${dept.deptCode}}" method="post" style="display:inline;">
-        <button type="submit" class="text-red-500 hover:underline">삭제</button>
-      </form>
-    </td>
-  </tr>
-  </tbody>
-</table>
+
+<div class="overflow-x-auto rounded shadow">
+  <table class="min-w-full table-auto border-collapse">
+    <thead class="bg-gray-600 text-white text-sm">
+    <tr>
+      <th class="px-4 py-3 border">부서코드</th>
+      <th class="px-4 py-3 border">부서명</th>
+      <th class="px-4 py-3 border">사용여부</th>
+      <th class="px-4 py-3 border">부서장</th>
+      <th class="px-4 py-3 border">시작일</th>
+      <th class="px-4 py-3 border">종료일</th>
+      <th class="px-4 py-3 border">관리</th>
+    </tr>
+    </thead>
+    <tbody class="text-gray-700 text-sm">
+    <tr
+        th:each="dept, stat : ${departments}"
+        th:classappend="${stat.index % 2 == 0} ? 'bg-white' : 'bg-gray-100'"
+        class="hover:bg-gray-300 transition text-center"
+    >
+      <td class="border px-4 py-2" th:text="${dept.deptCode}"></td>
+      <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
+      <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
+      <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
+      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.startDate)}|"></td>
+      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.endDate)}|"></td>
+      <td class="border px-4 py-2 space-x-2">
+        <a th:href="@{'/admin/department/edit/' + ${dept.deptCode}}"
+           class="inline-flex items-center bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600 transition">
+          ✏️ 수정
+        </a>
+        <!-- 삭제 폼 -->
+        <form th:action="@{'/admin/department/delete/' + ${dept.deptCode}}" method="post" class="inline-flex"
+              onsubmit="return confirm('정말 이 부서를 삭제하시겠습니까?');">
+          <button type="submit"
+                  class="inline-flex items-center bg-red-500 text-white text-xs px-3 py-1 rounded hover:bg-red-600 transition">
+            🗑️ 삭제
+          </button>
+        </form>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 하단: 돌아가기 + 부서추가 버튼 -->
+<div class="flex justify-between items-center mt-8">
+  <a href="/admin"
+     class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 shadow">
+    ← 돌아가기
+  </a>
+  <a href="/admin/department/add"
+     class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 shadow">
+    ➕ 부서 추가
+  </a>
+</div>
 
 </body>
 </html>

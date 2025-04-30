@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>부서 등록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-10 bg-gray-100">
+
+<div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+  <h1 class="text-2xl font-bold text-gray-800 mb-4">부서 등록</h1>
+
+  <!-- 에러 메시지 출력 -->
+  <div th:if="${errorMessage}" class="bg-red-100 text-red-700 p-4 rounded mb-6">
+    <strong>오류: </strong> <span th:text="${errorMessage}"></span>
+  </div>
+
+  <form th:action="@{/admin/department/add}" method="post" class="space-y-4">
+
+    <!-- 부서코드 -->
+    <div>
+      <label for="deptCode" class="block">부서 코드</label>
+      <input type="text" id="deptCode" name="deptCode" class="w-full border p-2 rounded" required/>
+    </div>
+
+    <!-- 부서명 (선택 입력) -->
+    <div>
+      <label for="deptName" class="block">부서명</label>
+      <input type="text" id="deptName" name="deptName" class="w-full border p-2 rounded" placeholder="부서명을 입력하세요">
+    </div>
+
+    <!-- 부서 사용여부 -->
+    <div>
+      <label class="block">사용 여부</label>
+      <input type="checkbox" name="useYn" value="Y" checked/> 사용
+    </div>
+
+    <!-- 부서 카테고리 -->
+    <div>
+      <label for="deptCategory" class="block">부서 구분</label>
+      <select id="deptCategory" name="deptCategory" class="w-full border p-2 rounded" required>
+        <option value="">-- 선택하세요 --</option>
+        <option value="10">CEO</option>
+        <option value="20">COO</option>
+        <option value="21">위원회</option>
+        <option value="30">본부</option>
+        <option value="40">팀</option>
+        <option value="41">부</option>
+        <option value="50">과</option>
+        <option value="60">그룹</option>
+        <option value="70">파트</option>
+      </select>
+    </div>
+
+    <!-- 상위 부서 (선택 입력) -->
+    <div>
+      <label for="parentDept" class="block">상위 부서</label>
+      <select id="parentDept" name="parentDept" class="w-full border p-2 rounded">
+        <option value="">없음</option>
+        <option th:each="dept : ${departments}" th:value="${dept.deptCode}" th:text="${dept.deptName}"></option>
+      </select>
+    </div>
+
+    <!-- 부서장 (선택 입력) -->
+    <div>
+      <label for="deptLeader" class="block">부서장</label>
+      <input type="text" id="deptLeader" name="deptLeader" class="w-full border p-2 rounded" placeholder="부서장 사번 입력"/>
+    </div>
+
+    <!-- 시작일 (선택 입력) -->
+    <div>
+      <label class="block mb-1">시작일</label>
+      <input type="date" class="border px-4 py-2 w-full">
+    </div>
+
+    <!-- 종료일 (선택 입력) -->
+    <div>
+      <label class="block mb-1">종료일</label>
+      <input type="date" class="border px-4 py-2 w-full">
+    </div>
+
+    <!-- 제출 -->
+    <div class="pt-4">
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">저장</button>
+    </div>
+
+  </form>
+</div>
+
+<!-- 하단 돌아가기 -->
+<div class="flex justify-between items-center mt-8">
+  <a href="/admin/department/list" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 shadow">
+    ← 돌아가기
+  </a>
+</div>
+
+</body>
+</html>
