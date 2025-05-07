@@ -2,7 +2,7 @@ package com.jb.ess.controller;
 
 import com.jb.ess.domain.Department;
 import com.jb.ess.service.DepartmentService;
-import java.util.List;
+import com.jb.ess.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 @RequestMapping("/admin/department")
@@ -72,14 +73,29 @@ public class AdminDepartmentController {
     @GetMapping("/edit/{deptCode}")
     public String editDepartmentForm(@PathVariable String deptCode, Model model) {
         Department department = departmentService.getDepartmentByDeptCode(deptCode);
-        List<Department> departments = departmentService.getAllDepartments();
+        department.setStartDate(DateUtil.formatDate(department.getStartDate()));
+        department.setEndDate(DateUtil.formatDate(department.getEndDate()));
         model.addAttribute("department", department);
         model.addAttribute("departments", departmentService.getAllDepartments());
         return "admin/department/edit";
     }
 
-    @PostMapping("/update")
-    public String editDepartment(@ModelAttribute Department department) {
+    @PostMapping("/edit")
+    public String editDepartment(@ModelAttribute Department department,
+                                @RequestParam("originalDeptCode") String originalDeptCode,
+                                Model model) {
+
+        // 부서코드가 변경되었는지 확인
+        if (!originalDeptCode.equals(department.getDeptCode())) {
+            if (departmentService.existsByDeptCode(department.getDeptCode())) {
+                model.addAttribute("errorMessage", "이미 존재하는 부서코드입니다.");
+                model.addAttribute("department", department);
+                model.addAttribute("departments", departmentService.getAllDepartments());
+                model.addAttribute("originalDeptCode", originalDeptCode); // 이거 필수!
+                return "admin/department/edit";
+            }
+        }
+
         if (department.getParentDept() == null) department.setParentDept("");
         if (department.getDeptLeader() == null) department.setDeptLeader("");
         if (department.getStartDate() == null) department.setStartDate("");

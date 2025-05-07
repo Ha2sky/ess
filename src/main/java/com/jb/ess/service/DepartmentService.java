@@ -34,4 +34,8 @@ public class DepartmentService {
         // 부서가 존재하는지 확인하고 삭제 처리
         departmentMapper.deleteDepartment(deptCode);
     }
+
+    public boolean existsByDeptCode(String deptCode) {
+        return departmentMapper.findByDeptCode(deptCode) != null;
+    }
 }

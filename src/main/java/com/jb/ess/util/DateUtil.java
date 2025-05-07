@@ -8,6 +8,7 @@ public class DateUtil {
     private static final DateTimeFormatter INPUT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter OUTPUT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+    // yyyyMMdd → yyyy-MM-dd
     public static String formatDate(String dateStr) {
         if (dateStr == null || dateStr.isBlank()) return "-";
         if (MAX_DATE.equals(dateStr)) return "-";
