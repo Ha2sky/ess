@@ -35,13 +35,6 @@ public interface EmployeeMapper {
     /* 특정 부서에 소속된 사원 목록 조회 */
     List<Employee> findEmployeesByDeptCode(@Param("deptCode") String deptCode);
 
-    /* 사원코드로 단일 사원 조회 */
-    @Select("""
-        SELECT *
-        FROM HRIMASTER
-        WHERE EMP_CODE = #{empCode}
-    """)
-
     /* 사원의 부서코드 변경 (배정 또는 삭제) */
     @Update("""
         UPDATE HRIMASTER
