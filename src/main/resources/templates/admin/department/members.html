@@ -36,7 +36,7 @@
       <td class="border px-2 py-1">
         <div class="flex justify-center space-x-2">
           <!-- 사원 부서 제외 버튼 -->
-          <form th:action="@{'/admin/department/' + ${department.deptCode} + '/remove'}" method="post"
+          <form th:action="@{'/admin/department/' + ${department.deptCode} + '/members/remove'}" method="post"
                 onsubmit="return confirm('정말 이 사원을 부서에서 제외하시겠습니까?');">
             <input type="hidden" name="empCode" th:value="${member.empCode}"/>
             <button type="submit"

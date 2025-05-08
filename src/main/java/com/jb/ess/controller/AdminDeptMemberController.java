@@ -32,7 +32,7 @@ public class AdminDeptMemberController {
     /* 사원 부서 배정 */
     @PostMapping("/{deptCode}/members/add")
     public String addEmployeeToDepartment(@PathVariable String deptCode,
-        @RequestParam("empCode") String empCode) {
+                                          @RequestParam("empCode") String empCode) {
         employeeService.assignEmployeeToDepartment(empCode, deptCode);
         return "redirect:/admin/department/" + deptCode + "/members";
     }
@@ -40,7 +40,7 @@ public class AdminDeptMemberController {
     /* 부서에서 사원 제거 */
     @PostMapping("/{deptCode}/members/remove")
     public String removeEmployeeFromDepartment(@PathVariable String deptCode,
-        @RequestParam("empCode") String empCode) {
+                                               @RequestParam("empCode") String empCode) {
         employeeService.removeEmployeeFromDepartment(empCode);
         return "redirect:/admin/department/" + deptCode + "/members";
     }
@@ -48,7 +48,7 @@ public class AdminDeptMemberController {
     /* 부서장 등록 */
     @PostMapping("/{deptCode}/setLeader")
     public String setDepartmentLeader(@PathVariable String deptCode,
-        @RequestParam String empCode) {
+                                      @RequestParam String empCode) {
         departmentMapper.updateDeptLeader(deptCode, empCode);
         return "redirect:/admin/department/" + deptCode + "/members";
     }
