@@ -5,17 +5,14 @@ import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface DepartmentMapper {
     @Select("""
-        SELECT
-            DEPT_CODE       AS deptCode,        DEPT_NAME   AS deptName,
-            PARENT_DEPT     AS parentDept,      DEPT_LEADER AS deptLeader,
-            DEPT_CATEGORY   AS deptCategory,    START_DATE  AS startDate,
-            END_DATE        AS endDate,         USE_YN      AS useYn
+        SELECT *
         FROM ORGDEPTMASTER
         ORDER BY DEPT_CODE
     """)
@@ -38,11 +35,7 @@ public interface DepartmentMapper {
     void updateDepartment(Department department);
 
     @Select("""
-        SELECT
-            DEPT_CODE       AS deptCode,        DEPT_NAME   AS deptName,
-            PARENT_DEPT     AS parentDept,      DEPT_LEADER AS deptLeader,
-            DEPT_CATEGORY   AS deptCategory,    START_DATE  AS startDate,
-            END_DATE        AS endDate,         USE_YN      AS useYn
+        SELECT *
         FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
@@ -56,4 +49,7 @@ public interface DepartmentMapper {
         WHERE DEPT_CODE = #{deptCode}
     """)
     void deleteDepartment(String deptCode);
+
+    @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
+    void updateDeptLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
 }

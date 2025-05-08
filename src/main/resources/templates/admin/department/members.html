@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>부서 사원 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-10 bg-gray-100">
+
+<!-- 상단 -->
+<div class="mb-6">
+  <h1 class="text-2xl font-bold mb-2 text-gray-800" th:text="'[' + ${deptCode} + ']  ' + ${department.deptName} + ' 사원 관리'"></h1>
+</div>
+
+<!-- 사원 목록 테이블 -->
+<div class="mb-8 bg-white rounded shadow">
+  <table class="min-w-full border-collapse text-sm">
+    <thead class="bg-gray-600 text-white">
+    <tr>
+      <th class="border px-2 py-1">부서장</th>
+      <th class="border px-4 py-2">사원번호</th>
+      <th class="border px-4 py-2">이름</th>
+      <th class="border px-4 py-2">직위</th>
+      <th class="border px-4 py-2">직책</th>
+      <th class="border px-4 py-2">관리</th>
+    </tr>
+    </thead>
+    <tbody class="text-gray-700 text-sm text-center">
+    <tr th:each="member : ${members}">
+      <td class="border px-2 py-1"
+          th:text="${member.empCode == department.deptLeader} ? 'O' : ''"></td> <!-- 부서장 표시 -->
+      <td class="border px-2 py-1" th:text="${member.empCode}"></td>
+      <td class="border px-2 py-1" th:text="${member.empName}"></td>
+      <td class="border px-2 py-1" th:text="${member.positionName}"></td>
+      <td class="border px-2 py-1" th:text="${member.dutyName}"></td>
+      <td class="border px-2 py-1">
+        <div class="flex justify-center space-x-2">
+          <!-- 사원 부서 제외 버튼 -->
+          <form th:action="@{'/admin/department/' + ${department.deptCode} + '/remove'}" method="post"
+                onsubmit="return confirm('정말 이 사원을 부서에서 제외하시겠습니까?');">
+            <input type="hidden" name="empCode" th:value="${member.empCode}"/>
+            <button type="submit"
+                    class="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600 transition">
+              🗑️ 제외
+            </button>
+          </form>
+          <!-- 부서장 등록 버튼 (부서장이 아닌 경우에만 표시) -->
+          <form th:if="${member.empCode != department.deptLeader}"
+                th:action="@{'/admin/department/' + ${department.deptCode} + '/setLeader'}"
+                method="post"
+                onsubmit="return confirm('이 사원을 부서장으로 등록하시겠습니까? 기존 부서장은 교체됩니다.');">
+            <input type="hidden" name="empCode" th:value="${member.empCode}"/>
+            <button type="submit"
+                    class="bg-green-500 text-white text-xs px-2 py-1 rounded hover:bg-green-600 transition">
+              👑 부서장
+            </button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 사원 추가 폼 -->
+<div class="bg-white p-6 rounded shadow">
+  <h2 class="text-lg font-semibold mb-4 text-gray-800">사원 추가</h2>
+  <form th:action="@{'/admin/department/' + ${deptCode} + '/members/add'}" method="post" class="flex gap-4 items-center">
+    <select name="empCode" class="border border-gray-300 rounded px-4 py-2 w-64">
+      <option value="">사원을 선택하세요</option>
+      <option th:each="user : ${availableUsers}" th:value="${user.empCode}" th:text="${user.empName + ' (' + user.empCode + ')'}"></option>
+    </select>
+    <button type="submit"
+            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+      ➕ 추가
+    </button>
+  </form>
+</div>
+
+<!-- 하단 -->
+<div class="flex justify-between items-center mt-8">
+  <a href="/admin/department/list"
+     class="inline-block bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm">
+    ← 부서 목록
+  </a>
+</div>
+</body>
+</html>

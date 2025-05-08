@@ -5,77 +5,89 @@
   <title>부서 수정</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="p-10">
-<h1 class="text-2xl font-bold mb-4">부서 수정</h1>
+<body class="p-10 bg-gray-100">
 
-<form th:action="@{/admin/department/edit}" th:object="${department}" method="post" class="space-y-4">
-  <input type="hidden" name="originalDeptCode" th:value="${originalDeptCode != null ? originalDeptCode : department.deptCode}" />
+<div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+  <h1 class="text-2xl font-bold text-gray-800 mb-4">부서 수정</h1>
 
+  <!-- 에러 메시지 출력 -->
   <div th:if="${errorMessage}" class="bg-red-100 text-red-700 p-4 rounded mb-6">
     <strong>오류: </strong> <span th:text="${errorMessage}"></span>
   </div>
 
-  <!-- 부서코드 -->
-  <div>
-    <label class="block mb-1">부서 코드</label>
-    <input type="text" th:field="*{deptCode}" class="border px-4 py-2 w-full" required/>
-  </div>
+  <form th:action="@{/admin/department/edit}" th:object="${department}" method="post" class="space-y-4">
+    <input type="hidden" name="originalDeptCode" th:value="${originalDeptCode != null ? originalDeptCode : department.deptCode}" />
 
-  <div>
-    <label class="block mb-1">부서명</label>
-    <input type="text" th:field="*{deptName}" class="border px-4 py-2 w-full" placeholder="부서명을 입력하세요">
-  </div>
+    <!-- 부서코드 -->
+    <div>
+      <label for="deptCode" class="block">부서 코드</label>
+      <input type="text" id="deptCode" th:field="*{deptCode}" class="w-full border p-2 rounded" required />
+    </div>
 
-  <div>
-    <label class="block mb-1">부서 카테고리</label>
-    <select th:field="*{deptCategory}" class="border px-4 py-2 w-full">
-      <option value="10" th:selected="${department.deptCategory == 10}">CEO</option>
-      <option value="20" th:selected="${department.deptCategory == 20}">COO</option>
-      <option value="21" th:selected="${department.deptCategory == 21}">위원회</option>
-      <option value="30" th:selected="${department.deptCategory == 30}">본부</option>
-      <option value="40" th:selected="${department.deptCategory == 40}">팀</option>
-      <option value="41" th:selected="${department.deptCategory == 41}">부</option>
-      <option value="50" th:selected="${department.deptCategory == 50}">과</option>
-      <option value="60" th:selected="${department.deptCategory == 60}">그룹</option>
-      <option value="70" th:selected="${department.deptCategory == 70}">파트</option>
-    </select>
-  </div>
+    <!-- 부서명 -->
+    <div>
+      <label for="deptName" class="block">부서명</label>
+      <input type="text" id="deptName" th:field="*{deptName}" class="w-full border p-2 rounded" placeholder="부서명을 입력하세요">
+    </div>
 
-  <div>
-    <label class="block mb-1">상위부서</label>
-    <select th:field="*{parentDept}" class="border px-4 py-2 w-full">
-      <option value="">없음</option>
-      <option th:each="dept : ${departments}"
-              th:value="${dept.deptCode}"
-              th:text="${dept.deptName}"
-              th:selected="${dept.deptCode == department.parentDept}"></option>
-    </select>
-  </div>
+    <!-- 부서 카테고리 -->
+    <div>
+      <label for="deptCategory" class="block">부서 구분</label>
+      <select id="deptCategory" th:field="*{deptCategory}" class="w-full border p-2 rounded">
+        <option value="">-- 선택하세요 --</option>
+        <option value="10" th:selected="${department.deptCategory == 10}">CEO</option>
+        <option value="20" th:selected="${department.deptCategory == 20}">COO</option>
+        <option value="21" th:selected="${department.deptCategory == 21}">위원회</option>
+        <option value="30" th:selected="${department.deptCategory == 30}">본부</option>
+        <option value="40" th:selected="${department.deptCategory == 40}">팀</option>
+        <option value="41" th:selected="${department.deptCategory == 41}">부</option>
+        <option value="50" th:selected="${department.deptCategory == 50}">과</option>
+        <option value="60" th:selected="${department.deptCategory == 60}">그룹</option>
+        <option value="70" th:selected="${department.deptCategory == 70}">파트</option>
+      </select>
+    </div>
 
-  <div>
-    <label class="block mb-1">부서장</label>
-    <input type="text" th:field="*{deptLeader}" class="border px-4 py-2 w-full" placeholder="부서장 사번 입력">
-  </div>
+    <!-- 상위 부서 -->
+    <div>
+      <label for="parentDept" class="block">상위 부서</label>
+      <select id="parentDept" th:field="*{parentDept}" class="w-full border p-2 rounded">
+        <option value="">없음</option>
+        <option th:each="dept : ${departments}" th:value="${dept.deptCode}"
+                th:text="${dept.deptName}" th:selected="${dept.deptCode == department.parentDept}"></option>
+      </select>
+    </div>
 
-  <div>
-    <label class="block mb-1">시작일</label>
-    <input type="date" th:field="*{startDate}" class="border px-4 py-2 w-full">
-  </div>
+    <!-- 시작일 -->
+    <div>
+      <label for="startDate" class="block">시작일</label>
+      <input type="date" id="startDate" th:field="*{startDate}" class="w-full border p-2 rounded">
+    </div>
 
-  <div>
-    <label class="block mb-1">종료일</label>
-    <input type="date" th:field="*{endDate}" class="border px-4 py-2 w-full">
-  </div>
+    <!-- 종료일 -->
+    <div>
+      <label for="endDate" class="block">종료일</label>
+      <input type="date" id="endDate" th:field="*{endDate}" class="w-full border p-2 rounded">
+    </div>
 
-  <div class="flex items-center">
-    <input type="checkbox" th:field="*{useYn}" value="Y" class="mr-2">
-    <label>사용 여부</label>
-  </div>
+    <!-- 사용 여부 -->
+    <div class="flex items-center">
+      <input type="checkbox" th:field="*{useYn}" value="Y" class="mr-2">
+      <label>사용 여부</label>
+    </div>
 
-  <div>
-    <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">수정</button>
-  </div>
-</form>
+    <!-- 수정 버튼 -->
+    <div class="pt-4">
+      <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">수정</button>
+    </div>
+  </form>
+</div>
+
+<!-- 하단 돌아가기 -->
+<div class="flex justify-between items-center mt-8 max-w-xl mx-auto">
+  <a href="/admin/department/list" class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 shadow">
+    ← 돌아가기
+  </a>
+</div>
 
 </body>
 </html>

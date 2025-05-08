@@ -6,12 +6,7 @@ import com.jb.ess.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequestMapping("/admin/department")
@@ -19,57 +14,36 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AdminDepartmentController {
     private final DepartmentService departmentService;
 
-/* ===============================================================================================
-    부서 목록
-=============================================================================================== */
+    /* 부서 목록 */
     @GetMapping("/list")
     public String departmentList(Model model) {
         model.addAttribute("departments", departmentService.getAllDepartments());
         return "admin/department/list";
     }
 
-/* ===============================================================================================
-    부서 등록(추가)
-=============================================================================================== */
+    /* 부서 등록 폼 */
     @GetMapping("/add")
     public String addDepartmentForm(Model model) {
         model.addAttribute("departments", departmentService.getAllDepartments());
         return "admin/department/add";
     }
 
+    /* 부서 등록 */
     @PostMapping("/add")
     public String addDepartment(@ModelAttribute Department department, Model model) {
-        if (department.getDeptName() == null) department.setDeptName("");
-        if (department.getParentDept() == null) department.setParentDept("");
-        if (department.getDeptLeader() == null) department.setDeptLeader("");
-        if (department.getUseYn() == null) department.setUseYn("N");
-        if (department.getStartDate() == null) department.setStartDate("");
-        if (department.getEndDate() == null || department.getEndDate().isBlank()) {
-            department.setEndDate("99991231");
-        }
+        sanitizeDepartment(department);
 
-        // 시작일, 종료일 하이픈 제거
-        if (department.getStartDate() != null && !department.getStartDate().isBlank()) {
-            department.setStartDate(department.getStartDate().replace("-", ""));
-        }
-        if (department.getEndDate() == null || department.getEndDate().isBlank()) {
-            department.setEndDate("99991231");
-        } else {
-            department.setEndDate(department.getEndDate().replace("-", ""));
-        }
-
-        try { // 부서코드 중복체크
+        try {
             departmentService.saveDepartment(department);
             return "redirect:/admin/department/list";
         } catch (IllegalArgumentException e) {
             model.addAttribute("errorMessage", e.getMessage());
+            model.addAttribute("departments", departmentService.getAllDepartments());
             return "admin/department/add";
         }
     }
 
-/* ===============================================================================================
-    부서 수정
-=============================================================================================== */
+    /* 부서 수정 폼 */
     @GetMapping("/edit/{deptCode}")
     public String editDepartmentForm(@PathVariable String deptCode, Model model) {
         Department department = departmentService.getDepartmentByDeptCode(deptCode);
@@ -77,57 +51,62 @@ public class AdminDepartmentController {
         department.setEndDate(DateUtil.formatDate(department.getEndDate()));
         model.addAttribute("department", department);
         model.addAttribute("departments", departmentService.getAllDepartments());
+        model.addAttribute("originalDeptCode", deptCode);
         return "admin/department/edit";
     }
 
+    /* 부서 수정 */
     @PostMapping("/edit")
     public String editDepartment(@ModelAttribute Department department,
-                                @RequestParam("originalDeptCode") String originalDeptCode,
-                                Model model) {
+        @RequestParam("originalDeptCode") String originalDeptCode,
+        Model model) {
 
-        // 부서코드가 변경되었는지 확인
-        if (!originalDeptCode.equals(department.getDeptCode())) {
-            if (departmentService.existsByDeptCode(department.getDeptCode())) {
-                model.addAttribute("errorMessage", "이미 존재하는 부서코드입니다.");
-                model.addAttribute("department", department);
-                model.addAttribute("departments", departmentService.getAllDepartments());
-                model.addAttribute("originalDeptCode", originalDeptCode); // 이거 필수!
-                return "admin/department/edit";
-            }
+        if (!originalDeptCode.equals(department.getDeptCode()) &&
+            departmentService.existsByDeptCode(department.getDeptCode())) {
+            model.addAttribute("errorMessage", "이미 존재하는 부서코드입니다.");
+            model.addAttribute("department", department);
+            model.addAttribute("departments", departmentService.getAllDepartments());
+            model.addAttribute("originalDeptCode", originalDeptCode);
+            return "admin/department/edit";
         }
 
-        if (department.getParentDept() == null) department.setParentDept("");
-        if (department.getDeptLeader() == null) department.setDeptLeader("");
-        if (department.getStartDate() == null) department.setStartDate("");
-        if (department.getUseYn() == null) department.setUseYn("N");
-        if (department.getEndDate() == null || department.getEndDate().isBlank()) {
-            department.setEndDate("99991231"); // 종료일 없으면 99991231
-        }
-
-        // 시작일, 종료일 하이픈 제거
-        if (department.getStartDate() != null && !department.getStartDate().isBlank()) {
-            department.setStartDate(department.getStartDate().replace("-", ""));
-        }
-        if (department.getEndDate() == null || department.getEndDate().isBlank()) {
-            department.setEndDate("99991231");
-        } else {
-            department.setEndDate(department.getEndDate().replace("-", ""));
-        }
+        sanitizeDepartment(department);
         departmentService.updateDepartment(department);
         return "redirect:/admin/department/list";
     }
 
-/* ===============================================================================================
-    부서 삭제
-=============================================================================================== */
+    /* 부서 삭제 */
     @PostMapping("/delete/{deptCode}")
     public String deleteDepartment(@PathVariable String deptCode) {
         try {
-            departmentService.deleteDepartment(deptCode); // 부서 삭제
-            return "redirect:/admin/department"; // 부서 목록 페이지로 리다이렉트
+            departmentService.deleteDepartment(deptCode);
+            return "redirect:/admin/department";
         } catch (Exception e) {
-            // 오류 처리 로직, 예: 부서 삭제 실패
             return "redirect:/admin/department?error=true";
         }
+    }
+
+    /* 공통 처리 메서드 */
+    private void sanitizeDepartment(Department department) {
+        department.setDeptName(defaultIfNull(department.getDeptName()));
+        department.setParentDept(defaultIfNull(department.getParentDept()));
+        department.setDeptLeader(defaultIfNull(department.getDeptLeader()));
+        department.setUseYn(department.getUseYn() == null ? "N" : department.getUseYn());
+
+        String start = defaultIfNull(department.getStartDate()).replace("-", "");
+        String end = defaultIfNull(department.getEndDate(), "99991231").replace("-", "");
+
+        department.setStartDate(start);
+        department.setEndDate(end);
+    }
+
+    /* 시작일 */
+    private String defaultIfNull(String value) {
+        return value == null ? "" : value;
+    }
+
+    /* 종료일 */
+    private String defaultIfNull(String value, String defaultValue) {
+        return (value == null || value.isBlank()) ? defaultValue : value;
     }
 }

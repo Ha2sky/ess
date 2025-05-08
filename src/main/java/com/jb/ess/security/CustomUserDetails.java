@@ -1,6 +1,6 @@
 package com.jb.ess.security;
 
-import com.jb.ess.domain.User;
+import com.jb.ess.domain.Employee;
 import java.util.Collection;
 import java.util.Collections;
 import org.springframework.security.core.GrantedAuthority;
@@ -8,25 +8,25 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 public class CustomUserDetails implements UserDetails {
-    private final User user;
+    private final Employee employee;
 
-    public CustomUserDetails(User user){
-        this.user = user;
+    public CustomUserDetails(Employee employee){
+        this.employee = employee;
     }
 
         @Override
         public String getUsername(){
-            return user.getEmpCode();
+            return employee.getEmpCode();
         }
 
         @Override
         public String getPassword(){
-            return user.getPassword();
+            return employee.getPassword();
         }
 
         @Override
         public Collection<? extends GrantedAuthority> getAuthorities() {
-            String role = user.getEmpState().equalsIgnoreCase("SYS") ? "ROLE_ADMIN" : "ROLE_USER";
+            String role = employee.getEmpState().equalsIgnoreCase("SYS") ? "ROLE_ADMIN" : "ROLE_USER";
         return Collections.singleton(new SimpleGrantedAuthority(role));
     }
 }
