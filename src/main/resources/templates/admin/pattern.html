@@ -1,10 +1,108 @@
+<!-- 사용 테이블: HRTSHIFTMASTER, HRTSHIFTPATTERNDTL, HRTTIMEITEM -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Title</title>
+  <title>근태 패턴 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<h2>Pattern</h2>
+<body class="bg-blue-700 min-h-screen p-8">
+<div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">근태 패턴 관리</h1>
+
+  <!-- 검색/필터 영역 -->
+  <div class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="col-span-2">
+      <label class="block text-sm font-medium text-gray-700 mb-2">조회기간</label>
+      <div class="flex items-center gap-2">
+        <input type="date" name="startDate" th:value="${startDate}" class="flex-1 p-2 border rounded-lg">
+        <span>~</span>
+        <input type="date" name="endDate" th:value="${endDate}" class="flex-1 p-2 border rounded-lg">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">근태패턴명</label>
+      <input type="text" name="shiftName" class="w-full p-2 border rounded-lg">
+    </div>
+  </div>
+
+  <!-- 패턴 등록 폼 (HRTSHIFTMASTER) -->
+  <form th:action="@{/admin/pattern}" method="post" class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">패턴 코드</label>
+        <input type="text" name="shiftCode" class="w-full p-2 border rounded-lg" required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">패턴 이름</label>
+        <input type="text" name="shiftName" class="w-full p-2 border rounded-lg" required>
+      </div>
+      <div class="flex items-end pb-2">
+        <label class="flex items-center">
+          <input type="checkbox" name="useYn" value="1" checked class="mr-2">
+          <span>사용여부</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 시간 설정 (HRTSHIFTMASTER.WORK_ON_HHMM/WORK_OFF_HHMM) -->
+    <div class="bg-gray-50 p-4 rounded-lg space-y-4">
+      <div class="flex items-center gap-4">
+        <span class="w-24">출근 시간</span>
+        <input type="time" name="workOnHhmm" class="p-2 border rounded-lg" required>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="w-24">퇴근 시간</span>
+        <input type="time" name="workOffHhmm" class="p-2 border rounded-lg" required>
+      </div>
+    </div>
+
+    <button type="submit" class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition">
+      패턴 저장
+    </button>
+  </form>
+
+  <!-- 패턴별 달력 UI (HRTSHIFTPATTERNDTL, HRTTIMEITEM) -->
+  <div class="mt-8">
+    <h3 class="text-lg font-semibold mb-4">패턴 일자별 근태코드 설정</h3>
+    <div class="mb-4">
+      <select id="patternSelect" class="w-full p-2 border rounded-lg" onchange="loadPatternCalendar(this.value)">
+        <option value="">패턴을 선택하세요</option>
+        <option th:each="shift : ${shiftMasters}"
+                th:value="${shift.shiftCode}"
+                th:text="${shift.shiftName}"></option>
+      </select>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full border-collapse">
+        <thead>
+        <tr class="bg-gray-100">
+          <th class="border p-2 w-32">근태패턴명</th>
+          <th th:each="day : ${#numbers.sequence(1, 31)}" class="border p-2 w-16">
+            <div th:text="${day + '일'}" class="text-center"></div>
+            <div th:text="${#dates.format(#dates.create(2025, 5, day), 'E')}" class="text-xs text-gray-500 text-center"></div>
+          </th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${patternRows}">
+          <td class="border p-2 font-medium" th:text="${row.shiftName}"></td>
+          <td th:each="day : ${#numbers.sequence(1, 31)}" class="border p-1 text-center">
+            <select class="w-full p-1 text-sm rounded border bg-transparent"
+                    th:id="${'code-' + row.shiftCode + '-' + day}"
+                    onchange="updatePatternCode(this)">
+              <option value="">-</option>
+              <option th:each="time : ${timeItems}"
+                      th:value="${time.timeItemCode}"
+                      th:text="${time.timeItemName}"
+                      th:selected="${row.codes[day-1] == time.timeItemCode}"></option>
+            </select>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 </body>
 </html>

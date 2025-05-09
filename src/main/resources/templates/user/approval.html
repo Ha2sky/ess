@@ -1,10 +1,68 @@
+<!-- 사용 테이블: HRTAPRHIST, HRTATTAPL, HRIMASTER -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Title</title>
+  <title>근태 승인 관리</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<h2>approval</h2>
+<body class="bg-blue-700 min-h-screen p-8">
+<div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">근태 승인 관리</h1>
+
+  <!-- 검색 필터 -->
+  <form th:action="@{/approval/list}" method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-4 gap-4">
+    <div class="col-span-2">
+      <label class="block text-sm font-medium text-gray-700">대상일자</label>
+      <div class="flex items-center gap-2">
+        <input type="date" name="startDate" th:value="${startDate}" class="w-full p-2 border rounded-lg">
+        <span>~</span>
+        <input type="date" name="endDate" th:value="${endDate}" class="w-full p-2 border rounded-lg">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">근태유형</label>
+      <select name="applyType" class="w-full p-2 border rounded-lg">
+        <option value="연장">연장근로</option>
+        <option value="휴일">휴일근로</option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+        조회
+      </button>
+    </div>
+  </form>
+
+  <!-- 결재 목록 테이블 (HRTAPRHIST, HRTATTAPL, HRIMASTER) -->
+  <div class="overflow-x-auto rounded-lg border mb-6">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-600 text-white">
+      <tr>
+        <th class="w-12 p-3"><input type="checkbox"></th>
+        <th class="p-3">결재번호</th>
+        <th class="p-3">신청자</th>
+        <th class="p-3">근태유형</th>
+        <th class="p-3">대상일</th>
+        <th class="p-3">상태</th>
+      </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+      <tr th:each="hist : ${approvalList}" class="hover:bg-gray-50">
+        <td class="p-3 text-center"><input type="checkbox" th:value="${hist.histNo}"></td>
+        <td class="p-3 text-center" th:text="${hist.histNo}"></td>
+        <td class="p-3 text-center" th:text="${hist.empName}"></td>
+        <td class="p-3 text-center" th:text="${hist.applyType}"></td>
+        <td class="p-3 text-center" th:text="${#dates.format(hist.targetDate, 'yyyy-MM-dd')}"></td>
+        <td class="p-3 text-center">
+            <span th:class="${hist.approvalStatus == '승인'} ? 'bg-green-100 text-green-800' :
+                           ${hist.approvalStatus == '반려'} ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'"
+                  class="px-2 py-1 rounded-full" th:text="${hist.approvalStatus}"></span>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </body>
 </html>

@@ -1,10 +1,70 @@
+<!-- 사용 테이블: HRTATTAPL, HRTAPRHIST -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Title</title>
+  <title>근태 신청 이력</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<h2>history</h2>
+<body class="bg-blue-700 min-h-screen p-8">
+<div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">근태 신청 이력</h1>
+
+  <!-- 검색 필터 -->
+  <form th:action="@{/user/history}" method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-4 gap-4">
+    <div class="col-span-2">
+      <label class="block text-sm font-medium text-gray-700">대상일자</label>
+      <div class="flex items-center gap-2">
+        <input type="date" name="startDate"
+               th:value="${startDate}"
+               class="w-full p-2 border rounded-lg">
+        <span>~</span>
+        <input type="date" name="endDate"
+               th:value="${endDate}"
+               class="w-full p-2 border rounded-lg">
+      </div>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700">상태</label>
+      <select name="status" class="w-full p-2 border rounded-lg">
+        <option value="">전체</option>
+        <option th:each="status : ${statusOptions}" th:value="${status}" th:text="${status}"></option>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+        조회
+      </button>
+    </div>
+  </form>
+
+  <!-- 이력 테이블 (HRTATTAPL, HRTAPRHIST) -->
+  <div class="overflow-x-auto rounded-lg border mb-6">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-600 text-white">
+      <tr>
+        <th class="px-4 py-3">신청일</th>
+        <th class="px-4 py-3">근태유형</th>
+        <th class="px-4 py-3">대상일</th>
+        <th class="px-4 py-3">상태</th>
+      </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+      <tr th:each="item : ${history}" class="hover:bg-gray-50">
+        <td class="px-4 py-2 text-center"
+            th:text="${#dates.format(#dates.parse(item.applyDate, 'yyyyMMdd'), 'yyyy-MM-dd')}"></td>
+        <td class="px-4 py-2 text-center" th:text="${item.applyType}"></td>
+        <td class="px-4 py-2 text-center"
+            th:text="${#dates.format(#dates.parse(item.targetDate, 'yyyyMMdd'), 'yyyy-MM-dd')}"></td>
+        <td class="px-4 py-2 text-center">
+            <span th:class="${item.status == '승인'} ? 'bg-green-100 text-green-800' :
+                           ${item.status == '반려'} ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'"
+                  class="px-2 py-1 rounded-full" th:text="${item.status}"></span>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 </body>
 </html>
