@@ -20,6 +20,7 @@
       <th class="px-4 py-3 border">부서명</th>
       <th class="px-4 py-3 border">사용여부</th>
       <th class="px-4 py-3 border">부서장</th>
+      <th class="px-4 py-3 border">인원</th>
       <th class="px-4 py-3 border">시작일</th>
       <th class="px-4 py-3 border">종료일</th>
       <th class="px-4 py-3 border">관리</th>
@@ -35,6 +36,7 @@
       <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
       <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
       <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
+      <td class="border px-4 py-2" th:text="${dept.empCount} + 명"></td>
       <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.startDate)}|"></td>
       <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.endDate)}|"></td>
       <td class="border px-4 py-2 space-x-2">

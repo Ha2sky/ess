@@ -41,7 +41,7 @@ public class AdminDeptMemberController {
     @PostMapping("/{deptCode}/members/remove")
     public String removeEmployeeFromDepartment(@PathVariable String deptCode,
                                                @RequestParam("empCode") String empCode) {
-        employeeService.removeEmployeeFromDepartment(empCode);
+        employeeService.removeEmployeeFromDepartment(empCode, deptCode);
         return "redirect:/admin/department/" + deptCode + "/members";
     }
 

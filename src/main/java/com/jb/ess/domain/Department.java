@@ -12,4 +12,6 @@ public class Department {
     private String startDate;   // 시작일자
     private String endDate;     // 종료일자
     private String useYn;       // 사용여부
+
+    private int empCount;
 }

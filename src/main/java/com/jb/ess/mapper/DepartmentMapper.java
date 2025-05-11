@@ -12,9 +12,28 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface DepartmentMapper {
     @Select("""
-        SELECT *
-        FROM ORGDEPTMASTER
-        ORDER BY DEPT_CODE
+        SELECT
+            d.DEPT_CODE,
+            d.DEPT_NAME,
+            d.DEPT_CATEGORY,
+            d.PARENT_DEPT,
+            d.USE_YN,
+            d.START_DATE,
+            d.END_DATE,
+            d.DEPT_LEADER,
+            COUNT(e.EMP_CODE) AS EMP_COUNT
+        FROM ORGDEPTMASTER d
+        LEFT JOIN HRIMASTER e ON d.DEPT_CODE = e.DEPT_CODE
+        GROUP BY
+            d.DEPT_CODE,
+            d.DEPT_NAME,
+            d.DEPT_CATEGORY,
+            d.PARENT_DEPT,
+            d.USE_YN,
+            d.START_DATE,
+            d.END_DATE,
+            d.DEPT_LEADER
+        ORDER BY d.DEPT_CODE
     """)
     List<Department> findAll();
 
@@ -52,4 +71,12 @@ public interface DepartmentMapper {
 
     @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
     void updateDeptLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
+
+    // 현재 부서장의 사번 조회
+    @Select("SELECT DEPT_LEADER FROM ORGDEPTMASTER WHERE DEPT_CODE = #{deptCode}")
+    String findDepartmentLeader(String deptCode);
+
+    // 부서장의 사번 업데이트 (null로 설정해 해제)
+    @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
+    void updateDepartmentLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
 }
