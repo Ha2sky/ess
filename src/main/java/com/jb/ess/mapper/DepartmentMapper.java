@@ -35,6 +35,7 @@ public interface DepartmentMapper {
             d.DEPT_LEADER
         ORDER BY d.DEPT_CODE
     """)
+    // 부서 리스트
     List<Department> findAll();
 
     @Insert("""
@@ -43,6 +44,7 @@ public interface DepartmentMapper {
         VALUES (#{deptCode}, #{deptName}, #{parentDept}, #{deptLeader},
                 #{deptCategory}, #{startDate}, #{endDate}, #{useYn})
     """)
+    // 부서 생성
     void insertDepartment(Department department);
 
     @Update("""
@@ -51,6 +53,7 @@ public interface DepartmentMapper {
             START_DATE = #{startDate}, END_DATE = #{endDate}, USE_YN = #{useYn}, DEPT_CATEGORY = #{deptCategory}
         WHERE DEPT_CODE = #{deptCode}
     """)
+    // 부서 수정
     void updateDepartment(Department department);
 
     @Select("""
@@ -58,18 +61,22 @@ public interface DepartmentMapper {
         FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
+    // 부서 코드로 부서 찾기
     Department findByDeptCode(String deptCode);
 
     @Select("SELECT COUNT(*) FROM ORGDEPTMASTER WHERE DEPT_CODE = #{deptCode}")
+    // 부서에 소속된 인원수
     int countByDeptCode(String deptCode);
 
     @Delete("""
         DELETE FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
+    // 부서 삭제
     void deleteDepartment(String deptCode);
 
     @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
+    // 부서장 변경
     void updateDeptLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
 
     // 현재 부서장의 사번 조회
