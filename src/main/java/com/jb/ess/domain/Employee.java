@@ -1,9 +1,14 @@
 package com.jb.ess.domain;
 
+import java.io.Serial;
+import java.io.Serializable;
 import lombok.Data;
 
 @Data
-public class Employee {
+public class Employee implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     private String empCode;         // 사원번호
     private String password;        // 비밀번호
     private String empName;         // 이름

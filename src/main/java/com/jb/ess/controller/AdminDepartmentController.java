@@ -12,20 +12,25 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/admin/department")
 @RequiredArgsConstructor
 public class AdminDepartmentController {
+
+    private static final String REDIRECT_LIST = "redirect:/admin/department/list";
+    private static final String VIEW_ADD = "admin/department/add";
+    private static final String VIEW_EDIT = "admin/department/edit";
+
     private final DepartmentService departmentService;
 
     /* 부서 목록 */
     @GetMapping("/list")
     public String departmentList(Model model) {
-        model.addAttribute("departments", departmentService.getAllDepartments());
+        departmentsList(model);
         return "admin/department/list";
     }
 
     /* 부서 등록 폼 */
     @GetMapping("/add")
     public String addDepartmentForm(Model model) {
-        model.addAttribute("departments", departmentService.getAllDepartments());
-        return "admin/department/add";
+        departmentsList(model);
+        return VIEW_ADD;
     }
 
     /* 부서 등록 */
@@ -35,11 +40,11 @@ public class AdminDepartmentController {
 
         try {
             departmentService.saveDepartment(department);
-            return "redirect:/admin/department/list";
+            return REDIRECT_LIST;
         } catch (IllegalArgumentException e) {
             model.addAttribute("errorMessage", e.getMessage());
-            model.addAttribute("departments", departmentService.getAllDepartments());
-            return "admin/department/add";
+            departmentsList(model);
+            return VIEW_ADD;
         }
     }
 
@@ -50,9 +55,9 @@ public class AdminDepartmentController {
         department.setStartDate(DateUtil.formatDate(department.getStartDate()));
         department.setEndDate(DateUtil.formatDate(department.getEndDate()));
         model.addAttribute("department", department);
-        model.addAttribute("departments", departmentService.getAllDepartments());
+        departmentsList(model);
         model.addAttribute("originalDeptCode", deptCode);
-        return "admin/department/edit";
+        return VIEW_EDIT;
     }
 
     /* 부서 수정 */
@@ -65,14 +70,14 @@ public class AdminDepartmentController {
             departmentService.existsByDeptCode(department.getDeptCode())) {
             model.addAttribute("errorMessage", "이미 존재하는 부서코드입니다.");
             model.addAttribute("department", department);
-            model.addAttribute("departments", departmentService.getAllDepartments());
+            departmentsList(model);
             model.addAttribute("originalDeptCode", originalDeptCode);
-            return "admin/department/edit";
+            return VIEW_EDIT;
         }
 
         sanitizeDepartment(department);
         departmentService.updateDepartment(department);
-        return "redirect:/admin/department/list";
+        return REDIRECT_LIST;
     }
 
     /* 부서 삭제 */
@@ -108,5 +113,9 @@ public class AdminDepartmentController {
     /* 종료일 */
     private String defaultIfNull(String value, String defaultValue) {
         return (value == null || value.isBlank()) ? defaultValue : value;
+    }
+
+    private void departmentsList(Model model) {
+        model.addAttribute("departments", departmentService.getAllDepartments());
     }
 }

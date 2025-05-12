@@ -20,6 +20,11 @@ public class AdminDeptMemberController {
     private final DepartmentService departmentService;
     private final DepartmentMapper departmentMapper;
 
+    // 공통된 리다이렉트 URL 생성 메소드
+    private String redirectToDeptMembers(String deptCode) {
+        return "redirect:/admin/department/" + deptCode + "/members";
+    }
+
     /* 부서별 사원 목록 페이지 */
     @GetMapping("/{deptCode}/members")
     public String viewDepartmentMembers(@PathVariable String deptCode, Model model) {
@@ -34,7 +39,7 @@ public class AdminDeptMemberController {
     public String addEmployeeToDepartment(@PathVariable String deptCode,
                                           @RequestParam("empCode") String empCode) {
         employeeService.assignEmployeeToDepartment(empCode, deptCode);
-        return "redirect:/admin/department/" + deptCode + "/members";
+        return redirectToDeptMembers(deptCode);
     }
 
     /* 부서에서 사원 제거 */
@@ -42,7 +47,7 @@ public class AdminDeptMemberController {
     public String removeEmployeeFromDepartment(@PathVariable String deptCode,
                                                @RequestParam("empCode") String empCode) {
         employeeService.removeEmployeeFromDepartment(empCode, deptCode);
-        return "redirect:/admin/department/" + deptCode + "/members";
+        return redirectToDeptMembers(deptCode);
     }
 
     /* 부서장 등록 */
@@ -50,6 +55,6 @@ public class AdminDeptMemberController {
     public String setDepartmentLeader(@PathVariable String deptCode,
                                       @RequestParam String empCode) {
         departmentMapper.updateDeptLeader(deptCode, empCode);
-        return "redirect:/admin/department/" + deptCode + "/members";
+        return redirectToDeptMembers(deptCode);
     }
 }

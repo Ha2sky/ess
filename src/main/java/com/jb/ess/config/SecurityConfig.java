@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -20,11 +19,10 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    @Autowired
     private CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
-
     private final CustomUserDetailsService userDetailsService;
 
+    @Autowired
     public SecurityConfig(CustomUserDetailsService userDetailsService) {
         this.userDetailsService = userDetailsService;
     }

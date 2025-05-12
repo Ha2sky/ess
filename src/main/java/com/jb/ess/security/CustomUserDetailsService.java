@@ -10,17 +10,18 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
+    private final EmployeeMapper employeeMapper;
+
     @Autowired
-    private EmployeeMapper employeeMapper;
+    public CustomUserDetailsService(EmployeeMapper employeeMapper) {
+        this.employeeMapper = employeeMapper;
+    }
 
     @Override
     public UserDetails loadUserByUsername(String empCode) throws UsernameNotFoundException {
-        System.out.println("로그인 시도: " + empCode);
         Employee employee = employeeMapper.findByEmployeeName(empCode);
 
-        if (employee == null) {
-            throw new UsernameNotFoundException("User not found");
-        } else System.out.println("DB에서 찾은 사용자: " + empCode);
+        if (employee == null) {throw new UsernameNotFoundException("User not found");}
 
         return new CustomUserDetails(employee);
     }

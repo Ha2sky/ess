@@ -25,23 +25,23 @@
   <div id="general-section" class="tab-content">
     <form th:action="@{/attendance/general}" method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-4 gap-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700">근태 유형</label>
+        <label class="block text-sm font-medium text-gray-700">근태 유형
         <select name="applyType" class="w-full p-2 border rounded-lg" required>
           <option value="연장" selected>연장근로</option>
           <option value="휴일">휴일근로</option>
-        </select>
+        </select></label>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700">근무일</label>
+        <label class="block text-sm font-medium text-gray-700">근무일
         <input type="date" name="targetDate"
                th:value="${targetDate}"
-               class="w-full p-2 border rounded-lg">
+               class="w-full p-2 border rounded-lg"></label>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700">부서</label>
+        <label class="block text-sm font-medium text-gray-700">부서
         <select name="deptCode" class="w-full p-2 border rounded-lg">
           <option th:value="${user.deptCode}" th:text="${user.deptName}" selected></option>
-        </select>
+        </select></label>
       </div>
       <div>
         <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
@@ -88,24 +88,24 @@
   <div id="other-section" class="tab-content hidden">
     <form th:action="@{/attendance/other}" method="get" class="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-4 gap-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700">근무일</label>
+        <label class="block text-sm font-medium text-gray-700">근무일
         <input type="date" name="targetDate"
                th:value="${targetDate}"
-               class="w-full p-2 border rounded-lg">
+               class="w-full p-2 border rounded-lg"></label>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700">부서</label>
+        <label class="block text-sm font-medium text-gray-700">부서
         <select name="deptCode" class="w-full p-2 border rounded-lg">
           <option th:value="${user.deptCode}" th:text="${user.deptName}" selected></option>
-        </select>
+        </select></label>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700">근무계획</label>
+        <label class="block text-sm font-medium text-gray-700">근무계획
         <select name="shiftCode" class="w-full p-2 border rounded-lg">
           <option th:each="shift : ${shiftMasters}"
                   th:value="${shift.shiftCode}"
                   th:text="${shift.shiftName}"></option>
-        </select>
+        </select></label>
       </div>
       <div>
         <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
