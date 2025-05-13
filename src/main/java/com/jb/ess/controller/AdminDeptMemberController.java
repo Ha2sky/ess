@@ -1,6 +1,5 @@
 package com.jb.ess.controller;
 
-import com.jb.ess.mapper.DepartmentMapper;
 import com.jb.ess.service.DepartmentService;
 import com.jb.ess.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AdminDeptMemberController {
     private final EmployeeService employeeService;
     private final DepartmentService departmentService;
-    private final DepartmentMapper departmentMapper;
 
     // 공통된 리다이렉트 URL 생성 메소드
     private String redirectToDeptMembers(String deptCode) {
@@ -54,7 +52,7 @@ public class AdminDeptMemberController {
     @PostMapping("/{deptCode}/setLeader")
     public String setDepartmentLeader(@PathVariable String deptCode,
                                       @RequestParam String empCode) {
-        departmentMapper.updateDeptLeader(deptCode, empCode);
+        employeeService.assignHeader(empCode, deptCode);
         return redirectToDeptMembers(deptCode);
     }
 }

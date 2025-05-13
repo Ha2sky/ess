@@ -30,6 +30,11 @@ public class EmployeeService {
         employeeMapper.updateEmployeeDepartment(empCode, deptCode);
     }
 
+    public void assignHeader(String empCode, String deptCode) {
+        employeeMapper.updateIsHeader(empCode);
+        departmentMapper.updateDeptLeader(deptCode, empCode);
+    }
+
     /* 기존 사원을 부서에서 제거 (삭제 = 부서코드를 NULL 처리) */
     @Transactional
     public void removeEmployeeFromDepartment(String empCode, String deptCode) {
@@ -39,6 +44,7 @@ public class EmployeeService {
         if (empCode.equals(currentLeader)) {
             // 2. 부서장일 경우, 부서장 해제 (null 처리)
             departmentMapper.updateDepartmentLeader(deptCode, null);
+            employeeMapper.updateNotHeader(empCode);
         }
 
         // 3. 사원의 부서코드 null 처리 (부서 제외)
@@ -48,5 +54,10 @@ public class EmployeeService {
     /* 부서에 소속되지 않은 모든 사원 조회 (선택 리스트용) */
     public List<Employee> getEmployeesWithoutDepartment() {
         return employeeMapper.findEmployeesWithoutDepartment();
+    }
+
+    /* 부서장 권한 확인 */
+    public Employee findIsHeader(String empCode) {
+        return employeeMapper.findIsHeader(empCode);
     }
 }

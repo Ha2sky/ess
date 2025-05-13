@@ -55,4 +55,28 @@ public interface EmployeeMapper {
         ORDER BY u.EMP_CODE
     """)
     List<Employee> findEmployeesWithoutDepartment();
+
+    /* 부서장 권한 부여 */
+    @Update("""
+        UPDATE HRIMASTER
+        SET IS_HEADER = 'Y'
+        WHERE EMP_CODE = #{empCode}
+    """)
+    void updateIsHeader(@Param("empCode") String empCode);
+
+    /* 부서장 권한 삭제 */
+    @Update("""
+        UPDATE HRIMASTER
+        SET IS_HEADER = 'N'
+        WHERE EMP_CODE = #{empCode}
+    """)
+    void updateNotHeader(@Param("empCode") String empCode);
+
+    /* 부서장 권한 확인 */
+    @Select("""
+        SELECT IS_HEADER
+        FROM HRIMASTER
+        WHERE EMP_CODE = #{empCode}
+    """)
+    Employee findIsHeader(@Param("empCode") String empCode);
 }

@@ -26,4 +26,5 @@ public class Employee implements Serializable {
 
     private String positionName;  // 직위명
     private String dutyName;      // 직책명
+    private String isHeader;
 }
