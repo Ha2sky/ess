@@ -53,6 +53,7 @@ public class PatternService {
         };
     }
 
+    /* 각 근태코드에 색상 부여 */
     public Map<String, String> generateShiftCodeColors(List<ShiftMaster> shiftCodes) {
         String[] colors = {
             "bg-red-200", "bg-green-200", "bg-blue-200", "bg-yellow-200",
@@ -67,5 +68,11 @@ public class PatternService {
             i++;
         }
         return colorMap;
+    }
+
+    /* 근태패턴 저장 */
+    public void savePattern(PatternDetail pattern) {
+        // 유효성 검사, 중복 확인 등 필요한 로직이 있다면 여기서 처리
+        patternMapper.insertShiftPattern(pattern);
     }
 }
