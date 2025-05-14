@@ -15,6 +15,6 @@ public class AdminMainController {
 
     @GetMapping("/pattern")
     public String patternPage() {
-        return "admin/pattern";
+        return "redirect:/admin/pattern/list";
     }
 }
