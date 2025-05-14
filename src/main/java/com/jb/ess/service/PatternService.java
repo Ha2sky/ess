@@ -19,8 +19,9 @@ import org.springframework.stereotype.Service;
 public class PatternService {
     private final PatternMapper patternMapper;
 
-    public List<Map<String, Object>> getPatternCalendar(YearMonth month) {
-        List<PatternDetail> patterns = patternMapper.findAllPatterns();
+    /* 근태패턴명으로 근태패턴 검색 */
+    public List<Map<String, Object>> getPatternCalendar(YearMonth month, String patternName) {
+        List<PatternDetail> patterns = patternMapper.findPatternsByName(patternName);
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (PatternDetail pattern : patterns) {
@@ -32,7 +33,7 @@ public class PatternService {
                 LocalDate date = month.atDay(day);
                 DayOfWeek dow = date.getDayOfWeek();
                 String shiftCode = getShiftCodeByDayOfWeek(pattern, dow);
-                row.put(String.valueOf(day), shiftCode); // "1", "2", ..., "30"
+                row.put(String.valueOf(day), shiftCode);
             }
 
             result.add(row);

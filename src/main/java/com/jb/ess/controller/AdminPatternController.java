@@ -27,13 +27,13 @@ public class AdminPatternController {
     /* 근태패턴 테이블 */
     @GetMapping("/list")
     public String showAllPatterns(@RequestParam(value = "month", required = false) String monthStr,
-        Model model) {
-
+                                  @RequestParam(value = "patternName", required = false) String patternName,
+                                  Model model) {
         YearMonth selectedMonth = (monthStr != null) ? YearMonth.parse(monthStr) : YearMonth.now();
 
         int daysInMonth = selectedMonth.lengthOfMonth();
         List<String> dateHeaders = DateUtil.getDateHeaders(selectedMonth);
-        List<Map<String, Object>> patternTable = patternService.getPatternCalendar(selectedMonth);
+        List<Map<String, Object>> patternTable = patternService.getPatternCalendar(selectedMonth, patternName);
         List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes();
         Map<String, String> colorMap = patternService.generateShiftCodeColors(shiftCodes);
 
@@ -43,6 +43,7 @@ public class AdminPatternController {
         model.addAttribute("shiftCodeList", shiftCodes);
         model.addAttribute("shiftColorMap", colorMap);
         model.addAttribute("dateHeaders", dateHeaders);
+        model.addAttribute("patternName", patternName);
 
         return "admin/pattern/list";
     }

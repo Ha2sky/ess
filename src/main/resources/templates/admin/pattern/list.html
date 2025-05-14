@@ -13,14 +13,20 @@
   <form method="get" th:action="@{/admin/pattern/list}" class="flex gap-4 items-end mb-6">
     <input type="month" name="month" th:value="${selectedMonth}" class="border px-3 py-2 rounded h-10">
 
+    <!-- 근태패턴명으로 검색 -->
+    <input type="text" name="patternName" th:value="${patternName}"
+           placeholder="근태패턴명 검색"
+           class="border px-3 py-2 rounded h-10 w-52">
+
     <button type="submit"
             class="bg-blue-600 text-white px-4 h-10 rounded hover:bg-blue-700">
       조회
     </button>
 
+    <!-- 근태패턴 생성 -->
     <a href="/admin/pattern/create"
        class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 h-10 rounded flex items-center">
-      + 근태패턴 추가
+      + 근태패턴 생성
     </a>
   </form>
 
@@ -55,9 +61,9 @@
       <hr>
       <ul>
         <li th:each="code : ${shiftCodeList}" class="flex items-center mb-1">
-                <span class="w-4 h-4 rounded-full inline-block mr-2"
-                      th:classappend="${shiftColorMap[code.shiftCode]}"></span>
-          <span th:text="${code.shiftCode} + ' - ' + ${code.shiftName}"></span>
+          <span class="w-4 h-4 rounded-full inline-block mr-2"
+                th:classappend="${shiftColorMap[code.shiftCode]}"></span>
+          <span th:text="${code.shiftCode + ' - ' + code.shiftName}"></span>
         </li>
       </ul>
     </div>

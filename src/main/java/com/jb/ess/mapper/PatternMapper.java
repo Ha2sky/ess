@@ -4,6 +4,7 @@ import com.jb.ess.domain.PatternDetail;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -11,9 +12,10 @@ public interface PatternMapper {
     @Select("""
         SELECT *
         FROM HRTSHIFTPATTERNDTL
+        WHERE #{patternName} IS NULL OR WORK_PATTERN_NAME LIKE CONCAT('%', #{patternName}, '%')
     """)
-    /* 모든 근태패턴 조회 */
-    List<PatternDetail> findAllPatterns();
+    /* 근태패턴명으로 근태패턴 검색 */
+    List<PatternDetail> findPatternsByName(@Param("patternName") String patternName);
 
     @Insert("""
         INSERT INTO HRTSHIFTPATTERNDTL (
