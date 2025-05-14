@@ -10,9 +10,18 @@
   <h1 class="text-2xl font-bold mb-6">근태패턴 캘린더</h1>
 
   <!-- 월 선택 -->
-  <form method="get" th:action="@{/admin/pattern/list}" class="flex gap-4 mb-6">
-    <input type="month" name="month" th:value="${selectedMonth}" class="border px-3 py-2 rounded">
-    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">조회</button>
+  <form method="get" th:action="@{/admin/pattern/list}" class="flex gap-4 items-end mb-6">
+    <input type="month" name="month" th:value="${selectedMonth}" class="border px-3 py-2 rounded h-10">
+
+    <button type="submit"
+            class="bg-blue-600 text-white px-4 h-10 rounded hover:bg-blue-700">
+      조회
+    </button>
+
+    <a href="/admin/pattern/create"
+       class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 h-10 rounded flex items-center">
+      + 근태패턴 추가
+    </a>
   </form>
 
   <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -23,7 +32,7 @@
         <tr class="bg-gray-200">
           <th class="border border-white p-2 w-32 min-w-[50px]">패턴코드</th>
           <th class="border border-white p-2 w-64 min-w-[100px]">패턴명</th>
-          <th th:each="day : ${#numbers.sequence(1, daysInMonth)}" class="border border-white p-2" th:text="${day + '일'}"></th>
+          <th th:each="header : ${dateHeaders}" class="border border-white p-2 w-64 min-w-[50px]" th:text="${header}"></th>
         </tr>
         </thead>
         <tbody>
@@ -31,7 +40,7 @@
           <td class="border p-2 w-32 min-w-[50px]" th:text="${row['patternCode']}"></td>
           <td class="border p-2 w-64 min-w-[100px]" th:text="${row['patternName']}"></td>
           <td th:each="day : ${#numbers.sequence(1, daysInMonth)}"
-              class="border border-gray p-2"
+              class="border border-gray p-2 w-64 min-w-[50px]"
               th:classappend="${shiftColorMap[row[day.toString()]]}"
               th:text="${row[day.toString()] != null ? row[day.toString()] : '-'}">
           </td>
