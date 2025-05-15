@@ -5,7 +5,14 @@
   <title>부서 목록</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="p-10 bg-gray-100">
+<body class="p-6 bg-gray-100">
+<!-- 헤더 메뉴 -->
+<div class="bg-white shadow mb-6 px-6 py-4 rounded flex space-x-6 text-gray-600 font-medium text-sm">
+  <!-- 링크 -->
+  <a href="/admin/department/list" class="font-bold text-blue-600 border-b-2 border-blue-600">부서목록</a>
+  <!-- 현재 -->
+  <a href="/admin/pattern/list" class="hover:text-blue-600">패턴목록</a>
+</div>
 
 <!-- 상단: 제목만 -->
 <div class="flex justify-center mb-6">
@@ -30,7 +37,7 @@
     <tr
         th:each="dept, stat : ${departments}"
         th:classappend="${stat.index % 2 == 0} ? 'bg-white' : 'bg-gray-100'"
-        class="hover:bg-gray-300 transition text-center"
+        class="hover:bg-blue-100 transition text-center"
     >
       <td class="border px-4 py-2" th:text="${dept.deptCode}"></td>
       <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
@@ -63,15 +70,11 @@
   </table>
 </div>
 
-<!-- 하단: 돌아가기 + 부서추가 버튼 -->
-<div class="flex justify-between items-center mt-8">
-  <a href="/admin"
-     class="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600 shadow">
-    ← 돌아가기
-  </a>
+<!-- 하단: 이전버튼 + 부서추가 버튼 -->
+<div class="flex justify-end items-center mt-8">
   <a href="/admin/department/add"
-     class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 shadow">
-    ➕ 부서 추가
+     class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 shadow">
+    ➕ 추가
   </a>
 </div>
 

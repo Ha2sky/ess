@@ -6,6 +6,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-6">
+<!-- 헤더 메뉴 -->
+<div class="bg-white shadow mb-6 px-6 py-4 rounded flex space-x-6 text-gray-600 font-medium text-sm">
+  <!-- 링크 -->
+  <a href="/admin/department/list" class="hover:text-blue-600">부서목록</a>
+  <!-- 현재 -->
+  <a href="/admin/pattern/list" class="font-bold text-blue-600 border-b-2 border-blue-600">패턴목록</a>
+</div>
+
 <div class="max-w-7xl mx-auto bg-white p-6 rounded shadow">
   <h1 class="text-2xl font-bold mb-6">근태패턴 목록</h1>
 
@@ -31,7 +39,7 @@
     <!-- 패턴 추가 버튼 -->
     <a href="/admin/pattern/create"
        class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 h-10 rounded flex items-center">
-      ➕ 패턴 추가
+      ➕ 추가
     </a>
   </form>
 
@@ -52,7 +60,7 @@
           </tr>
           </thead>
           <tbody>
-          <tr th:each="row : ${patternTable}" class="hover:bg-gray-50">
+          <tr th:each="row : ${patternTable}" class="hover:bg-blue-100 even:bg-gray-100">
             <td class="border p-2">
               <input type="checkbox" name="patternCodes" th:value="${row['patternCode']}">
             </td>
@@ -69,7 +77,7 @@
       </div>
 
       <!-- 색상표 영역 -->
-      <div class="bg-gray-50 p-4 rounded shadow text-sm w-64 h-fit">
+      <div class="bg-gray-50 p-4 rounded shadow text-sm w-40 h-fit">
         <h2 class="font-bold text-gray-700 mb-2">근태코드 색상</h2>
         <hr>
         <ul>
