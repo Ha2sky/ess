@@ -2,6 +2,7 @@ package com.jb.ess.mapper;
 
 import com.jb.ess.domain.PatternDetail;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -43,4 +44,10 @@ public interface PatternMapper {
     """)
     /* 근태패턴 저장 */
     void insertShiftPattern(PatternDetail pattern);
+
+    @Delete("""
+        DELETE FROM HRTSHIFTPATTERNDTL
+        WHERE WORK_PATTERN_CODE = #{patternCode}
+    """)
+    void deletePattern(@Param("patternCode") String patternCode);
 }

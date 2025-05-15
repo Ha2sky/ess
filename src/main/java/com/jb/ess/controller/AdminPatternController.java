@@ -62,4 +62,11 @@ public class AdminPatternController {
         patternService.savePattern(form); // 또는 mapper 직접 호출
         return "redirect:/admin/pattern/list";
     }
+
+    /* 근태패턴 삭제 */
+    @PostMapping("/delete")
+    public String deletePatterns(@RequestParam(value = "patternCodes", required = false) List<String> patternCodes) {
+        patternService.deletePatternsByCodes(patternCodes);
+        return "redirect:/admin/pattern/list";
+    }
 }

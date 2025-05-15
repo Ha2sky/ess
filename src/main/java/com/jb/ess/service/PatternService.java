@@ -76,4 +76,13 @@ public class PatternService {
         // 유효성 검사, 중복 확인 등 필요한 로직이 있다면 여기서 처리
         patternMapper.insertShiftPattern(pattern);
     }
+
+    /* 근태패턴 삭제 */
+    public void deletePatternsByCodes(List<String> patternCodes) {
+        if (patternCodes == null) return;
+        for (String code : patternCodes) {
+            if (code == null || code.isEmpty()) continue;
+            patternMapper.deletePattern(code);
+        }
+    }
 }
