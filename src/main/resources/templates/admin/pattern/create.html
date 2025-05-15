@@ -89,7 +89,8 @@
           <option value="">선택</option>
           <option th:each="shift : ${shiftCodes}"
                   th:value="${shift.shiftCode}"
-                  th:text="${shift.shiftName}">
+                  th:text="${shift.shiftName}"
+                  th:selected="${shift.shiftCode == '13'}">
           </option>
         </select>
       </div>
@@ -100,7 +101,8 @@
           <option value="">선택</option>
           <option th:each="shift : ${shiftCodes}"
                   th:value="${shift.shiftCode}"
-                  th:text="${shift.shiftName}">
+                  th:text="${shift.shiftName}"
+                  th:selected="${shift.shiftCode == '12'}">
           </option>
         </select>
       </div>

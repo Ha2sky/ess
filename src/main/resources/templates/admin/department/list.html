@@ -44,8 +44,8 @@
       <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
       <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
       <td class="border px-4 py-2" th:text="${dept.empCount} + 명"></td>
-      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.startDate)}|"></td>
-      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.util.DateUtil).formatDate(dept.endDate)}|"></td>
+      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(dept.startDate)}|"></td>
+      <td class="border px-4 py-2" th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(dept.endDate)}|"></td>
       <td class="border px-4 py-2 space-x-2">
         <a th:href="@{'/admin/department/edit/' + ${dept.deptCode}}"
            class="inline-flex items-center bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600 transition">
