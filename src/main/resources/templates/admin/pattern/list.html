@@ -24,7 +24,7 @@
 
     <!-- 패턴명 검색 (돋보기 아이콘 포함) -->
     <div class="relative">
-      <input type="text" name="patternName" th:value="${patternName}"
+      <input type="text" name="workPatternName" th:value="${workPatternName}"
              placeholder="근태패턴명 검색"
              class="border px-3 py-2 pr-10 rounded h-10 w-52">
       <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500">
@@ -62,13 +62,13 @@
           <tbody>
           <tr th:each="row : ${patternTable}" class="hover:bg-blue-100 even:bg-gray-100">
             <td class="border p-2">
-              <input type="checkbox" name="patternCodes" th:value="${row['patternCode']}">
+              <input type="checkbox" name="workPatternCodes" th:value="${row['workPatternCode']}">
             </td>
             <td class="border p-2 w-32 min-w-[45px]" th:text="${row['workPatternCode']}"></td>
             <td class="border p-2 w-64 min-w-[100px]" th:text="${row['workPatternName']}"></td>
             <td th:each="day : ${#numbers.sequence(1, daysInMonth)}"
                 class="border p-2 w-64 min-w-[45px]"
-                th:classappend="${shiftColorMap[row[day.toString()]]}"
+                th:classappend="${row[day.toString()] != null ? shiftColorMap[row[day.toString()]] : ''}"
                 th:text="${row[day.toString()] != null ? row[day.toString()] : '-'}">
             </td>
           </tr>
@@ -103,7 +103,7 @@
 <script>
   document.getElementById('selectAll').addEventListener('change', function () {
     const isChecked = this.checked;
-    document.querySelectorAll('input[name="patternCodes"]').forEach(cb => {
+    document.querySelectorAll('input[name="workPatternCodes"]').forEach(cb => {
       cb.checked = isChecked;
     });
   });

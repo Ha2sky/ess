@@ -85,6 +85,22 @@ public class PatternService {
         return result;
     }
 
+    /* 근태패턴 삭제 */
+    public void deletePatternsByCodes(List<String> workPatternCodes) {
+        if (workPatternCodes == null) return;
+        for (String code : workPatternCodes) {
+            System.out.println("code: " + code);
+            if (code == null || code.isEmpty()) continue;
+            shiftPatternMapper.deletePattern(code);
+        }
+    }
+
+//    /* 근태패턴 저장 */
+//    public void savePattern(PatternDetail pattern) {
+//        // 유효성 검사, 중복 확인 등 필요한 로직이 있다면 여기서 처리
+//        patternMapper.insertShiftPattern(pattern);
+//    }
+
     private String getShiftCodeByDayOfWeek(ShiftPattern pattern, DayOfWeek dow) {
         String workPatternCode = pattern.getWorkPatternCode();
         return switch (dow) {
