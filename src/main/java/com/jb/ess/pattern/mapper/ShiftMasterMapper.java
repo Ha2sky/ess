@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ShiftMasterMapper {
     @Select("""
-        SELECT SHIFT_CODE, SHIFT_NAME
+        SELECT *
         FROM HRTSHIFTMASTER
         WHERE USE_YN = 'Y'
     """)
