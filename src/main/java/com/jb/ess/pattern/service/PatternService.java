@@ -1,11 +1,15 @@
 package com.jb.ess.pattern.service;
 
-import com.jb.ess.common.domain.PatternDetail;
+import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
-import com.jb.ess.pattern.mapper.PatternMapper;
+import com.jb.ess.common.domain.ShiftPattern;
+import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
+import com.jb.ess.pattern.mapper.ShiftPatternDtlMapper;
+import com.jb.ess.pattern.mapper.ShiftPatternMapper;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -17,43 +21,30 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class PatternService {
-    private final PatternMapper patternMapper;
+    private final ShiftPatternMapper shiftPatternMapper;
+    private final ShiftPatternDtlMapper shiftPatternDtlMapper;
+    private final ShiftCalendarMapper shiftCalendarMapper;
 
-    /* 근태패턴명으로 근태패턴 검색 */
-    public List<Map<String, Object>> getPatternCalendar(YearMonth month, String patternName) {
-        List<PatternDetail> patterns = patternMapper.findPatternsByName(patternName);
-        List<Map<String, Object>> result = new ArrayList<>();
+    public void generateShiftCalendar(String workPatternCode, YearMonth yearMonth) {
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-        for (PatternDetail pattern : patterns) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("patternCode", pattern.getWorkPatternCode());
-            row.put("patternName", pattern.getWorkPatternName());
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            int dayOfWeek = date.getDayOfWeek().getValue(); // 1: 월 ~ 7: 일
+            System.out.println("workPatternCode: " + workPatternCode + ", dayOfWeek: " + dayOfWeek + ", date: " + date.format(formatter));
+            String shiftCode = shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, dayOfWeek);
 
-            for (int day = 1; day <= month.lengthOfMonth(); day++) {
-                LocalDate date = month.atDay(day);
-                DayOfWeek dow = date.getDayOfWeek();
-                String shiftCode = getShiftCodeByDayOfWeek(pattern, dow);
-                row.put(String.valueOf(day), shiftCode);
+            if (shiftCode != null) {
+                String shiftDate = date.format(formatter); // → "20250601" 형식으로 변환
+                shiftCalendarMapper.insertShiftCalendar(new ShiftCalendar(
+                    workPatternCode,
+                    shiftDate,
+                    shiftCode
+                ));
             }
-
-            result.add(row);
         }
-
-        return result;
     }
-
-    private String getShiftCodeByDayOfWeek(PatternDetail pattern, DayOfWeek dow) {
-        return switch (dow) {
-            case MONDAY -> pattern.getMonShiftCode();
-            case TUESDAY -> pattern.getTueShiftCode();
-            case WEDNESDAY -> pattern.getWedShiftCode();
-            case THURSDAY -> pattern.getThuShiftCode();
-            case FRIDAY -> pattern.getFriShiftCode();
-            case SATURDAY -> pattern.getSatShiftCode();
-            case SUNDAY -> pattern.getSunShiftCode();
-        };
-    }
-
     /* 각 근태코드에 색상 부여 */
     public Map<String, String> generateShiftCodeColors(List<ShiftMaster> shiftCodes) {
         String[] colors = {
@@ -71,18 +62,39 @@ public class PatternService {
         return colorMap;
     }
 
-    /* 근태패턴 저장 */
-    public void savePattern(PatternDetail pattern) {
-        // 유효성 검사, 중복 확인 등 필요한 로직이 있다면 여기서 처리
-        patternMapper.insertShiftPattern(pattern);
+    /* 근태패턴명으로 근태패턴 검색 */
+    public List<Map<String, Object>> getPatternCalendar(YearMonth month, String patternName) {
+        List<ShiftPattern> patterns = shiftPatternMapper.findPatternsByName(patternName);
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (ShiftPattern pattern : patterns) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("workPatternCode", pattern.getWorkPatternCode());
+            row.put("workPatternName", pattern.getWorkPatternName());
+
+            for (int day = 1; day <= month.lengthOfMonth(); day++) {
+                LocalDate date = month.atDay(day);
+                DayOfWeek dow = date.getDayOfWeek();
+                String shiftCode = getShiftCodeByDayOfWeek(pattern, dow);
+                row.put(String.valueOf(day), shiftCode);
+            }
+
+            result.add(row);
+        }
+
+        return result;
     }
 
-    /* 근태패턴 삭제 */
-    public void deletePatternsByCodes(List<String> patternCodes) {
-        if (patternCodes == null) return;
-        for (String code : patternCodes) {
-            if (code == null || code.isEmpty()) continue;
-            patternMapper.deletePattern(code);
-        }
+    private String getShiftCodeByDayOfWeek(ShiftPattern pattern, DayOfWeek dow) {
+        String workPatternCode = pattern.getWorkPatternCode();
+        return switch (dow) {
+            case MONDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 1);
+            case TUESDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 2);
+            case WEDNESDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 3);
+            case THURSDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 4);
+            case FRIDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 5);
+            case SATURDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 6);
+            case SUNDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 7);
+        };
     }
 }

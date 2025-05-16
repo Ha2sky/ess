@@ -55,7 +55,7 @@
               <input type="checkbox" id="selectAll">
             </th>
             <th class="border border-white p-2 w-32 min-w-[45px]">패턴코드</th>
-            <th class="border border-white p-2 w-64 min-w-[80px]">패턴명</th>
+            <th class="border border-white p-2 w-64 min-w-[100px]">패턴명</th>
             <th th:each="header : ${dateHeaders}" class="border border-white p-2 w-64 min-w-[45px]" th:text="${header}"></th>
           </tr>
           </thead>
@@ -64,8 +64,8 @@
             <td class="border p-2">
               <input type="checkbox" name="patternCodes" th:value="${row['patternCode']}">
             </td>
-            <td class="border p-2 w-32 min-w-[45px]" th:text="${row['patternCode']}"></td>
-            <td class="border p-2 w-64 min-w-[80px]" th:text="${row['patternName']}"></td>
+            <td class="border p-2 w-32 min-w-[45px]" th:text="${row['workPatternCode']}"></td>
+            <td class="border p-2 w-64 min-w-[100px]" th:text="${row['workPatternName']}"></td>
             <td th:each="day : ${#numbers.sequence(1, daysInMonth)}"
                 class="border p-2 w-64 min-w-[45px]"
                 th:classappend="${shiftColorMap[row[day.toString()]]}"
