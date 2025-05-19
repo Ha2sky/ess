@@ -40,4 +40,9 @@ public class DateUtil {
 
         return headers;
     }
+
+    /* 현재시각 String 변환 */
+    public static String getDateTimeNow() {
+        return LocalDate.now().format(INPUT_FORMAT);
+    }
 }

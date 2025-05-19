@@ -1,10 +1,13 @@
 package com.jb.ess.pattern.controller;
 
 import com.jb.ess.common.domain.ShiftMaster;
+import com.jb.ess.common.domain.ShiftPattern;
+import com.jb.ess.common.domain.ShiftPatternDtl;
 import com.jb.ess.pattern.mapper.ShiftMasterMapper;
 import com.jb.ess.pattern.service.PatternService;
 import com.jb.ess.common.util.DateUtil;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping("/admin/pattern")
 @RequiredArgsConstructor
 public class AdminPatternController {
+
     private final PatternService patternService;
     private final ShiftMasterMapper shiftMasterMapper;
 
@@ -27,16 +31,15 @@ public class AdminPatternController {
     public String showAllPatterns(@RequestParam(value = "month", required = false) String monthStr,
                                   @RequestParam(value = "workPatternCode", required = false) String workPatternCode,
                                   Model model) {
+
+        /* 선택한 yyyy-mm 에 대해 존재하는 근태패턴의 캘린더를 생성 */
         YearMonth selectedMonth = (monthStr != null) ? YearMonth.parse(monthStr) : YearMonth.now();
-
-        /* 근태패턴 캘린더 생성 제너레이터 */
-//        patternService.generateShiftCalendar("A-1", YearMonth.of(2025, 5));
-//        patternService.generateShiftCalendar("B-1", YearMonth.of(2025, 5));
-
+        patternService.generateShiftCalendar(workPatternCode, selectedMonth);
 
         int daysInMonth = selectedMonth.lengthOfMonth();
         List<String> dateHeaders = DateUtil.getDateHeaders(selectedMonth);
         List<Map<String, Object>> patternTable = patternService.getPatternCalendar(selectedMonth, workPatternCode);
+        /* 근태코드 색상관련 */
         List<ShiftMaster> shiftCodeList = shiftMasterMapper.findAllShiftCodes();
         Map<String, String> colorMap = patternService.generateShiftCodeColors(shiftCodeList);
 
@@ -52,25 +55,47 @@ public class AdminPatternController {
         return "admin/pattern/list";
     }
 
-//    /* 근태패턴 생성폼 */
-//    @GetMapping("/create")
-//    public String createPatternForm(Model model) {
-//        List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // HRTSHIFTMASTER 전체 조회
-//        model.addAttribute("shiftCodes", shiftCodes);
-//        return "admin/pattern/create";
-//    }
-//
-//    /* 근태패턴 생성 */
-//    @PostMapping("/create")
-//    public String savePattern(@ModelAttribute PatternDetail form) {
-//        patternService.savePattern(form); // 또는 mapper 직접 호출
-//        return "redirect:/admin/pattern/list";
-//    }
-//
     /* 근태패턴 삭제 */
     @PostMapping("/delete")
-    public String deletePatterns(@RequestParam(value = "workPatternCodes", required = false) List<String> workPatternCodes) {
+    public String deletePatterns(
+        @RequestParam(value = "workPatternCodes", required = false) List<String> workPatternCodes) {
         patternService.deletePatternsByCodes(workPatternCodes);
+        return "redirect:/admin/pattern/list";
+    }
+
+    /* 근태패턴 생성폼 */
+    @GetMapping("/create")
+    public String createPatternForm(Model model) {
+        List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // HRTSHIFTMASTER 전체 조회
+        model.addAttribute("shiftCodes", shiftCodes);
+        return "admin/pattern/create";
+    }
+
+    /* 근태패턴 생성 */
+    @PostMapping("/create")
+    public String savePattern(@RequestParam String workPatternCode,
+        @RequestParam String workPatternName,
+        @RequestParam Map<String, String> dayOfWeekMap) {
+
+        // 마스터 패턴 도메인 생성
+        ShiftPattern pattern = new ShiftPattern();
+        pattern.setWorkPatternCode(workPatternCode);
+        pattern.setWorkPatternName(workPatternName);
+
+        // 디테일 목록 생성
+        List<ShiftPatternDtl> detailList = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            String paramKey = "dayOfWeekMap[" + i + "]";
+            if (dayOfWeekMap.containsKey(paramKey)) {
+                ShiftPatternDtl detail = new ShiftPatternDtl();
+                detail.setWorkPatternCode(workPatternCode);
+                detail.setDayOfWeek(i);
+                detail.setShiftCode(dayOfWeekMap.get(paramKey));
+                detailList.add(detail);
+            }
+        }
+
+        patternService.createPattern(pattern, detailList);
         return "redirect:/admin/pattern/list";
     }
 }
