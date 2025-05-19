@@ -63,8 +63,8 @@ public class PatternService {
     }
 
     /* 근태패턴명으로 근태패턴 검색 */
-    public List<Map<String, Object>> getPatternCalendar(YearMonth month, String patternName) {
-        List<ShiftPattern> patterns = shiftPatternMapper.findPatternsByName(patternName);
+    public List<Map<String, Object>> getPatternCalendar(YearMonth month, String workPatternCode) {
+        List<ShiftPattern> patterns = shiftPatternMapper.findPatternsByCode(workPatternCode);
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (ShiftPattern pattern : patterns) {
@@ -89,8 +89,9 @@ public class PatternService {
     public void deletePatternsByCodes(List<String> workPatternCodes) {
         if (workPatternCodes == null) return;
         for (String code : workPatternCodes) {
-            System.out.println("code: " + code);
             if (code == null || code.isEmpty()) continue;
+            shiftCalendarMapper.deleteShiftCalendar(code);
+            shiftPatternDtlMapper.deletePatternDtl(code);
             shiftPatternMapper.deletePattern(code);
         }
     }

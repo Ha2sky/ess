@@ -25,7 +25,7 @@ public class AdminPatternController {
     /* 근태패턴 테이블 */
     @GetMapping("/list")
     public String showAllPatterns(@RequestParam(value = "month", required = false) String monthStr,
-                                  @RequestParam(value = "workPatternName", required = false) String workPatternName,
+                                  @RequestParam(value = "workPatternCode", required = false) String workPatternCode,
                                   Model model) {
         YearMonth selectedMonth = (monthStr != null) ? YearMonth.parse(monthStr) : YearMonth.now();
 
@@ -36,7 +36,7 @@ public class AdminPatternController {
 
         int daysInMonth = selectedMonth.lengthOfMonth();
         List<String> dateHeaders = DateUtil.getDateHeaders(selectedMonth);
-        List<Map<String, Object>> patternTable = patternService.getPatternCalendar(selectedMonth, workPatternName);
+        List<Map<String, Object>> patternTable = patternService.getPatternCalendar(selectedMonth, workPatternCode);
         List<ShiftMaster> shiftCodeList = shiftMasterMapper.findAllShiftCodes();
         Map<String, String> colorMap = patternService.generateShiftCodeColors(shiftCodeList);
 
@@ -46,7 +46,8 @@ public class AdminPatternController {
         model.addAttribute("shiftCodeList", shiftCodeList);
         model.addAttribute("shiftColorMap", colorMap);
         model.addAttribute("dateHeaders", dateHeaders);
-        model.addAttribute("workPatternName", workPatternName);
+        /* 근태패턴코드 검색 */
+        model.addAttribute("workPatternCode", workPatternCode);
 
         return "admin/pattern/list";
     }
@@ -69,7 +70,6 @@ public class AdminPatternController {
     /* 근태패턴 삭제 */
     @PostMapping("/delete")
     public String deletePatterns(@RequestParam(value = "workPatternCodes", required = false) List<String> workPatternCodes) {
-        System.out.println("ddworkPatternCodes: " + workPatternCodes);
         patternService.deletePatternsByCodes(workPatternCodes);
         return "redirect:/admin/pattern/list";
     }

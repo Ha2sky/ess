@@ -4,7 +4,6 @@ import com.jb.ess.common.domain.ShiftPattern;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -13,17 +12,18 @@ public interface ShiftPatternMapper {
     @Select("""
         SELECT *
         FROM HRTSHIFTPATTERN
-        WHERE #{patternName} IS NULL OR WORK_PATTERN_NAME LIKE CONCAT('%', #{patternName}, '%')
+        WHERE #{workPatternCode} IS NULL OR WORK_PATTERN_NAME LIKE CONCAT('%', #{workPatternCode}, '%')
     """)
     /* 근태패턴명으로 근태패턴 검색 */
-    List<ShiftPattern> findPatternsByName(@Param("patternName") String patternName);
+    List<ShiftPattern> findPatternsByCode(String workPatternCode);
 
     @Delete("""
-        DELETE FROM HRTSHIFTPATTERNDTL
+        DELETE
+        FROM HRTSHIFTPATTERN
         WHERE WORK_PATTERN_CODE = #{workPatternCode}
     """)
     /* 근태패턴 삭제 */
-    void deletePattern(@Param("workPatternCode") String workPatternCode);
+    void deletePattern(String workPatternCode);
 
 //    @Insert("""
 //        INSERT INTO HRTSHIFTPATTERNDTL (
