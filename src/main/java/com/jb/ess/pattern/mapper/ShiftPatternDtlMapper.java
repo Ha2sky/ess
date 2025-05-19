@@ -1,6 +1,8 @@
 package com.jb.ess.pattern.mapper;
 
+import com.jb.ess.common.domain.ShiftPatternDtl;
 import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -24,4 +26,16 @@ public interface ShiftPatternDtlMapper {
     """)
     /* 근태패턴 삭제 */
     void deletePatternDtl(@Param("workPatternCode") String workPatternCode);
+
+    @Insert("""
+        INSERT
+        INTO HRTSHIFTPATTERNDTL (WORK_PATTERN_CODE,
+                                 SHIFT_CODE,
+                                 DAY_OF_WEEK)
+        VALUES (#{workPatternCode},
+                #{shiftCode},
+                #{dayOfWeek})
+    """)
+    /* 근태패턴 저장 */
+    void insertShiftPatternDetail(ShiftPatternDtl shiftPatternDtl);
 }

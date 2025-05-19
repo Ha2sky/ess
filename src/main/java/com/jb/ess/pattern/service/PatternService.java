@@ -3,6 +3,7 @@ package com.jb.ess.pattern.service;
 import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
+import com.jb.ess.common.domain.ShiftPatternDtl;
 import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternDtlMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternMapper;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class PatternService {
     private final ShiftPatternDtlMapper shiftPatternDtlMapper;
     private final ShiftCalendarMapper shiftCalendarMapper;
 
+    /* 캘린더 생성 제너레이터 */
     public void generateShiftCalendar(String workPatternCode, YearMonth yearMonth) {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
@@ -64,7 +67,12 @@ public class PatternService {
 
     /* 근태패턴명으로 근태패턴 검색 */
     public List<Map<String, Object>> getPatternCalendar(YearMonth month, String workPatternCode) {
-        List<ShiftPattern> patterns = shiftPatternMapper.findPatternsByCode(workPatternCode);
+        List<ShiftPattern> patterns;
+        if (workPatternCode == null || workPatternCode.isEmpty()) {
+            patterns = shiftPatternMapper.findAllPatterns();
+        } else {
+            patterns = shiftPatternMapper.findPatternsByCode(workPatternCode);
+        }
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (ShiftPattern pattern : patterns) {
@@ -96,11 +104,15 @@ public class PatternService {
         }
     }
 
-//    /* 근태패턴 저장 */
-//    public void savePattern(PatternDetail pattern) {
-//        // 유효성 검사, 중복 확인 등 필요한 로직이 있다면 여기서 처리
-//        patternMapper.insertShiftPattern(pattern);
-//    }
+    @Transactional
+    /* 근태패턴 저장 */
+    public void createPattern(ShiftPattern pattern, List<ShiftPatternDtl> detailList) {
+        shiftPatternMapper.insertShiftPattern(pattern);
+
+        for (ShiftPatternDtl detail : detailList) {
+            shiftPatternDtlMapper.insertShiftPatternDetail(detail);
+        }
+    }
 
     private String getShiftCodeByDayOfWeek(ShiftPattern pattern, DayOfWeek dow) {
         String workPatternCode = pattern.getWorkPatternCode();
