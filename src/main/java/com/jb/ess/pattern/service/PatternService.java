@@ -4,10 +4,10 @@ import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
 import com.jb.ess.common.domain.ShiftPatternDtl;
+import com.jb.ess.common.util.DateUtil;
 import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternDtlMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternMapper;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -35,7 +35,6 @@ public class PatternService {
 
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
             int dayOfWeek = date.getDayOfWeek().getValue(); // 1: 월 ~ 7: 일
-            System.out.println("workPatternCode: " + workPatternCode + ", dayOfWeek: " + dayOfWeek + ", date: " + date.format(formatter));
             String shiftCode = shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, dayOfWeek);
 
             if (shiftCode != null) {
@@ -65,7 +64,7 @@ public class PatternService {
         return colorMap;
     }
 
-    /* 근태패턴명으로 근태패턴 검색 */
+    /* 근태패턴 테이블 생성 */
     public List<Map<String, Object>> getPatternCalendar(YearMonth month, String workPatternCode) {
         List<ShiftPattern> patterns;
         if (workPatternCode == null || workPatternCode.isEmpty()) {
@@ -82,8 +81,8 @@ public class PatternService {
 
             for (int day = 1; day <= month.lengthOfMonth(); day++) {
                 LocalDate date = month.atDay(day);
-                DayOfWeek dow = date.getDayOfWeek();
-                String shiftCode = getShiftCodeByDayOfWeek(pattern, dow);
+                String shiftCode = shiftCalendarMapper.getShiftCodeByPatternCodeAndDate(pattern.getWorkPatternCode(),
+                                                                                        DateUtil.reverseFormatDate(date));
                 row.put(String.valueOf(day), shiftCode);
             }
 
@@ -116,18 +115,5 @@ public class PatternService {
 
     public Boolean findShiftCalendar(String workPatternCode, String dateStr) {
         return shiftCalendarMapper.getCountShiftCalendar(workPatternCode, dateStr) == 0;
-    }
-
-    private String getShiftCodeByDayOfWeek(ShiftPattern pattern, DayOfWeek dow) {
-        String workPatternCode = pattern.getWorkPatternCode();
-        return switch (dow) {
-            case MONDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 1);
-            case TUESDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 2);
-            case WEDNESDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 3);
-            case THURSDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 4);
-            case FRIDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 5);
-            case SATURDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 6);
-            case SUNDAY -> shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, 7);
-        };
     }
 }

@@ -32,4 +32,13 @@ public interface ShiftCalendarMapper {
     """)
     int getCountShiftCalendar(@Param("workPatternCode") String workPatternCode,
                               @Param("dateStr") String dateStr);
+
+    @Select("""
+        SELECT SHIFT_CODE
+        FROM HRTSHIFTCALENDAR
+        WHERE WORK_PATTERN_CODE = #{workPatternCode}
+        AND SHIFT_DATE = #{dateStr}
+    """)
+    String getShiftCodeByPatternCodeAndDate(@Param("workPatternCode") String workPatternCode,
+                                            @Param("dateStr") String dateStr);
 }
