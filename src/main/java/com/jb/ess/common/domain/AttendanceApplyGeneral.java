@@ -2,8 +2,8 @@ package com.jb.ess.common.domain;
 import lombok.Data;
 
 @Data
-public class AttendanceApply {
-    private String applyNo;       // 신청코드
+public class AttendanceApplyGeneral {
+    private String applyGeneralNo;       // 신청코드
     private String empCode;       // 신청대상자 사원코드
     private String timeItemCode;  // 근태항목코드
     private String applyDate;     // 신청일자
