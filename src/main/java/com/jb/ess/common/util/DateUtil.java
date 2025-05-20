@@ -27,6 +27,11 @@ public class DateUtil {
         }
     }
 
+    /* yyyy-mm-dd -> yyyymmdd */
+    public static String reverseFormatDate(LocalDate dateStr) {
+        return dateStr.format(INPUT_FORMAT);
+    }
+
     /* 1일 2일 -> 1일(월) 2일(화) */
     public static List<String> getDateHeaders(YearMonth month) {
         List<String> headers = new ArrayList<>();
@@ -41,7 +46,7 @@ public class DateUtil {
         return headers;
     }
 
-    /* 현재시각 String 변환 */
+    /* 현재날짜 String 변환 */
     public static String getDateTimeNow() {
         return LocalDate.now().format(INPUT_FORMAT);
     }
