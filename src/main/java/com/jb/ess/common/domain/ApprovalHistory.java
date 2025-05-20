@@ -5,7 +5,8 @@ import lombok.Data;
 @Data
 public class ApprovalHistory {
     private String histNo;         // 결재이력번호
-    private String applyNo;        // 신청번호
+    private String applyGeneralNo; // 신청코드
+    private String applyEtcNo;     // 신청코드
     private String approverCode;   // 결재자 사원코드
     private String approvalDate;   // 결재일
     private String approvalStatus; // 결재상태
