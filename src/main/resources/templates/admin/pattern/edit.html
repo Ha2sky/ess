@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>근태패턴 수정</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+
+<div class="max-w-6xl mx-auto bg-white p-6 border border-gray-300 rounded-md shadow">
+  <h2 class="text-2xl font-bold mb-6">근태패턴 수정</h2>
+
+  <form th:action="@{/admin/pattern/update}" method="post">
+    <!-- Hidden 필드 -->
+    <input type="hidden" name="workPatternCode" th:value="${workPatternCode}">
+    <input type="hidden" name="selectedMonth" th:value="${selectedMonth}">
+
+    <div class="mb-4">
+      <span class="text-gray-700 font-medium">근태패턴명: </span>
+      <span th:text="${patternName}" class="text-lg text-blue-600 font-semibold"></span>
+    </div>
+
+    <div class="overflow-auto border border-gray-200 rounded">
+      <table class="min-w-full text-sm text-center table-auto">
+        <thead class="bg-gray-100 text-xs text-gray-700 sticky top-0">
+        <tr>
+          <th class="px-2 py-2 border">일자</th>
+          <th class="px-2 py-2 border">근태코드</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="entry : ${shiftCodeMap}">
+          <td class="px-2 py-1 border" th:text="${entry.key}">01</td>
+          <td class="px-2 py-1 border">
+            <select th:name="'shiftCodes[' + ${entry.key} + ']'" class="w-full border rounded p-1">
+              <option value="">선택</option>
+              <option th:each="shift : ${shiftCodeList}"
+                      th:value="${shift.shiftCode}"
+                      th:text="${shift.shiftName}"
+                      th:selected="${shift.shiftCode == entry.value}">
+              </option>
+            </select>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-end space-x-3 mt-6">
+      <button type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
+        저장
+      </button>
+      <a href="/admin/pattern/list"
+         class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+        취소
+      </a>
+    </div>
+  </form>
+</div>
+
+</body>
+</html>

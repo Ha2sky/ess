@@ -1,20 +1,26 @@
 package com.jb.ess.pattern.controller;
 
+import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
 import com.jb.ess.common.domain.ShiftPatternDtl;
+import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
 import com.jb.ess.pattern.mapper.ShiftMasterMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternMapper;
 import com.jb.ess.pattern.service.PatternService;
 import com.jb.ess.common.util.DateUtil;
+import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,6 +32,7 @@ public class AdminPatternController {
     private final PatternService patternService;
     private final ShiftMasterMapper shiftMasterMapper;
     private final ShiftPatternMapper shiftPatternMapper;
+    private final ShiftCalendarMapper shiftCalendarMapper;
 
     /* 근태패턴 테이블 */
     @GetMapping("/list")
@@ -121,4 +128,59 @@ public class AdminPatternController {
         patternService.createPattern(pattern, detailList);
         return "redirect:/admin/pattern/list";
     }
+
+    @GetMapping("/edit/{workPatternCode}")
+    public String editPatternForm(@PathVariable String workPatternCode,
+                                  @RequestParam("month") String monthStr,
+                                  Model model) {
+        YearMonth selectedMonth = YearMonth.parse(monthStr);
+        List<ShiftMaster> shiftCodeList = shiftMasterMapper.findAllShiftCodes();
+
+        Map<String, String> shiftCodeMap = new LinkedHashMap<>();
+        for (int day = 1; day <= selectedMonth.lengthOfMonth(); day++) {
+            LocalDate date = selectedMonth.atDay(day);
+            String dateStr = DateUtil.reverseFormatDate(date); // yyyyMMdd
+            String shiftCode = shiftCalendarMapper.getShiftCodeByPatternCodeAndDate(workPatternCode, dateStr);
+            shiftCodeMap.put(String.valueOf(day), shiftCode);
+        }
+
+        ShiftPattern pattern = shiftPatternMapper.findPatternByCode(workPatternCode);
+
+        model.addAttribute("workPatternCode", workPatternCode);
+        model.addAttribute("selectedMonth", selectedMonth.toString()); // YYYY-MM
+        model.addAttribute("shiftCodeMap", shiftCodeMap);
+        model.addAttribute("shiftCodeList", shiftCodeList);
+        model.addAttribute("patternName", pattern.getWorkPatternName());
+
+        return "admin/pattern/edit";
+    }
+
+    @PostMapping("/update")
+    public String updatePattern(@RequestParam("workPatternCode") String workPatternCode,
+                                @RequestParam("selectedMonth") String selectedMonthStr,
+                                @RequestParam Map<String, String> shiftCodes) {
+
+        YearMonth selectedMonth = YearMonth.parse(selectedMonthStr);
+        List<ShiftCalendar> updatedList = new ArrayList<>();
+
+        for (int day = 1; day <= selectedMonth.lengthOfMonth(); day++) {
+            String key = "shiftCodes[" + day + "]";
+            if (shiftCodes.containsKey(key)) {
+                String shiftCode = shiftCodes.get(key);
+                if (shiftCode != null && !shiftCode.isEmpty()) {
+                    String shiftDate = selectedMonth.atDay(day).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                    updatedList.add(new ShiftCalendar(workPatternCode, shiftDate, shiftCode));
+                }
+            }
+        }
+
+        // 기존 패턴의 월 데이터를 삭제 후 재등록
+        shiftCalendarMapper.deleteShiftCalendarByMonth(workPatternCode, selectedMonthStr.replace("-", ""));
+        for (ShiftCalendar sc : updatedList) {
+            shiftCalendarMapper.insertShiftCalendar(sc);
+        }
+
+        return "redirect:/admin/pattern/list?month=" + selectedMonthStr + "&workPatternCode=" + workPatternCode;
+    }
+
 }

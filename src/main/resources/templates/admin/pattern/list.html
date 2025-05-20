@@ -22,7 +22,7 @@
     <!-- 월 선택 -->
     <input type="month" name="month" th:value="${selectedMonth}" class="border px-3 py-2 rounded h-10">
 
-    <!-- 패턴명 검색 (돋보기 아이콘 포함) -->
+    <!-- 패턴명 검색 -->
     <div class="relative">
       <input type="text" name="workPatternCode" th:value="${workPatternCode}"
              placeholder="근태패턴코드 검색"
@@ -41,10 +41,15 @@
        class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 h-10 rounded flex items-center">
       ➕ 추가
     </a>
+    <!-- 선택 수정 버튼 -->
+    <a href="javascript:void(0);" onclick="editSelectedPattern()"
+       class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded flex items-center">
+      ✏ 수정
+    </a>
   </form>
 
   <!-- 패턴 테이블 + 삭제 Form + 색상표 (flex로 가로배치) -->
-  <form method="post" th:action="@{/admin/pattern/delete}">
+  <form method="post" th:action="@{/admin/pattern/delete}" onsubmit="return validateSelection();">
     <div class="flex gap-6">
       <!-- 테이블 영역 -->
       <div class="overflow-auto flex-1">
@@ -101,10 +106,45 @@
 </div>
 
 <script>
-  document.getElementById('selectAll').addEventListener('change', function () {
-    const isChecked = this.checked;
-    document.querySelectorAll('input[name="workPatternCodes"]').forEach(cb => {
-      cb.checked = isChecked;
-    });
+  // month input이 바뀌면 form을 제출
+  document.querySelector('input[name="month"]').addEventListener('change', function() {
+    this.form.submit();
   });
+</script>
+
+<!-- 추가버튼 스크립트 -->
+<script>
+  function validateSelection() {
+    const checkedBoxes = document.querySelectorAll('input[name="workPatternCodes"]:checked');
+    if (checkedBoxes.length === 0) {
+      alert('삭제할 패턴을 하나 이상 선택하세요.');
+      return false;  // 폼 제출 막음
+    }
+    return true; // 제출 허용
+  }
+</script>
+
+<!-- 수정버튼 스크립트 -->
+<script>
+  function editSelectedPattern() {
+    const selected = document.querySelectorAll('input[name="workPatternCodes"]:checked');
+    if (selected.length === 0) {
+      alert('수정할 패턴을 선택하세요.');
+    } else if (selected.length > 1) {
+      alert('하나의 패턴만 선택할 수 있습니다.');
+    } else {
+      const code = selected[0].value;
+      // 현재 선택된 month 값 읽기
+      const monthInput = document.querySelector('input[name="month"]');
+      const month = monthInput ? monthInput.value : '';
+
+      // 수정 페이지로 이동할 때 month를 쿼리 파라미터로 붙임
+      let url = `/admin/pattern/edit/${code}`;
+      if (month) {
+        url += `?month=${encodeURIComponent(month)}`;
+      }
+
+      window.location.href = url;
+    }
+  }
 </script>

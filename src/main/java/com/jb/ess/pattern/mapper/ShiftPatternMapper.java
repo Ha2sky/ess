@@ -21,8 +21,16 @@ public interface ShiftPatternMapper {
         FROM HRTSHIFTPATTERN
         WHERE WORK_PATTERN_CODE = #{workPatternCode}
     """)
-    /* 근태패턴코드로 근태패턴 검색 */
+    /* 근태패턴코드로 근태패턴 모두 검색 */
     List<ShiftPattern> findPatternsByCode(String workPatternCode);
+
+    @Select("""
+        SELECT *
+        FROM HRTSHIFTPATTERN
+        WHERE WORK_PATTERN_CODE = #{workPatternCode}
+    """)
+        /* 근태패턴코드로 근태패턴 검색 */
+    ShiftPattern findPatternByCode(String workPatternCode);
 
     @Delete("""
         DELETE

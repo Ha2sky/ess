@@ -41,4 +41,14 @@ public interface ShiftCalendarMapper {
     """)
     String getShiftCodeByPatternCodeAndDate(@Param("workPatternCode") String workPatternCode,
                                             @Param("dateStr") String dateStr);
+
+    // 월 단위 삭제 (예: 202505, 202506 형태)
+    @Delete("""
+        DELETE
+        FROM HRTSHIFTCALENDAR
+        WHERE WORK_PATTERN_CODE = #{workPatternCode}
+        AND SHIFT_DATE LIKE '${month}%'
+    """)
+    void deleteShiftCalendarByMonth(@Param("workPatternCode") String workPatternCode,
+        @Param("month") String month);
 }
