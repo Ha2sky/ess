@@ -4,6 +4,7 @@ import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
 import com.jb.ess.common.domain.ShiftPatternDtl;
 import com.jb.ess.pattern.mapper.ShiftMasterMapper;
+import com.jb.ess.pattern.mapper.ShiftPatternMapper;
 import com.jb.ess.pattern.service.PatternService;
 import com.jb.ess.common.util.DateUtil;
 import java.time.YearMonth;
@@ -22,9 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping("/admin/pattern")
 @RequiredArgsConstructor
 public class AdminPatternController {
-
     private final PatternService patternService;
     private final ShiftMasterMapper shiftMasterMapper;
+    private final ShiftPatternMapper shiftPatternMapper;
 
     /* 근태패턴 테이블 */
     @GetMapping("/list")
@@ -32,9 +33,29 @@ public class AdminPatternController {
                                   @RequestParam(value = "workPatternCode", required = false) String workPatternCode,
                                   Model model) {
 
-        /* 선택한 yyyy-mm 에 대해 존재하는 근태패턴의 캘린더를 생성 */
-        YearMonth selectedMonth = (monthStr != null) ? YearMonth.parse(monthStr) : YearMonth.now();
-        patternService.generateShiftCalendar(workPatternCode, selectedMonth);
+        /* 선택한 yyyy-mm를 String to YearMonth 변환 */
+        if (monthStr == null) monthStr = YearMonth.now().toString();
+        YearMonth selectedMonth = YearMonth.parse(monthStr);
+
+        List<ShiftPattern> patterns;
+        /* 근태패턴코드 전체 조회인 경우 */
+        if (workPatternCode == null || workPatternCode.isEmpty()) {
+            patterns = shiftPatternMapper.findAllPatterns();
+            for (ShiftPattern pattern : patterns) {
+                /* HRTSHIFTCALENDAR에 근태패턴들의 캘린더가 존재하는지 탐색 */
+                if (Boolean.TRUE.equals(patternService.findShiftCalendar(pattern.getWorkPatternCode(), monthStr.replace("-", "")))){
+                    /* 선택한 yyyy-mm 에 대해 존재하는 근태패턴의 캘린더를 생성 */
+                    patternService.generateShiftCalendar(pattern.getWorkPatternCode(), selectedMonth);
+                }
+            }
+        /* 근태패턴코드 검색(1가지) 인 경우 */
+        } else {
+            /* HRTSHIFTCALENDAR에 근태패턴들의 캘린더가 존재하는지 탐색 */
+            if (Boolean.TRUE.equals(patternService.findShiftCalendar(workPatternCode, monthStr.replace("-", "")))){
+                /* 선택한 yyyy-mm 에 대해 존재하는 근태패턴의 캘린더를 생성 */
+                patternService.generateShiftCalendar(workPatternCode, selectedMonth);
+            }
+        }
 
         int daysInMonth = selectedMonth.lengthOfMonth();
         List<String> dateHeaders = DateUtil.getDateHeaders(selectedMonth);
@@ -43,12 +64,14 @@ public class AdminPatternController {
         List<ShiftMaster> shiftCodeList = shiftMasterMapper.findAllShiftCodes();
         Map<String, String> colorMap = patternService.generateShiftCodeColors(shiftCodeList);
 
+        /* 근태패턴 리스트 */
         model.addAttribute("selectedMonth", selectedMonth);
         model.addAttribute("patternTable", patternTable);
         model.addAttribute("daysInMonth", daysInMonth);
+        model.addAttribute("dateHeaders", dateHeaders);
+        /* 근태코드 색상 */
         model.addAttribute("shiftCodeList", shiftCodeList);
         model.addAttribute("shiftColorMap", colorMap);
-        model.addAttribute("dateHeaders", dateHeaders);
         /* 근태패턴코드 검색 */
         model.addAttribute("workPatternCode", workPatternCode);
 

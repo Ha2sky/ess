@@ -114,6 +114,10 @@ public class PatternService {
         }
     }
 
+    public Boolean findShiftCalendar(String workPatternCode, String dateStr) {
+        return shiftCalendarMapper.getCountShiftCalendar(workPatternCode, dateStr) == 0;
+    }
+
     private String getShiftCodeByDayOfWeek(ShiftPattern pattern, DayOfWeek dow) {
         String workPatternCode = pattern.getWorkPatternCode();
         return switch (dow) {
