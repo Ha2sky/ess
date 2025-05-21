@@ -9,13 +9,16 @@ import com.jb.ess.pattern.mapper.ShiftMasterMapper;
 import com.jb.ess.pattern.mapper.ShiftPatternMapper;
 import com.jb.ess.pattern.service.PatternService;
 import com.jb.ess.common.util.DateUtil;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -33,6 +36,7 @@ public class AdminPatternController {
     private final ShiftMasterMapper shiftMasterMapper;
     private final ShiftPatternMapper shiftPatternMapper;
     private final ShiftCalendarMapper shiftCalendarMapper;
+    private static final String VIEW_CREATE = "admin/pattern/create";
 
     /* 근태패턴 테이블 */
     @GetMapping("/list")
@@ -93,19 +97,33 @@ public class AdminPatternController {
         return "redirect:/admin/pattern/list";
     }
 
-    /* 근태패턴 생성폼 */
+    /* 근태패턴 생성 Form */
     @GetMapping("/create")
     public String createPatternForm(Model model) {
         List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // HRTSHIFTMASTER 전체 조회
         model.addAttribute("shiftCodes", shiftCodes);
-        return "admin/pattern/create";
+        return VIEW_CREATE;
     }
 
-    /* 근태패턴 생성 */
+    /* 근태패턴 생성 처리*/
     @PostMapping("/create")
     public String savePattern(@RequestParam String workPatternCode,
-        @RequestParam String workPatternName,
-        @RequestParam Map<String, String> dayOfWeekMap) {
+                              @RequestParam String workPatternName,
+                              @RequestParam Map<String, String> dayOfWeekMap,
+                              Model model) {
+
+        if (shiftPatternMapper.findPatternByCode(workPatternCode) != null) {
+            List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // 모든 근무조 목록
+            model.addAttribute("shiftCodes", shiftCodes);
+            model.addAttribute("errorMsg", "중복된 근태패턴코드입니다.");
+            return VIEW_CREATE;
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
+        Duration totalWorkTime = Duration.ZERO;
+        Duration total;
+        Duration break1 = Duration.ZERO;
+        Duration break2 = Duration.ZERO;
 
         // 마스터 패턴 도메인 생성
         ShiftPattern pattern = new ShiftPattern();
@@ -122,29 +140,60 @@ public class AdminPatternController {
                 detail.setDayOfWeek(i);
                 detail.setShiftCode(dayOfWeekMap.get(paramKey));
                 detailList.add(detail);
+
+                /* 근무시간 계산 */
+                ShiftMaster shift = shiftMasterMapper.findShiftByCode(detail.getShiftCode());
+                if (!Objects.equals(shift.getWorkDayType(), "0")) continue;
+                total = Duration.between(LocalTime.parse(shift.getWorkOnHhmm(), formatter),
+                    LocalTime.parse(shift.getWorkOffHhmm(), formatter));
+                if (!Objects.equals(shift.getBreak1StartHhmm(), "") && !Objects.equals(shift.getBreak1EndHhmm(), "")) {
+                    break1 = Duration.between(LocalTime.parse(shift.getBreak1StartHhmm(), formatter),
+                        LocalTime.parse(shift.getBreak1EndHhmm(), formatter));
+                }
+                if (!Objects.equals(shift.getBreak2StartHhmm(), "") && !Objects.equals(shift.getBreak2EndHhmm(), "")) {
+                    break2 = Duration.between(LocalTime.parse(shift.getBreak2StartHhmm(), formatter),
+                        LocalTime.parse(shift.getBreak2EndHhmm(), formatter));
+                }
+                Duration workTime = total.minus(break1).minus(break2);
+                totalWorkTime = totalWorkTime.plus(workTime);
             }
         }
 
-        patternService.createPattern(pattern, detailList);
+        if (totalWorkTime.toHours() >= 52) {
+            List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // 모든 근무조 목록
+            model.addAttribute("shiftCodes", shiftCodes);
+            model.addAttribute("errorMsg", "52시간을 초과하였습니다.");
+            return VIEW_CREATE;
+        }
+        else {
+            long totalMinutes = totalWorkTime.toMinutes();
+            long hours = totalMinutes / 60;
+            long minutes = totalMinutes % 60;
+            pattern.setTotalWorkingHours(String.format("%02d%02d", hours, minutes));
+            patternService.createPattern(pattern, detailList);
+        }
+
         return "redirect:/admin/pattern/list";
     }
 
+    /* 근태패턴 수정 Form */
     @GetMapping("/edit/{workPatternCode}")
     public String editPatternForm(@PathVariable String workPatternCode,
                                   @RequestParam("month") String monthStr,
                                   Model model) {
+        /* 선택된 yyyyMM */
         YearMonth selectedMonth = YearMonth.parse(monthStr);
         List<ShiftMaster> shiftCodeList = shiftMasterMapper.findAllShiftCodes();
-
         Map<String, String> shiftCodeMap = new LinkedHashMap<>();
+        ShiftPattern pattern = shiftPatternMapper.findPatternByCode(workPatternCode);
+
+        /* 일별 근태패턴코드 */
         for (int day = 1; day <= selectedMonth.lengthOfMonth(); day++) {
-            LocalDate date = selectedMonth.atDay(day);
+            LocalDate date = selectedMonth.atDay(day);         // yyyy-MM-dd
             String dateStr = DateUtil.reverseFormatDate(date); // yyyyMMdd
             String shiftCode = shiftCalendarMapper.getShiftCodeByPatternCodeAndDate(workPatternCode, dateStr);
             shiftCodeMap.put(String.valueOf(day), shiftCode);
         }
-
-        ShiftPattern pattern = shiftPatternMapper.findPatternByCode(workPatternCode);
 
         model.addAttribute("workPatternCode", workPatternCode);
         model.addAttribute("selectedMonth", selectedMonth.toString()); // YYYY-MM
@@ -155,14 +204,17 @@ public class AdminPatternController {
         return "admin/pattern/edit";
     }
 
+    /* 근태패턴 수정 처리 */
     @PostMapping("/update")
     public String updatePattern(@RequestParam("workPatternCode") String workPatternCode,
                                 @RequestParam("selectedMonth") String selectedMonthStr,
                                 @RequestParam Map<String, String> shiftCodes) {
 
+        /* 선택된 yyyyMM */
         YearMonth selectedMonth = YearMonth.parse(selectedMonthStr);
-        List<ShiftCalendar> updatedList = new ArrayList<>();
 
+        /* 수정된 캘린더 생성 */
+        List<ShiftCalendar> updatedList = new ArrayList<>();
         for (int day = 1; day <= selectedMonth.lengthOfMonth(); day++) {
             String key = "shiftCodes[" + day + "]";
             if (shiftCodes.containsKey(key)) {

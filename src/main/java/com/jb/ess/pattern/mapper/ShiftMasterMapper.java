@@ -12,5 +12,13 @@ public interface ShiftMasterMapper {
         FROM HRTSHIFTMASTER
         WHERE USE_YN = 'Y'
     """)
+    /* 모든 근태코드 */
     List<ShiftMaster> findAllShiftCodes();
+
+    @Select("""
+        SELECT *
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE = #{shiftCode}
+    """)
+    ShiftMaster findShiftByCode(String shiftCode);
 }

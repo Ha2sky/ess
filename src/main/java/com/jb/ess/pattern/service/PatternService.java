@@ -113,6 +113,7 @@ public class PatternService {
         }
     }
 
+    /* dateStr 날짜에 workPatternCode의 캘린더가 존재하는가? True : False */
     public Boolean findShiftCalendar(String workPatternCode, String dateStr) {
         return shiftCalendarMapper.getCountShiftCalendar(workPatternCode, dateStr) == 0;
     }

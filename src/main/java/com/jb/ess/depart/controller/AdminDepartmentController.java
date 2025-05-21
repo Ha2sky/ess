@@ -63,8 +63,8 @@ public class AdminDepartmentController {
     /* 부서 수정 */
     @PostMapping("/edit")
     public String editDepartment(@ModelAttribute Department department,
-        @RequestParam("originalDeptCode") String originalDeptCode,
-        Model model) {
+                                 @RequestParam("originalDeptCode") String originalDeptCode,
+                                 Model model) {
 
         if (!originalDeptCode.equals(department.getDeptCode()) &&
             departmentService.existsByDeptCode(department.getDeptCode())) {
