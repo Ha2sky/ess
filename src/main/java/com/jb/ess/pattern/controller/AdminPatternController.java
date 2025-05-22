@@ -59,7 +59,7 @@ public class AdminPatternController {
                     patternService.generateShiftCalendar(pattern.getWorkPatternCode(), selectedMonth);
                 }
             }
-        /* 근태패턴코드 검색(1가지) 인 경우 */
+            /* 근태패턴코드 검색(1가지) 인 경우 */
         } else {
             /* HRTSHIFTCALENDAR에 근태패턴들의 캘린더가 존재하는지 탐색 */
             if (Boolean.TRUE.equals(patternService.findShiftCalendar(workPatternCode, monthStr.replace("-", "")))){
@@ -91,8 +91,7 @@ public class AdminPatternController {
 
     /* 근태패턴 삭제 */
     @PostMapping("/delete")
-    public String deletePatterns(
-        @RequestParam(value = "workPatternCodes", required = false) List<String> workPatternCodes) {
+    public String deletePatterns(@RequestParam(value = "workPatternCodes", required = false) List<String> workPatternCodes) {
         patternService.deletePatternsByCodes(workPatternCodes);
         return "redirect:/admin/pattern/list";
     }
@@ -111,7 +110,6 @@ public class AdminPatternController {
                               @RequestParam String workPatternName,
                               @RequestParam Map<String, String> dayOfWeekMap,
                               Model model) {
-
         if (shiftPatternMapper.findPatternByCode(workPatternCode) != null) {
             return sendErrorMsg("중복된 근태패턴코드입니다.", model);
         }
@@ -140,7 +138,7 @@ public class AdminPatternController {
 
                 /* 익일근무 다음날 주간근무 불가 */
                 if (i < 5 && Objects.equals(shift.getWorkOffDayType(), "N1") &&
-                             Objects.equals(shiftMasterMapper.findShiftByCode(dayOfWeekMap.get("dayOfWeekMap[" + (i + 1) + "]")).getWorkOffDayType(), "N0")){
+                    Objects.equals(shiftMasterMapper.findShiftByCode(dayOfWeekMap.get("dayOfWeekMap[" + (i + 1) + "]")).getWorkOffDayType(), "N0")){
                     return sendErrorMsg("익일근무 다음날 주간근무는 불가능합니다.", model);
                 }
             }

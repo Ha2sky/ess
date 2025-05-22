@@ -44,10 +44,12 @@ public interface ShiftPatternMapper {
         INSERT
         INTO HRTSHIFTPATTERN (WORK_PATTERN_CODE,
                               WORK_PATTERN_NAME,
+                              TOTAL_WORKING_HOURS,
                               USE_YN,
                               CREATE_AT)
         VALUES (#{workPatternCode},
                 #{workPatternName},
+                #{totalWorkingHours},
                 #{useYn},
                 #{createAt})
     """)
