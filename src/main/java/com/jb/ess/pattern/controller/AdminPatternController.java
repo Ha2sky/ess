@@ -113,17 +113,8 @@ public class AdminPatternController {
                               Model model) {
 
         if (shiftPatternMapper.findPatternByCode(workPatternCode) != null) {
-            List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // 모든 근무조 목록
-            model.addAttribute("shiftCodes", shiftCodes);
-            model.addAttribute("errorMsg", "중복된 근태패턴코드입니다.");
-            return VIEW_CREATE;
+            return sendErrorMsg("중복된 근태패턴코드입니다.", model);
         }
-
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
-        Duration totalWorkTime = Duration.ZERO;
-        Duration total;
-        Duration break1 = Duration.ZERO;
-        Duration break2 = Duration.ZERO;
 
         // 마스터 패턴 도메인 생성
         ShiftPattern pattern = new ShiftPattern();
@@ -132,6 +123,7 @@ public class AdminPatternController {
 
         // 디테일 목록 생성
         List<ShiftPatternDtl> detailList = new ArrayList<>();
+        Duration totalWorkTime = Duration.ZERO;
         for (int i = 1; i <= 7; i++) {
             String paramKey = "dayOfWeekMap[" + i + "]";
             if (dayOfWeekMap.containsKey(paramKey)) {
@@ -141,31 +133,25 @@ public class AdminPatternController {
                 detail.setShiftCode(dayOfWeekMap.get(paramKey));
                 detailList.add(detail);
 
-                /* 근무시간 계산 */
                 ShiftMaster shift = shiftMasterMapper.findShiftByCode(detail.getShiftCode());
-                if (!Objects.equals(shift.getWorkDayType(), "0")) continue;
-                total = Duration.between(LocalTime.parse(shift.getWorkOnHhmm(), formatter),
-                    LocalTime.parse(shift.getWorkOffHhmm(), formatter));
-                if (!Objects.equals(shift.getBreak1StartHhmm(), "") && !Objects.equals(shift.getBreak1EndHhmm(), "")) {
-                    break1 = Duration.between(LocalTime.parse(shift.getBreak1StartHhmm(), formatter),
-                        LocalTime.parse(shift.getBreak1EndHhmm(), formatter));
+
+                if (!Objects.equals(shift.getWorkDayType(), "0")) continue; // 휴무, 휴일 배제
+                totalWorkTime = totalWorkTime.plus(getTotalWorkTime(shift));
+
+                /* 익일근무 다음날 주간근무 불가 */
+                if (i < 5 && Objects.equals(shift.getWorkOffDayType(), "N1") &&
+                             Objects.equals(shiftMasterMapper.findShiftByCode(dayOfWeekMap.get("dayOfWeekMap[" + (i + 1) + "]")).getWorkOffDayType(), "N0")){
+                    return sendErrorMsg("익일근무 다음날 주간근무는 불가능합니다.", model);
                 }
-                if (!Objects.equals(shift.getBreak2StartHhmm(), "") && !Objects.equals(shift.getBreak2EndHhmm(), "")) {
-                    break2 = Duration.between(LocalTime.parse(shift.getBreak2StartHhmm(), formatter),
-                        LocalTime.parse(shift.getBreak2EndHhmm(), formatter));
-                }
-                Duration workTime = total.minus(break1).minus(break2);
-                totalWorkTime = totalWorkTime.plus(workTime);
             }
         }
 
-        if (totalWorkTime.toHours() >= 52) {
-            List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes(); // 모든 근무조 목록
-            model.addAttribute("shiftCodes", shiftCodes);
-            model.addAttribute("errorMsg", "52시간을 초과하였습니다.");
-            return VIEW_CREATE;
+        /* 주 52시간 초과 불가 */
+        if (totalWorkTime.toMinutes() > (52 * 60)) {
+            return sendErrorMsg("52시간을 초과하였습니다.", model);
         }
         else {
+            /* 주 52시간 조건 충족 */
             long totalMinutes = totalWorkTime.toMinutes();
             long hours = totalMinutes / 60;
             long minutes = totalMinutes % 60;
@@ -235,4 +221,35 @@ public class AdminPatternController {
         return "redirect:/admin/pattern/list?month=" + selectedMonthStr + "&workPatternCode=" + workPatternCode;
     }
 
+    /* 총 근무시간 계산 */
+    public Duration getTotalWorkTime(ShiftMaster shift) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
+        Duration total;
+        Duration break1 = Duration.ZERO;
+        Duration break2 = Duration.ZERO;
+
+        // 출근시간, 퇴근시간
+        total = Duration.between(LocalTime.parse(shift.getWorkOnHhmm(), formatter),
+            LocalTime.parse(shift.getWorkOffHhmm(), formatter));
+        // 휴게1시작시간, 휴게1종료시간
+        if (!Objects.equals(shift.getBreak1StartHhmm(), "") && !Objects.equals(shift.getBreak1EndHhmm(), "")) {
+            break1 = Duration.between(LocalTime.parse(shift.getBreak1StartHhmm(), formatter),
+                LocalTime.parse(shift.getBreak1EndHhmm(), formatter));
+        }
+        // 휴게2시작시간, 휴게2종료시간
+        if (!Objects.equals(shift.getBreak2StartHhmm(), "") && !Objects.equals(shift.getBreak2EndHhmm(), "")) {
+            break2 = Duration.between(LocalTime.parse(shift.getBreak2StartHhmm(), formatter),
+                LocalTime.parse(shift.getBreak2EndHhmm(), formatter));
+        }
+
+        return total.minus(break1).minus(break2);
+    }
+
+    /* 에러메시지 전달 */
+    public String sendErrorMsg(String errorMsg, Model model) {
+        List<ShiftMaster> shiftCodes = shiftMasterMapper.findAllShiftCodes();
+        model.addAttribute("shiftCodes", shiftCodes);
+        model.addAttribute("errorMsg", errorMsg);
+        return VIEW_CREATE;
+    }
 }

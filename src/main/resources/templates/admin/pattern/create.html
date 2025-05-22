@@ -71,14 +71,14 @@
         <label for="day6" class="block text-sm font-medium text-gray-700">토요일</label>
         <select id="day6" name="dayOfWeekMap[6]" required class="mt-1 block w-full rounded border border-gray-300 p-2">
           <option value="">선택</option>
-          <option th:each="shift : ${shiftCodes}" th:value="${shift.shiftCode}" th:text="${shift.shiftName}"></option>
+          <option th:each="shift : ${shiftCodes}" th:value="${shift.shiftCode}" th:text="${shift.shiftName}" th:selected="${shift.shiftCode == '13'}"></option>
         </select>
       </div>
       <div>
         <label for="day7" class="block text-sm font-medium text-gray-700">일요일</label>
         <select id="day7" name="dayOfWeekMap[7]" required class="mt-1 block w-full rounded border border-gray-300 p-2">
           <option value="">선택</option>
-          <option th:each="shift : ${shiftCodes}" th:value="${shift.shiftCode}" th:text="${shift.shiftName}"></option>
+          <option th:each="shift : ${shiftCodes}" th:value="${shift.shiftCode}" th:text="${shift.shiftName}" th:selected="${shift.shiftCode == '12'}"></option>
         </select>
       </div>
     </div>
