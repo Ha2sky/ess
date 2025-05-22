@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class ApprovalHistory {
-    private String histNo;         // 결재이력번호
+    private String approvalNo;         // 결재이력번호
     private String applyGeneralNo; // 신청코드
     private String applyEtcNo;     // 신청코드
     private String approverCode;   // 결재자 사원코드
