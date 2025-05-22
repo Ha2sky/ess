@@ -74,7 +74,8 @@
       <label for="workPatternCode" class="block">근태패턴</label>
       <select id="workPatternCode" name="workPatternCode" class="w-full border p-2 rounded">
         <option value="">없음</option>
-        <option th:each="pattern : ${shiftPatterns}" th:value="${pattern.workPatternCode}" th:text="${pattern.workPatternName}"></option>
+        <option th:each="pattern : ${shiftPatterns}" th:value="${pattern.workPatternCode}"
+                th:text="${pattern.workPatternName}" th:selected="${pattern.workPatternCode == department.workPatternCode}"></option>
       </select>
     </div>
 

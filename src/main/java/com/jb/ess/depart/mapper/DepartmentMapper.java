@@ -54,13 +54,14 @@ public interface DepartmentMapper {
 
     @Update("""
         UPDATE ORGDEPTMASTER
-        SET DEPT_NAME = #{deptName}, PARENT_DEPT = #{parentDept}, DEPT_LEADER = #{deptLeader},
-            START_DATE = #{startDate}, END_DATE = #{endDate}, USE_YN = #{useYn},
-            DEPT_CATEGORY = #{deptCategory}, WORK_PATTERN_CODE = #{workPatternCode}
-        WHERE DEPT_CODE = #{deptCode}
+        SET DEPT_CODE = #{dept.deptCode}, DEPT_NAME = #{dept.deptName}, PARENT_DEPT = #{dept.parentDept},
+            DEPT_LEADER = #{dept.deptLeader}, START_DATE = #{dept.startDate}, END_DATE = #{dept.endDate},
+            USE_YN = #{dept.useYn}, DEPT_CATEGORY = #{dept.deptCategory}, WORK_PATTERN_CODE = #{dept.workPatternCode}
+        WHERE DEPT_CODE = #{originalDeptCode}
     """)
     // 부서 수정
-    void updateDepartment(Department department);
+    void updateDepartment(@Param("dept") Department department,
+                          @Param("originalDeptCode") String originalDeptCode);
 
     @Select("""
         SELECT *

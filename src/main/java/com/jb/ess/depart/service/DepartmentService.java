@@ -26,8 +26,8 @@ public class DepartmentService {
     }
 
     // 부서 수정
-    public void updateDepartment(Department department) {
-        departmentMapper.updateDepartment(department);
+    public void updateDepartment(Department department, String originalDeptCode) {
+        departmentMapper.updateDepartment(department, originalDeptCode);
     }
 
     // 부서 코드로 부서 찾기

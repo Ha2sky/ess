@@ -80,7 +80,7 @@ public class AdminDepartmentController {
         }
 
         sanitizeDepartment(department);
-        departmentService.updateDepartment(department);
+        departmentService.updateDepartment(department, originalDeptCode);
         return REDIRECT_LIST;
     }
 
@@ -97,10 +97,11 @@ public class AdminDepartmentController {
 
     /* 공통 처리 메서드 */
     private void sanitizeDepartment(Department department) {
+        department.setDeptCode(department.getDeptCode());
         department.setDeptName(defaultIfNull(department.getDeptName()));
         department.setParentDept(defaultIfNull(department.getParentDept()));
-        department.setDeptLeader(defaultIfNull(department.getDeptLeader()));
-        department.setWorkPatternCode(defaultIfNull(department.getWorkPatternCode()));
+        department.setDeptLeader(department.getDeptLeader() == null ? null : department.getDeptLeader());
+        department.setWorkPatternCode(department.getWorkPatternCode() == null ? null : department.getWorkPatternCode());
         department.setUseYn(department.getUseYn() == null ? "N" : department.getUseYn());
 
         String start = defaultIfNull(department.getStartDate()).replace("-", "");
