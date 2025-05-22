@@ -13,5 +13,6 @@ public class Department {
     private String endDate;         // 종료일자
     private String useYn;           // 사용여부
     private String workPatternCode; // 근태패턴코드
-    private int empCount;
+    private int empCount;           // 부서별 사원수
+    private String leaderName;      // 부서장 이름
 }

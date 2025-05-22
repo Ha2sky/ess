@@ -13,29 +13,32 @@ import org.apache.ibatis.annotations.Update;
 public interface DepartmentMapper {
     @Select("""
         SELECT
-            d.DEPT_CODE,
-            d.DEPT_NAME,
-            d.DEPT_CATEGORY,
-            d.PARENT_DEPT,
-            d.USE_YN,
-            d.START_DATE,
-            d.END_DATE,
-            d.DEPT_LEADER,
-            d.WORK_PATTERN_CODE,
-            COUNT(e.EMP_CODE) AS EMP_COUNT
-        FROM ORGDEPTMASTER d
-        LEFT JOIN HRIMASTER e ON d.DEPT_CODE = e.DEPT_CODE
-        GROUP BY
-            d.DEPT_CODE,
-            d.DEPT_NAME,
-            d.DEPT_CATEGORY,
-            d.PARENT_DEPT,
-            d.USE_YN,
-            d.START_DATE,
-            d.END_DATE,
-            d.DEPT_LEADER,
-            d.WORK_PATTERN_CODE
-        ORDER BY d.DEPT_CODE
+                d.DEPT_CODE,
+                d.DEPT_NAME,
+                d.DEPT_CATEGORY,
+                d.PARENT_DEPT,
+                d.USE_YN,
+                d.START_DATE,
+                d.END_DATE,
+                d.DEPT_LEADER,
+                leader.EMP_NAME AS LEADER_NAME,
+                d.WORK_PATTERN_CODE,
+                COUNT(e.EMP_CODE) AS EMP_COUNT
+            FROM ORGDEPTMASTER d
+            LEFT JOIN HRIMASTER e ON d.DEPT_CODE = e.DEPT_CODE
+            LEFT JOIN HRIMASTER leader ON d.DEPT_LEADER = leader.EMP_CODE
+            GROUP BY
+                d.DEPT_CODE,
+                d.DEPT_NAME,
+                d.DEPT_CATEGORY,
+                d.PARENT_DEPT,
+                d.USE_YN,
+                d.START_DATE,
+                d.END_DATE,
+                d.DEPT_LEADER,
+                leader.EMP_NAME,
+                d.WORK_PATTERN_CODE
+            ORDER BY d.DEPT_CODE
     """)
     // 부서 리스트
     List<Department> findAll();

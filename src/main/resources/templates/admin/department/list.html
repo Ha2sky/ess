@@ -42,7 +42,7 @@
       <td class="border px-4 py-2" th:text="${dept.deptCode}"></td>
       <td class="border px-4 py-2" th:text="${dept.deptName}"></td>
       <td class="border px-4 py-2" th:text="${dept.useYn == 'Y' ? '사용' : '미사용'}"></td>
-      <td class="border px-4 py-2" th:text="${dept.deptLeader}"></td>
+      <td class="border px-4 py-2" th:text="${dept.leaderName}"></td>
       <td class="border px-4 py-2" th:text="${dept.empCount} + 명"></td>
       <td class="border px-4 py-2" th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(dept.startDate)}|"></td>
       <td class="border px-4 py-2" th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(dept.endDate)}|"></td>
