@@ -69,6 +69,15 @@
       <input type="date" id="endDate" th:field="*{endDate}" class="w-full border p-2 rounded">
     </div>
 
+    <!-- 근태패턴 -->
+    <div>
+      <label for="workPatternCode" class="block">근태패턴</label>
+      <select id="workPatternCode" name="workPatternCode" class="w-full border p-2 rounded">
+        <option value="">없음</option>
+        <option th:each="pattern : ${shiftPatterns}" th:value="${pattern.workPatternCode}" th:text="${pattern.workPatternName}"></option>
+      </select>
+    </div>
+
     <!-- 사용 여부 -->
     <div class="flex items-center">
       <label>사용 여부

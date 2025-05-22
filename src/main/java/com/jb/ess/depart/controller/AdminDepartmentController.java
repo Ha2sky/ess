@@ -1,6 +1,7 @@
 package com.jb.ess.depart.controller;
 
 import com.jb.ess.common.domain.Department;
+import com.jb.ess.pattern.mapper.ShiftPatternMapper;
 import com.jb.ess.depart.service.DepartmentService;
 import com.jb.ess.common.util.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +13,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/admin/department")
 @RequiredArgsConstructor
 public class AdminDepartmentController {
-
     private static final String REDIRECT_LIST = "redirect:/admin/department/list";
     private static final String VIEW_ADD = "admin/department/add";
     private static final String VIEW_EDIT = "admin/department/edit";
 
     private final DepartmentService departmentService;
+    private final ShiftPatternMapper shiftPatternMapper;
 
     /* 부서 목록 */
     @GetMapping("/list")
@@ -30,6 +31,7 @@ public class AdminDepartmentController {
     @GetMapping("/add")
     public String addDepartmentForm(Model model) {
         departmentsList(model);
+        shiftPatternList(model);
         return VIEW_ADD;
     }
 
@@ -44,6 +46,7 @@ public class AdminDepartmentController {
         } catch (IllegalArgumentException e) {
             model.addAttribute("errorMessage", e.getMessage());
             departmentsList(model);
+            shiftPatternList(model);
             return VIEW_ADD;
         }
     }
@@ -56,6 +59,7 @@ public class AdminDepartmentController {
         department.setEndDate(DateUtil.formatDate(department.getEndDate()));
         model.addAttribute("department", department);
         departmentsList(model);
+        shiftPatternList(model);
         model.addAttribute("originalDeptCode", deptCode);
         return VIEW_EDIT;
     }
@@ -96,6 +100,7 @@ public class AdminDepartmentController {
         department.setDeptName(defaultIfNull(department.getDeptName()));
         department.setParentDept(defaultIfNull(department.getParentDept()));
         department.setDeptLeader(defaultIfNull(department.getDeptLeader()));
+        department.setWorkPatternCode(defaultIfNull(department.getWorkPatternCode()));
         department.setUseYn(department.getUseYn() == null ? "N" : department.getUseYn());
 
         String start = defaultIfNull(department.getStartDate()).replace("-", "");
@@ -117,5 +122,9 @@ public class AdminDepartmentController {
 
     private void departmentsList(Model model) {
         model.addAttribute("departments", departmentService.getAllDepartments());
+    }
+
+    private void shiftPatternList(Model model){
+        model.addAttribute("shiftPatterns", shiftPatternMapper.findAllPatterns());
     }
 }

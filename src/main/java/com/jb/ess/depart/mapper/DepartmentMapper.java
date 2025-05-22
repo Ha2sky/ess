@@ -21,6 +21,7 @@ public interface DepartmentMapper {
             d.START_DATE,
             d.END_DATE,
             d.DEPT_LEADER,
+            d.WORK_PATTERN_CODE,
             COUNT(e.EMP_CODE) AS EMP_COUNT
         FROM ORGDEPTMASTER d
         LEFT JOIN HRIMASTER e ON d.DEPT_CODE = e.DEPT_CODE
@@ -32,7 +33,8 @@ public interface DepartmentMapper {
             d.USE_YN,
             d.START_DATE,
             d.END_DATE,
-            d.DEPT_LEADER
+            d.DEPT_LEADER,
+            d.WORK_PATTERN_CODE
         ORDER BY d.DEPT_CODE
     """)
     // 부서 리스트
@@ -40,9 +42,9 @@ public interface DepartmentMapper {
 
     @Insert("""
         INSERT INTO ORGDEPTMASTER (DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER,
-                                   DEPT_CATEGORY, START_DATE, END_DATE, USE_YN)
+                                   DEPT_CATEGORY, START_DATE, END_DATE, USE_YN, WORK_PATTERN_CODE)
         VALUES (#{deptCode}, #{deptName}, #{parentDept}, #{deptLeader},
-                #{deptCategory}, #{startDate}, #{endDate}, #{useYn})
+                #{deptCategory}, #{startDate}, #{endDate}, #{useYn}, #{workPatternCode})
     """)
     // 부서 생성
     void insertDepartment(Department department);
@@ -50,7 +52,8 @@ public interface DepartmentMapper {
     @Update("""
         UPDATE ORGDEPTMASTER
         SET DEPT_NAME = #{deptName}, PARENT_DEPT = #{parentDept}, DEPT_LEADER = #{deptLeader},
-            START_DATE = #{startDate}, END_DATE = #{endDate}, USE_YN = #{useYn}, DEPT_CATEGORY = #{deptCategory}
+            START_DATE = #{startDate}, END_DATE = #{endDate}, USE_YN = #{useYn},
+            DEPT_CATEGORY = #{deptCategory}, WORK_PATTERN_CODE = #{workPatternCode}
         WHERE DEPT_CODE = #{deptCode}
     """)
     // 부서 수정
