@@ -10,9 +10,11 @@ import org.apache.ibatis.annotations.Select;
 public interface EmpAttendanceMapper {
     @Select("""
         SELECT emp.*,
-               att.*
+               att.*,
+               grd.POSITION_NAME
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
+        LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
         WHERE emp.DEPT_CODE = #{deptCode}
         ORDER BY emp.EMP_NAME
     """)

@@ -58,7 +58,7 @@
       <tr th:each="emp : ${employees}" class="hover:bg-gray-50">
         <td class="px-4 py-2 text-center" th:text="${emp.empCode}"></td>
         <td class="px-4 py-2 text-center" th:text="${emp.empName}"></td>
-        <td class="px-4 py-2 text-center" th:text="${emp.positionCode}"></td>
+        <td class="px-4 py-2 text-center" th:text="${emp.positionName}"></td>
         <td class="px-4 py-2 text-center" th:text="${emp.deptCode}"></td>
         <td class="px-4 py-2 text-center"
             th:text="${emp.checkInTime != null and !emp.checkInTime.isEmpty() ? #dates.format(#dates.parse(emp.checkInTime, 'HHmm'), 'HH:mm') : '-'}"></td>
