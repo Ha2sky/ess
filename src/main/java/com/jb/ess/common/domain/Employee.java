@@ -31,4 +31,5 @@ public class Employee implements Serializable {
     private String workDate;      // 근무일
     private String checkInTime;   // 출근시간(HHmm)
     private String checkOutTime;  // 퇴근시간(HHmm)
+    private String deptName;
 }

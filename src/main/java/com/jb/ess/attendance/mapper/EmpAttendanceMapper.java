@@ -11,10 +11,12 @@ public interface EmpAttendanceMapper {
     @Select("""
         SELECT emp.*,
                att.*,
-               grd.POSITION_NAME
+               grd.POSITION_NAME,
+               dept.DEPT_NAME
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
         LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
+        LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
         WHERE emp.DEPT_CODE = #{deptCode}
         ORDER BY emp.EMP_NAME
     """)
