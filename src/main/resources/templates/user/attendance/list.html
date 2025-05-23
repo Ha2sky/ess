@@ -16,7 +16,7 @@
       <div>
         <label for="workDate" class="block text-sm font-medium text-gray-700 mb-1">근무일</label>
         <input type="date" name="workDate" id="workDate"
-               th:value="${#dates.format(#dates.createNow(), 'yyyy-MM-dd')}"
+               th:value="${param.workDate != null ? param.workDate : #dates.format(#dates.createNow(), 'yyyy-MM-dd')}"
                class="w-40 p-2 border rounded-lg" required>
       </div>
 
@@ -72,3 +72,10 @@
 </div>
 </body>
 </html>
+
+<script>
+  // month input이 바뀌면 form을 제출
+  document.querySelector('input[name="workDate"]').addEventListener('change', function() {
+    this.form.submit();
+  });
+</script>
