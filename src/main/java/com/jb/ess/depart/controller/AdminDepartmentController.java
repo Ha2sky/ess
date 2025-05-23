@@ -121,10 +121,12 @@ public class AdminDepartmentController {
         return (value == null || value.isBlank()) ? defaultValue : value;
     }
 
+    /* 부서 리스트 */
     private void departmentsList(Model model) {
         model.addAttribute("departments", departmentService.getAllDepartments());
     }
 
+    /* 패턴 리스트 */
     private void shiftPatternList(Model model){
         model.addAttribute("shiftPatterns", shiftPatternMapper.findAllPatterns());
     }

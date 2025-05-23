@@ -66,4 +66,12 @@ public interface EmployeeMapper {
         WHERE EMP_CODE = #{empCode}
     """)
     Employee findIsHeader(@Param("empCode") String empCode);
+
+    /* 부서 코드 찾기 */
+    @Select("""
+        SELECT DEPT_CODE
+        FROM HRIMASTER
+        WHERE EMP_CODE = #{empCode}
+    """)
+    String getDeptCodeByEmpCode(String empCode);
 }

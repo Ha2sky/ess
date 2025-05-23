@@ -26,5 +26,9 @@ public class Employee implements Serializable {
 
     private String positionName;  // 직위명
     private String dutyName;      // 직책명
-    private String isHeader;
+    private String isHeader;      // 부서장(Y/N)
+
+    private String workDate;      // 근무일
+    private String checkInTime;   // 출근시간(HHmm)
+    private String checkOutTime;  // 퇴근시간(HHmm)
 }
