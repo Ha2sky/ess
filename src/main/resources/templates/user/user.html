@@ -31,7 +31,7 @@
 
     <!-- 부서장 권한이 있을 경우에만 표시 -->
     <div th:if="${emp.isHeader == 'Y'}">
-      <a th:href="@{/user/approval}"
+      <a th:href="@{/user/approval/}"
          class="block w-full text-center bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg transition">
         부서원 근태 승인
       </a>
