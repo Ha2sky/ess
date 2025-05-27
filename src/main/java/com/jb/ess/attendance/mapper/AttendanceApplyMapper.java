@@ -3,7 +3,6 @@ package com.jb.ess.attendance.mapper;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.common.domain.ApprovalHistory;
 import org.apache.ibatis.annotations.*;
 import java.util.List;
 
