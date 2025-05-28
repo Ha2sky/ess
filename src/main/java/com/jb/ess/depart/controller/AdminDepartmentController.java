@@ -1,7 +1,7 @@
 package com.jb.ess.depart.controller;
 
 import com.jb.ess.common.domain.Department;
-import com.jb.ess.pattern.mapper.ShiftPatternMapper;
+import com.jb.ess.common.mapper.ShiftPatternMapper;
 import com.jb.ess.depart.service.DepartmentService;
 import com.jb.ess.common.util.DateUtil;
 import lombok.RequiredArgsConstructor;

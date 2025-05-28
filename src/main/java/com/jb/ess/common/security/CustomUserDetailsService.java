@@ -2,7 +2,7 @@ package com.jb.ess.common.security;
 
 import com.jb.ess.common.domain.Employee;
 
-import com.jb.ess.login.mapper.UserMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -11,10 +11,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
-    private final UserMapper employeeMapper;
+    private final EmployeeMapper employeeMapper;
 
     @Autowired
-    public CustomUserDetailsService(UserMapper employeeMapper) {
+    public CustomUserDetailsService(EmployeeMapper employeeMapper) {
         this.employeeMapper = employeeMapper;
     }
 

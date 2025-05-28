@@ -1,7 +1,7 @@
 package com.jb.ess.login.controller;
 
+import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.security.CustomUserDetails;
-import com.jb.ess.depart.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 @RequiredArgsConstructor
 public class LoginController {
-    private final EmployeeService employeeService;
+    private final EmployeeMapper employeeMapper;
 
     @GetMapping("/login")
     public String loginPage() {
@@ -26,8 +26,8 @@ public class LoginController {
 
     @GetMapping("/user")
     public String userPage(Model model, @AuthenticationPrincipal CustomUserDetails user) {
-        String empCode = user.getUsername();
-        model.addAttribute("emp", employeeService.findIsHeader(empCode));
+        model.addAttribute("deptCode", employeeMapper.getDeptCodeByEmpCode(user.getUsername()));
+        model.addAttribute("isHeader", employeeMapper.findIsHeader(user.getUsername()));
         return "user/user";
     }
 }

@@ -1,4 +1,4 @@
-package com.jb.ess.pattern.mapper;
+package com.jb.ess.common.mapper;
 
 import com.jb.ess.common.domain.ShiftPatternDtl;
 import org.apache.ibatis.annotations.Delete;

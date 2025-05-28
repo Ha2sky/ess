@@ -1,10 +1,10 @@
 package com.jb.ess.attendance.service;
 
-import com.jb.ess.attendance.mapper.EmpAttendanceMapper;
+import com.jb.ess.common.mapper.EmpAttendanceMapper;
 import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.depart.mapper.DepartmentMapper;
-import com.jb.ess.depart.mapper.EmployeeMapper;
+import com.jb.ess.common.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

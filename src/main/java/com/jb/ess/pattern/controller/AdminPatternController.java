@@ -1,12 +1,16 @@
 package com.jb.ess.pattern.controller;
 
+import com.jb.ess.common.domain.EmpCalendar;
 import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
 import com.jb.ess.common.domain.ShiftPatternDtl;
-import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
-import com.jb.ess.pattern.mapper.ShiftMasterMapper;
-import com.jb.ess.pattern.mapper.ShiftPatternMapper;
+import com.jb.ess.common.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.EmpCalendarMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
+import com.jb.ess.common.mapper.ShiftCalendarMapper;
+import com.jb.ess.common.mapper.ShiftMasterMapper;
+import com.jb.ess.common.mapper.ShiftPatternMapper;
 import com.jb.ess.pattern.service.PatternService;
 import com.jb.ess.common.util.DateUtil;
 import java.time.Duration;
@@ -38,6 +42,9 @@ public class AdminPatternController {
     private final ShiftPatternMapper shiftPatternMapper;
     private final ShiftCalendarMapper shiftCalendarMapper;
     private static final String VIEW_CREATE = "admin/pattern/create";
+    private final EmpCalendarMapper empCalendarMapper;
+    private final EmployeeMapper employeeMapper;
+    private final DepartmentMapper departmentMapper;
 
     /* 근태패턴 테이블 */
     @GetMapping("/list")
@@ -58,6 +65,9 @@ public class AdminPatternController {
                 if (Boolean.TRUE.equals(patternService.findShiftCalendar(pattern.getWorkPatternCode(), monthStr.replace("-", "")))){
                     /* 선택한 yyyy-mm 에 대해 존재하는 근태패턴의 캘린더를 생성 */
                     patternService.generateShiftCalendar(pattern.getWorkPatternCode(), selectedMonth);
+                }
+                if (Boolean.TRUE.equals(patternService.findEmpCalendar(pattern.getWorkPatternCode(), monthStr.replace("-", "")))){
+                    patternService.generateEmpCalendar(pattern.getWorkPatternCode(), selectedMonth);
                 }
             }
             /* 근태패턴코드 검색(1가지) 인 경우 */
@@ -195,26 +205,60 @@ public class AdminPatternController {
                                 @RequestParam("selectedMonth") String selectedMonthStr,
                                 @RequestParam Map<String, String> shiftCodes) {
 
-        /* 선택된 yyyyMM */
-        YearMonth selectedMonth = YearMonth.parse(selectedMonthStr);
+        // 선택된 yyyyMM (예: "2025-06" or "202506")
+        YearMonth selectedMonth = YearMonth.parse(selectedMonthStr.replace("-", ""));
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-        /* 수정된 캘린더 생성 */
+        // 수정된 캘린더 리스트 생성
         List<ShiftCalendar> updatedList = new ArrayList<>();
+        List<String> shiftDates = new ArrayList<>();
+        List<EmpCalendar> empCalendarList = new ArrayList<>();
+
         for (int day = 1; day <= selectedMonth.lengthOfMonth(); day++) {
             String key = "shiftCodes[" + day + "]";
-            if (shiftCodes.containsKey(key)) {
-                String shiftCode = shiftCodes.get(key);
-                if (shiftCode != null && !shiftCode.isEmpty()) {
-                    String shiftDate = selectedMonth.atDay(day).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-                    updatedList.add(new ShiftCalendar(workPatternCode, shiftDate, shiftCode));
+            String shiftCode = shiftCodes.get(key);
+            if (shiftCode != null && !shiftCode.isEmpty()) {
+                String shiftDate = selectedMonth.atDay(day).format(formatter);
+                updatedList.add(new ShiftCalendar(workPatternCode, shiftDate, shiftCode));
+                shiftDates.add(shiftDate);
+            }
+        }
+
+        // 기존 패턴의 해당 월 데이터 삭제 후 배치 삽입
+        shiftCalendarMapper.deleteShiftCalendarByMonth(workPatternCode, selectedMonthStr.replace("-", ""));
+        if (!updatedList.isEmpty()) {
+            shiftCalendarMapper.insertBatch(updatedList);
+        }
+
+        // === EmpCalendar 삭제 및 재삽입 ===
+        if (!shiftDates.isEmpty()) {
+            // 1. 삭제
+            empCalendarMapper.deleteEmpCalendarForUpdate(workPatternCode, selectedMonthStr.replace("-", ""));
+            // 2. 재삽입할 EmpCalendar 데이터 생성
+            List<String> deptCodes = departmentMapper.findDeptCodesByWorkPatternCode(workPatternCode);
+            for (String deptCode : deptCodes) {
+                List<String> empCodes = employeeMapper.findEmpCodesByDeptCode(deptCode);
+                for (String empCode : empCodes) {
+                    for (ShiftCalendar sc : updatedList) {
+                        int dayOfWeek = LocalDate.parse(sc.getShiftDate(), formatter).getDayOfWeek()
+                            .getValue();
+                        String holidayYn = (dayOfWeek == 6 || dayOfWeek == 7) ? "Y" : "N";
+                        empCalendarList.add(new EmpCalendar(
+                            workPatternCode,
+                            sc.getShiftDate(),
+                            sc.getShiftCode(),
+                            empCode,
+                            deptCode,
+                            holidayYn
+                        ));
+                    }
                 }
             }
         }
 
-        // 기존 패턴의 월 데이터를 삭제 후 재등록
-        shiftCalendarMapper.deleteShiftCalendarByMonth(workPatternCode, selectedMonthStr.replace("-", ""));
-        for (ShiftCalendar sc : updatedList) {
-            shiftCalendarMapper.insertShiftCalendar(sc);
+        // 3. 재삽입
+        if (!empCalendarList.isEmpty()) {
+            empCalendarMapper.insertBatch(empCalendarList);
         }
 
         return "redirect:/admin/pattern/list?month=" + selectedMonthStr + "&workPatternCode=" + workPatternCode;

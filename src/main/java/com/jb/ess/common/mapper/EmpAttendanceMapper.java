@@ -1,4 +1,4 @@
-package com.jb.ess.attendance.mapper;
+package com.jb.ess.common.mapper;
 
 import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;

@@ -1,9 +1,17 @@
 package com.jb.ess.depart.service;
 
+import com.jb.ess.common.domain.EmpCalendar;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.depart.mapper.DepartmentMapper;
-import com.jb.ess.depart.mapper.EmployeeMapper;
+import com.jb.ess.common.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.EmpCalendarMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
+import com.jb.ess.pattern.service.PatternService;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmployeeService {
     private final EmployeeMapper employeeMapper;
     private final DepartmentMapper departmentMapper;
+    private final EmpCalendarMapper empCalendarMapper;
+    private final PatternService patternService;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     /* 특정 부서에 소속된 사원 목록 조회 */
     public List<Employee> getEmployeesByDeptCode(String deptCode) {
@@ -22,6 +33,32 @@ public class EmployeeService {
     /* 기존 사원을 특정 부서에 배정 (추가) */
     public void assignEmployeeToDepartment(String empCode, String deptCode) {
         employeeMapper.updateEmployeeDepartment(empCode, deptCode);
+
+        /* 사원의 근태패턴캘린더 생성 */
+        String workPatternCode = departmentMapper.findWorkPatternCodeByDeptCode(deptCode);
+        Map<Integer, String> shiftCodeMap = patternService.getShiftCodeMap(workPatternCode);
+        List<LocalDate> dates = patternService.getDatesInMonth(YearMonth.now());
+        List<EmpCalendar> batchList = new ArrayList<>();
+
+        for (LocalDate date : dates) {
+            int dayOfWeek = date.getDayOfWeek().getValue();
+            String shiftCode = shiftCodeMap.get(dayOfWeek);
+            if (shiftCode != null) {
+                String holidayYn = (dayOfWeek == 6 || dayOfWeek == 7) ? "Y" : "N";
+                batchList.add(new EmpCalendar(
+                    workPatternCode,
+                    date.format(FORMATTER),
+                    shiftCode,
+                    empCode,
+                    deptCode,
+                    holidayYn
+                ));
+            }
+        }
+
+        if (!batchList.isEmpty()) {
+            empCalendarMapper.insertBatch(batchList);
+        }
     }
 
     public void assignHeader(String empCode, String deptCode) {
@@ -41,17 +78,15 @@ public class EmployeeService {
             employeeMapper.updateNotHeader(empCode);
         }
 
-        // 3. 사원의 부서코드 null 처리 (부서 제외)
+        // 3. 사원의 근태패턴캘린더 삭제
+        empCalendarMapper.deleteEmpCalendarByEmpCode(deptCode, empCode);
+
+        // 4. 사원의 부서코드 null 처리 (부서 제외)
         employeeMapper.updateEmployeeDepartment(empCode, null);
     }
 
     /* 부서에 소속되지 않은 모든 사원 조회 (선택 리스트용) */
     public List<Employee> getEmployeesWithoutDepartment() {
         return employeeMapper.findEmployeesWithoutDepartment();
-    }
-
-    /* 부서장 권한 확인 */
-    public Employee findIsHeader(String empCode) {
-        return employeeMapper.findIsHeader(empCode);
     }
 }

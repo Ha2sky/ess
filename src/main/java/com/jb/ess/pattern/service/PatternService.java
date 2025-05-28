@@ -1,13 +1,17 @@
 package com.jb.ess.pattern.service;
 
+import com.jb.ess.common.domain.EmpCalendar;
 import com.jb.ess.common.domain.ShiftCalendar;
 import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.domain.ShiftPattern;
 import com.jb.ess.common.domain.ShiftPatternDtl;
+import com.jb.ess.common.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.EmpCalendarMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.util.DateUtil;
-import com.jb.ess.pattern.mapper.ShiftCalendarMapper;
-import com.jb.ess.pattern.mapper.ShiftPatternDtlMapper;
-import com.jb.ess.pattern.mapper.ShiftPatternMapper;
+import com.jb.ess.common.mapper.ShiftCalendarMapper;
+import com.jb.ess.common.mapper.ShiftPatternDtlMapper;
+import com.jb.ess.common.mapper.ShiftPatternMapper;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -26,27 +30,91 @@ public class PatternService {
     private final ShiftPatternMapper shiftPatternMapper;
     private final ShiftPatternDtlMapper shiftPatternDtlMapper;
     private final ShiftCalendarMapper shiftCalendarMapper;
+    private final DepartmentMapper departmentMapper;
+    private final EmployeeMapper employeeMapper;
+    private final EmpCalendarMapper empCalendarMapper;
 
-    /* 캘린더 생성 제너레이터 */
-    public void generateShiftCalendar(String workPatternCode, YearMonth yearMonth) {
-        LocalDate startDate = yearMonth.atDay(1);
-        LocalDate endDate = yearMonth.atEndOfMonth();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            int dayOfWeek = date.getDayOfWeek().getValue(); // 1: 월 ~ 7: 일
+    // 요일별 shiftCode 매핑 캐시
+    public Map<Integer, String> getShiftCodeMap(String workPatternCode) {
+        Map<Integer, String> shiftCodeMap = new HashMap<>();
+        for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
             String shiftCode = shiftPatternDtlMapper.getShiftCodeByPatternAndDay(workPatternCode, dayOfWeek);
-
             if (shiftCode != null) {
-                String shiftDate = date.format(formatter); // → "20250601" 형식으로 변환
-                shiftCalendarMapper.insertShiftCalendar(new ShiftCalendar(
+                shiftCodeMap.put(dayOfWeek, shiftCode);
+            }
+        }
+        return shiftCodeMap;
+    }
+
+    /* 달마다 몇일인지 계산 */
+    public List<LocalDate> getDatesInMonth(YearMonth yearMonth) {
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+        List<LocalDate> dates = new ArrayList<>();
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+            dates.add(date);
+        }
+        return dates;
+    }
+
+    /* 근태패턴캘린더 생성자 */
+    public void generateShiftCalendar(String workPatternCode, YearMonth yearMonth) {
+        Map<Integer, String> shiftCodeMap = getShiftCodeMap(workPatternCode);
+        List<LocalDate> dates = getDatesInMonth(yearMonth);
+
+        List<ShiftCalendar> batchList = new ArrayList<>();
+        for (LocalDate date : dates) {
+            int dayOfWeek = date.getDayOfWeek().getValue();
+            String shiftCode = shiftCodeMap.get(dayOfWeek);
+            if (shiftCode != null) {
+                batchList.add(new ShiftCalendar(
                     workPatternCode,
-                    shiftDate,
+                    date.format(FORMATTER),
                     shiftCode
                 ));
             }
         }
+
+        if (!batchList.isEmpty()) {
+            shiftCalendarMapper.insertBatch(batchList);
+        }
     }
+
+    /* 사원의 근태패턴캘린더 생성자 */
+    public void generateEmpCalendar(String workPatternCode, YearMonth yearMonth) {
+        Map<Integer, String> shiftCodeMap = getShiftCodeMap(workPatternCode);
+        List<LocalDate> dates = getDatesInMonth(yearMonth);
+        List<EmpCalendar> batchList = new ArrayList<>();
+
+        List<String> deptCodes = departmentMapper.findDeptCodesByWorkPatternCode(workPatternCode);
+        for (String deptCode : deptCodes) {
+            List<String> empCodes = employeeMapper.findEmpCodesByDeptCode(deptCode);
+            for (String empCode : empCodes) {
+                for (LocalDate date : dates) {
+                    int dayOfWeek = date.getDayOfWeek().getValue();
+                    String shiftCode = shiftCodeMap.get(dayOfWeek);
+                    if (shiftCode != null) {
+                        String holidayYn = (dayOfWeek == 6 || dayOfWeek == 7) ? "Y" : "N";
+                        batchList.add(new EmpCalendar(
+                            workPatternCode,
+                            date.format(FORMATTER),
+                            shiftCode,
+                            empCode,
+                            deptCode,
+                            holidayYn
+                        ));
+                    }
+                }
+            }
+        }
+
+        if (!batchList.isEmpty()) {
+            empCalendarMapper.insertBatch(batchList);
+        }
+    }
+
     /* 각 근태코드에 색상 부여 */
     public Map<String, String> generateShiftCodeColors(List<ShiftMaster> shiftCodes) {
         String[] colors = {
@@ -99,6 +167,7 @@ public class PatternService {
             if (code == null || code.isEmpty()) continue;
             shiftCalendarMapper.deleteShiftCalendar(code);
             shiftPatternDtlMapper.deletePatternDtl(code);
+            empCalendarMapper.deleteEmpCalendar(code);
             shiftPatternMapper.deletePattern(code);
         }
     }
@@ -113,8 +182,22 @@ public class PatternService {
         }
     }
 
-    /* dateStr 날짜에 workPatternCode의 캘린더가 존재하는가? True : False */
+    /* dateStr 날짜에 workPatternCode의 캘린더가 존재하는가? False : True */
     public Boolean findShiftCalendar(String workPatternCode, String dateStr) {
         return shiftCalendarMapper.getCountShiftCalendar(workPatternCode, dateStr) == 0;
+    }
+
+    /* dateStr 날짜에 workPatternCode의 사원용 캘린더가 존재하는가? False : True */
+    public Boolean findEmpCalendar(String workPatternCode, String dateStr) {
+        List<String> deptCodes = departmentMapper.findDeptCodesByWorkPatternCode(workPatternCode);
+        for (String deptCode : deptCodes) {
+            List<String> empCodes = employeeMapper.findEmpCodesByDeptCode(deptCode);
+            for (String empCode : empCodes) {
+                if (empCalendarMapper.getCountEmpCalendar(workPatternCode, dateStr, empCode) == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

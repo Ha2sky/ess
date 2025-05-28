@@ -1,4 +1,4 @@
-package com.jb.ess.depart.mapper;
+package com.jb.ess.common.mapper;
 
 import com.jb.ess.common.domain.Department;
 import java.util.List;
@@ -93,4 +93,20 @@ public interface DepartmentMapper {
     // 부서장의 사번 업데이트 (null로 설정해 해제)
     @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
     void updateDepartmentLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
+
+    @Select("""
+        SELECT DEPT_CODE
+        FROM ORGDEPTMASTER
+        WHERE WORK_PATTERN_CODE = #{workPatternCode}
+    """)
+    // workPatternCode를 사용중인 부서코드 리스트
+    List<String> findDeptCodesByWorkPatternCode(@Param("workPatternCode") String workPatternCode);
+
+    @Select("""
+        SELECT WORK_PATTERN_CODE
+        FROM ORGDEPTMASTER
+        WHERE DEPT_CODE = #{deptCode}
+    """)
+    /* deptCode가 사용중인 workPatternCode 반환 */
+    String findWorkPatternCodeByDeptCode(String deptCode);
 }

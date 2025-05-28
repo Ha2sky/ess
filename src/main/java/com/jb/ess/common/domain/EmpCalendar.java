@@ -11,4 +11,15 @@ public class EmpCalendar {
     private String workPatternCode; // 근태패턴코드
     private String shiftCodeOrig;   // 기존근태코드
     private String holidayYn;       // 휴일여부
+    private String deptCode;        // 부서코드
+
+    public EmpCalendar(String workPatternCode, String yyyymmdd, String shiftCode,
+                       String empCode, String deptCode, String holidayYn) {
+        this.workPatternCode = workPatternCode;
+        this.yyyymmdd = yyyymmdd;
+        this.shiftCode = shiftCode;
+        this.empCode = empCode;
+        this.deptCode = deptCode;
+        this.holidayYn = holidayYn;
+    }
 }
