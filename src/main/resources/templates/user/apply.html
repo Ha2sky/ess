@@ -10,13 +10,15 @@
 
 <div class="max-w-full mx-auto bg-white rounded shadow">
   <!-- 헤더 -->
-    <div class="bg-blue-600 text-white p-4 rounded-t">
-        <h1 class="text-2xl font-bold">근태 신청</h1>
-        <p>현재 사용자:
-            <span th:text="${currentEmp?.empName} ?: '정보없음'"></span> <!-- Safe Navigation 연산자 추가 -->
-            (<span th:text="${currentEmp?.empCode} ?: 'N/A'"></span>)
-        </p>
-    </div>
+  <div class="bg-blue-600 text-white p-4 rounded-t">
+    <h1 class="text-2xl font-bold">근태 신청</h1>
+    <p>현재 사용자:
+      <span th:text="${currentEmp?.empName} ?: '정보없음'"></span>
+      (<span th:text="${currentEmp?.empCode} ?: 'N/A'"></span>)
+      <!-- 부서장 여부 표시 추가 -->
+      <span th:if="${currentEmp?.isHeader == 'Y'}" class="bg-yellow-500 text-black px-2 py-1 rounded text-sm ml-2">부서장</span>
+    </p>
+  </div>
 
   <!-- 탭 메뉴 -->
   <div class="border-b border-gray-200">
@@ -189,6 +191,7 @@
         <tr>
           <th class="border border-gray-300 px-4 py-2">신청번호</th>
           <th class="border border-gray-300 px-4 py-2">대상자</th>
+          <th class="border border-gray-300 px-4 py-2">신청자</th>
           <th class="border border-gray-300 px-4 py-2">신청일</th>
           <th class="border border-gray-300 px-4 py-2">대상일</th>
           <th class="border border-gray-300 px-4 py-2">신청유형</th>
@@ -199,6 +202,7 @@
         <tr th:each="apply : ${generalApplies}">
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyGeneralNo}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.empName}"></td>
+          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applicantName}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyDate}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetDate}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyType}"></td>
@@ -216,6 +220,7 @@
         <tr>
           <th class="border border-gray-300 px-4 py-2">신청번호</th>
           <th class="border border-gray-300 px-4 py-2">대상자</th>
+          <th class="border border-gray-300 px-4 py-2">신청자</th>
           <th class="border border-gray-300 px-4 py-2">신청일</th>
           <th class="border border-gray-300 px-4 py-2">시작일</th>
           <th class="border border-gray-300 px-4 py-2">종료일</th>
@@ -226,6 +231,7 @@
         <tr th:each="apply : ${etcApplies}">
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyEtcNo}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.empName}"></td>
+          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applicantName}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyDate}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetStartDate}"></td>
           <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetEndDate}"></td>
@@ -255,32 +261,45 @@
           }
       });
 
-      // 일반근태 사원 조회
+      // 일반근태 사원 조회 - 수정: 에러 처리 및 데이터 표시 개선
       $('#searchGeneralBtn').click(function() {
           const deptCode = $('#generalDeptCode').val();
           const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
+          if (!workDate) {
+              alert('근무일을 선택해주세요.');
+              return;
+          }
+
           $.ajax({
               url: '/user/apply/employees',
               method: 'GET',
-              data: { deptCode: deptCode, workDate: workDate },
+              data: {
+                  deptCode: deptCode,
+                  workDate: workDate
+              },
               success: function(employees) {
                   const tbody = $('#generalEmployeeTable tbody');
                   tbody.empty();
 
+                  if (employees.length === 0) {
+                      tbody.append('<tr><td colspan="11" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
+                      return;
+                  }
+
                   employees.forEach(function(emp) {
                       const row = `
-                          <tr>
+                          <tr data-emp-code="${emp.empCode}">
                               <td class="border border-gray-300 px-4 py-2">
                                   <input type="radio" name="selectedEmp" value="${emp.empCode}">
                               </td>
                               <td class="border border-gray-300 px-4 py-2">${emp.empCode}</td>
                               <td class="border border-gray-300 px-4 py-2">${emp.empName}</td>
                               <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.deptCode}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.workPlan || ''}</td>
+                              <td class="border border-gray-300 px-4 py-2">${emp.deptName || emp.deptCode}</td>
+                              <td class="border border-gray-300 px-4 py-2">${emp.workPlanName || emp.workPlan || '-'}</td>
                               <td class="border border-gray-300 px-4 py-2">
-                                  <select class="apply-type border rounded p-1">
+                                  <select class="apply-type border rounded p-1 w-full">
                                       <option value="">선택</option>
                                       <option value="연장">연장</option>
                                       <option value="조출연장">조출연장</option>
@@ -292,13 +311,13 @@
                                   </select>
                               </td>
                               <td class="border border-gray-300 px-4 py-2">
-                                  <input type="time" class="start-time border rounded p-1">
+                                  <input type="time" class="start-time border rounded p-1 w-full">
                               </td>
                               <td class="border border-gray-300 px-4 py-2">
-                                  <input type="time" class="end-time border rounded p-1">
+                                  <input type="time" class="end-time border rounded p-1 w-full">
                               </td>
                               <td class="border border-gray-300 px-4 py-2">
-                                  <input type="text" class="reason border rounded p-1" placeholder="사유">
+                                  <input type="text" class="reason border rounded p-1 w-full" placeholder="사유">
                               </td>
                               <td class="border border-gray-300 px-4 py-2">대기</td>
                           </tr>
@@ -306,7 +325,8 @@
                       tbody.append(row);
                   });
               },
-              error: function() {
+              error: function(xhr, status, error) {
+                  console.error('사원 조회 실패:', error);
                   alert('사원 조회에 실패했습니다.');
               }
           });
@@ -316,7 +336,21 @@
       $('#saveGeneralBtn').click(function() {
           const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
-              alert('선택된 행이 없습니다.');
+              alert('신청할 사원을 선택해주세요.');
+              return;
+          }
+
+          const applyType = selectedRow.find('.apply-type').val();
+          const startTime = selectedRow.find('.start-time').val();
+          const endTime = selectedRow.find('.end-time').val();
+
+          if (!applyType) {
+              alert('신청근무를 선택해주세요.');
+              return;
+          }
+
+          if (!startTime || !endTime) {
+              alert('시작시간과 종료시간을 입력해주세요.');
               return;
           }
 
@@ -324,19 +358,222 @@
               empCode: selectedRow.find('input[name="selectedEmp"]').val(),
               timeItemCode: '01', // 기본값
               targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
-              startTime: selectedRow.find('.start-time').val().replace(':', ''),
-              endTime: selectedRow.find('.end-time').val().replace(':', ''),
-              applyType: selectedRow.find('.apply-type').val(),
+              startTime: startTime.replace(':', ''),
+              endTime: endTime.replace(':', ''),
+              applyType: applyType,
               deptCode: $('#generalDeptCode').val()
           };
 
-          if (!applyData.applyType) {
-              alert('신청근무를 선택해주세요.');
+          $.ajax({
+              url: '/user/apply/general',
+              method: 'POST',
+              contentType: 'application/json',
+              data: JSON.stringify(applyData),
+              success: function(result) {
+                  if (result === 'success') {
+                      alert('저장되었습니다.');
+                      location.reload(); // 페이지 새로고침으로 신청 내역 업데이트
+                  } else {
+                      alert(result);
+                  }
+              },
+              error: function(xhr, status, error) {
+                  console.error('저장 실패:', error);
+                  alert('저장에 실패했습니다.');
+              }
+          });
+      });
+
+      // 삭제 처리
+      $('#deleteGeneralBtn').click(function() {
+          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
+          if (selectedRow.length === 0) {
+              alert('삭제할 항목을 선택해주세요.');
+              return;
+          }
+
+          const applyNo = selectedRow.attr('data-apply-no');
+          if (!applyNo) {
+              alert('저장된 신청건만 삭제할 수 있습니다.');
+              return;
+          }
+
+          if (confirm('정말 삭제하시겠습니까?')) {
+              $.ajax({
+                  url: '/user/apply/delete',
+                  method: 'POST',
+                  data: {
+                      applyNo: applyNo,
+                      applyType: 'general'
+                  },
+                  success: function(result) {
+                      if (result === 'success') {
+                          alert('삭제되었습니다.');
+                          location.reload();
+                      } else {
+                          alert(result);
+                      }
+                  },
+                  error: function(xhr, status, error) {
+                      console.error('삭제 실패:', error);
+                      alert('삭제에 실패했습니다.');
+                  }
+              });
+          }
+      });
+
+      // 상신 처리 - 수정: 저장된 신청건 식별 로직 개선
+      $('#submitGeneralBtn').click(function() {
+        const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
+        if (selectedRow.length === 0) {
+            alert('상신할 항목을 선택해주세요.');
+            return;
+        }
+
+        const applyNo = selectedRow.attr('data-apply-no');
+        if (!applyNo) {
+            alert('저장된 신청건만 상신할 수 있습니다.');
+            return;
+        }
+
+        if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
+            $.ajax({
+                url: '/user/apply/submit',
+                method: 'POST',
+                data: {
+                    applyNo: applyNo,
+                    applyType: 'general'
+                },
+                success: function(result) {
+                    if (result === 'success') {
+                        alert('상신되었습니다.');
+                        location.reload();
+                    } else {
+                        alert('상신 실패: ' + result);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('상신 실패:', error);
+                    alert('상신에 실패했습니다.');
+                }
+            });
+        }
+      });
+
+      // 기타근태 사원 조회
+      $('#searchEtcBtn').click(function() {
+          const deptCode = $('#etcDeptCode').val();
+          const workDate = $('#etcWorkDate').val().replace(/-/g, '');
+          const workPlan = $('#etcWorkPlan').val();
+
+          if (!workDate) {
+              alert('근무일을 선택해주세요.');
               return;
           }
 
           $.ajax({
-              url: '/user/apply/general',
+              url: '/user/apply/employees',
+              method: 'GET',
+              data: {
+                  deptCode: deptCode,
+                  workDate: workDate,
+                  workPlan: workPlan
+              },
+              success: function(employees) {
+                  const tbody = $('#etcEmployeeTable tbody');
+                  tbody.empty();
+
+                  if (employees.length === 0) {
+                      tbody.append('<tr><td colspan="12" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
+                      return;
+                  }
+
+                  employees.forEach(function(emp) {
+                      const row = `
+                          <tr data-emp-code="${emp.empCode}">
+                              <td class="border px-4 py-2">
+                                  <input type="radio" name="selectedEtcEmp" value="${emp.empCode}">
+                              </td>
+                              <td class="border px-4 py-2">${emp.empCode}</td>
+                              <td class="border px-4 py-2">${emp.empName}</td>
+                              <td class="border px-4 py-2">${emp.positionName || ''}</td>
+                              <td class="border px-4 py-2">${emp.deptName || emp.deptCode}</td>
+                              <td class="border px-4 py-2">${emp.workPlanName || emp.workPlan || '-'}</td>
+                              <td class="border px-4 py-2">
+                                  <select class="etc-shift border rounded p-1 w-full">
+                                      <option value="">선택</option>
+                                      <option value="01">정상근무</option>
+                                      <option value="12">휴일</option>
+                                      <option value="13">휴무</option>
+                                  </select>
+                              </td>
+                              <td class="border px-4 py-2">
+                                  <input type="date" class="start-date border rounded p-1 w-full" value="${$('#etcWorkDate').val()}">
+                              </td>
+                              <td class="border px-4 py-2">
+                                  <input type="date" class="end-date border rounded p-1 w-full" value="${$('#etcWorkDate').val()}">
+                              </td>
+                              <td class="border px-4 py-2">
+                                  <select class="apply-time border rounded p-1 w-full">
+                                      <option value="1일이전신청">1일이전신청</option>
+                                      <option value="당일신청">당일신청</option>
+                                  </select>
+                              </td>
+                              <td class="border px-4 py-2">
+                                  <input type="text" class="reason border rounded p-1 w-full" placeholder="사유">
+                              </td>
+                              <td class="border px-4 py-2">대기</td>
+                          </tr>
+                      `;
+                      tbody.append(row);
+                  });
+              },
+              error: function(xhr, status, error) {
+                  console.error('사원 조회 실패:', error);
+                  alert('사원 조회에 실패했습니다.');
+              }
+          });
+      });
+
+      // 기타근태 저장
+      $('#saveEtcBtn').click(function() {
+          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
+          if (selectedRow.length === 0) {
+              alert('신청할 사원을 선택해주세요.');
+              return;
+          }
+
+          const shiftCode = selectedRow.find('.etc-shift').val();
+          const startDate = selectedRow.find('.start-date').val();
+          const endDate = selectedRow.find('.end-date').val();
+          const reason = selectedRow.find('.reason').val();
+
+          if (!shiftCode) {
+              alert('변경근무를 선택해주세요.');
+              return;
+          }
+
+          if (!startDate || !endDate) {
+              alert('시작일과 종료일을 입력해주세요.');
+              return;
+          }
+
+          if (!reason.trim()) {
+              alert('사유를 입력해주세요.');
+              return;
+          }
+
+          const applyData = {
+              empCode: selectedRow.find('input[name="selectedEtcEmp"]').val(),
+              shiftCode: shiftCode,
+              targetStartDate: startDate.replace(/-/g, ''),
+              targetEndDate: endDate.replace(/-/g, ''),
+              applyDateTime: selectedRow.find('.apply-time').val(),
+              reason: reason
+          };
+
+          $.ajax({
+              url: '/user/apply/etc',
               method: 'POST',
               contentType: 'application/json',
               data: JSON.stringify(applyData),
@@ -348,112 +585,92 @@
                       alert(result);
                   }
               },
-              error: function() {
+              error: function(xhr, status, error) {
+                  console.error('저장 실패:', error);
                   alert('저장에 실패했습니다.');
               }
           });
       });
 
-      // 상신 처리
-      $('#submitGeneralBtn').click(function() {
-        const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-        if (!selectedRow.length) return alert('선택된 항목이 없습니다');
+      // 기타근태 삭제 및 상신
+      $('#deleteEtcBtn').click(function() {
+          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
+          if (selectedRow.length === 0) {
+              alert('삭제할 항목을 선택해주세요.');
+              return;
+          }
 
-        const applyNo = selectedRow.data('apply-no');
-        const applyType = 'general';
+          const applyNo = selectedRow.attr('data-apply-no');
+          if (!applyNo) {
+              alert('저장된 신청건만 삭제할 수 있습니다.');
+              return;
+          }
 
-        if (confirm('정말 상신하시겠습니까?')) {
-            $.ajax({
-                url: '/user/apply/submit',
-                method: 'POST',
-                data: {
-                    applyNo: applyNo,
-                    applyType: applyType
-                },
-                success: function(res) {
-                    if (res === 'success') {
-                        location.reload();
-                    } else {
-                        alert('상신 실패: ' + res);
-                    }
-                }
-            });
-        }
+          if (confirm('정말 삭제하시겠습니까?')) {
+              $.ajax({
+                  url: '/user/apply/delete',
+                  method: 'POST',
+                  data: {
+                      applyNo: applyNo,
+                      applyType: 'etc'
+                  },
+                  success: function(result) {
+                      if (result === 'success') {
+                          alert('삭제되었습니다.');
+                          location.reload();
+                      } else {
+                          alert(result);
+                      }
+                  },
+                  error: function(xhr, status, error) {
+                      console.error('삭제 실패:', error);
+                      alert('삭제에 실패했습니다.');
+                  }
+              });
+          }
       });
 
-      // 기타근태 사원 조회
-    $('#searchEtcBtn').click(function() {
-        const deptCode = $('#etcDeptCode').val();
-        const workDate = $('#etcWorkDate').val().replace(/-/g, '');
+      $('#submitEtcBtn').click(function() {
+          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
+          if (selectedRow.length === 0) {
+              alert('상신할 항목을 선택해주세요.');
+              return;
+          }
 
-        $.ajax({
-            url: '/user/apply/employees',
-            method: 'GET',
-            data: {
-                deptCode: deptCode,
-                workDate: workDate,
-                workPlan: $('#etcWorkPlan').val()
-            },
-            success: function(employees) {
-                const tbody = $('#etcEmployeeTable tbody');
-                tbody.empty();
+          const applyNo = selectedRow.attr('data-apply-no');
+          if (!applyNo) {
+              alert('저장된 신청건만 상신할 수 있습니다.');
+              return;
+          }
 
-                employees.forEach(function(emp) {
-                    const row = `
-                        <tr data-apply-no="${emp.applyEtcNo || ''}">
-                            <td class="border px-4 py-2">
-                                <input type="radio" name="selectedEtcEmp" value="${emp.empCode}">
-                            </td>
-                            <!-- 나머지 테이블 컬럼 -->
-                        </tr>
-                    `;
-                    tbody.append(row);
-                });
-            }
-        });
-    });
+          if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
+              $.ajax({
+                  url: '/user/apply/submit',
+                  method: 'POST',
+                  data: {
+                      applyNo: applyNo,
+                      applyType: 'etc'
+                  },
+                  success: function(result) {
+                      if (result === 'success') {
+                          alert('상신되었습니다.');
+                          location.reload();
+                      } else {
+                          alert('상신 실패: ' + result);
+                      }
+                  },
+                  error: function(xhr, status, error) {
+                      console.error('상신 실패:', error);
+                      alert('상신에 실패했습니다.');
+                  }
+              });
+          }
+      });
 
-    // 기타근태 저장
-    $('#saveEtcBtn').click(function() {
-        const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
-        const applyData = {
-            empCode: selectedRow.find('input').val(),
-            shiftCode: selectedRow.find('.etc-shift').val(),
-            targetStartDate: selectedRow.find('.start-date').val().replace(/-/g, ''),
-            targetEndDate: selectedRow.find('.end-date').val().replace(/-/g, ''),
-            reason: selectedRow.find('.reason').val()
-        };
-
-        $.ajax({
-            url: '/user/apply/etc',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(applyData),
-            success: function(result) {
-                if (result === 'success') location.reload();
-            }
-        });
-    });
-
-    // 기타근태 상신
-    $('#submitEtcBtn').click(function() {
-        const applyNo = $('input[name="selectedEtcEmp"]:checked').closest('tr').data('apply-no');
-        if (!applyNo) return alert('선택된 신청건이 없습니다');
-
-        if (confirm('기타근태를 상신하시겠습니까?')) {
-            $.ajax({
-                url: '/user/apply/submit',
-                method: 'POST',
-                data: {
-                    applyNo: applyNo,
-                    applyType: 'etc'
-                },
-                success: function(res) {
-                    if (res === 'success') location.reload();
-                }
-            });
-        }
-    });
+      // 페이지 로드 시 자동으로 당일 사원 조회
+      if ($('#generalWorkDate').val()) {
+          $('#searchGeneralBtn').click();
+      }
   });
 </script>
 

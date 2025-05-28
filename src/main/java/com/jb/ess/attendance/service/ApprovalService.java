@@ -1,10 +1,10 @@
 package com.jb.ess.attendance.service;
 
-import com.jb.ess.attendance.mapper.ApprovalMapper;
-import com.jb.ess.attendance.mapper.AttendanceApplyMapper;
+import com.jb.ess.common.mapper.ApprovalMapper;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.ApprovalHistory;
+import com.jb.ess.common.mapper.AttendanceApplyMapper;
 import com.jb.ess.common.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -62,9 +62,9 @@ public class ApprovalService {
 
         // 신청 상태 업데이트
         if ("general".equals(applyType)) {
-            attendanceApplyMapper.updateGeneralStatus(applyNo, "승인완료");
+            attendanceApplyMapper.updateGeneralApplyStatus(applyNo, "승인완료");
         } else {
-            attendanceApplyMapper.updateEtcStatus(applyNo, "승인완료");
+            attendanceApplyMapper.updateEtcApplyStatus(applyNo, "승인완료");
         }
     }
 
@@ -87,9 +87,9 @@ public class ApprovalService {
 
         // 신청 상태 업데이트
         if ("general".equals(applyType)) {
-            attendanceApplyMapper.updateGeneralStatus(applyNo, "반려");
+            attendanceApplyMapper.updateGeneralApplyStatus(applyNo, "반려");
         } else {
-            attendanceApplyMapper.updateEtcStatus(applyNo, "반려");
+            attendanceApplyMapper.updateEtcApplyStatus(applyNo, "반려");
         }
     }
 

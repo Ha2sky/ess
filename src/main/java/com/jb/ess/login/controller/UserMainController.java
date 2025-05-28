@@ -11,24 +11,24 @@ public class UserMainController {
     // 근태신청
     @GetMapping("/apply")
     public String attendanceApply() {
-        return "/user/apply";
+        return "user/apply";
     }
 
     // 근태신청내역
     @GetMapping("/history")
     public String attendanceHistory() {
-        return "/user/history";
+        return "user/history";
     }
 
     // 부서근태조회
     @GetMapping("/attendance")
     public String departmentAttendance() {
-        return "redirect:/user/attendance/list";
+        return "redirect:/user/attendance/list"; // 기존 코드 유지
     }
 
     // 부서원근태승인(부서장 전용)
     @GetMapping("/approval")
     public String approvalPage() {
-        return "/user/approval";
+        return "user/approval";
     }
 }

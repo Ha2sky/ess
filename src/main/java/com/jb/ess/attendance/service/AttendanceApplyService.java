@@ -1,158 +1,171 @@
 package com.jb.ess.attendance.service;
 
-import com.jb.ess.attendance.mapper.AttendanceApplyMapper;
-import com.jb.ess.attendance.mapper.ApprovalMapper;
-import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
-import com.jb.ess.common.domain.ApprovalHistory;
+import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.common.util.DateUtil;
-import com.jb.ess.depart.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.AttendanceApplyMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AttendanceApplyService {
-
     private final AttendanceApplyMapper attendanceApplyMapper;
-    private final ApprovalMapper approvalMapper;
-    private final DepartmentMapper departmentMapper;
 
-    /**
-     * 근태신청 가능한 사원 조회
-     */
-    public List<Employee> getApplicableEmployees(String deptCode, String workDate, String empCode, String isLeader) {
-        return attendanceApplyMapper.findApplicableEmployees(deptCode, workDate, empCode, isLeader);
+    // 현재 사용자 정보 조회
+    public Employee getCurrentEmployee(String empCode) {
+        return attendanceApplyMapper.findEmployeeByEmpCode(empCode);
     }
 
-    /**
-     * 일반근태 신청 저장
-     */
+    // 부서별 사원 조회 (부서장용)
+    public List<Employee> getEmployeesByDept(String deptCode, String workDate, String workPlan) {
+        return attendanceApplyMapper.findEmployeesByDept(deptCode, workDate, workPlan);
+    }
+
+    // 현재 사원만 조회 (일반 사원용)
+    public List<Employee> getCurrentEmployeeList(String empCode, String workDate) {
+        return attendanceApplyMapper.findCurrentEmployeeWithCalendar(empCode, workDate);
+    }
+
+    // 일반근태 신청 유효성 검증
+    public String validateGeneralApply(AttendanceApplyGeneral apply) {
+        // 시간 검증
+        if (apply.getStartTime() != null && apply.getEndTime() != null) {
+            int startTime = Integer.parseInt(apply.getStartTime());
+            int endTime = Integer.parseInt(apply.getEndTime());
+
+            if (startTime >= endTime) {
+                return "시작시간이 종료시간보다 늦을 수 없습니다.";
+            }
+        }
+
+        // 중복 신청 검증
+        boolean hasDuplicate = attendanceApplyMapper.checkDuplicateGeneralApply(
+                apply.getEmpCode(), apply.getTargetDate(), apply.getApplyType());
+        if (hasDuplicate) {
+            return "해당 일자에 동일한 신청이 이미 존재합니다.";
+        }
+
+        return "valid";
+    }
+
+    // 기타근태 신청 유효성 검증
+    public String validateEtcApply(AttendanceApplyEtc apply) {
+        // 날짜 검증
+        int startDate = Integer.parseInt(apply.getTargetStartDate());
+        int endDate = Integer.parseInt(apply.getTargetEndDate());
+
+        if (startDate > endDate) {
+            return "시작일이 종료일보다 늦을 수 없습니다.";
+        }
+
+        // 중복 신청 검증
+        boolean hasDuplicate = attendanceApplyMapper.checkDuplicateEtcApply(
+                apply.getEmpCode(), apply.getTargetStartDate(), apply.getTargetEndDate());
+        if (hasDuplicate) {
+            return "해당 기간에 중복된 신청이 존재합니다.";
+        }
+
+        return "valid";
+    }
+
+    // 일반근태 신청 저장
     @Transactional
     public void saveGeneralApply(AttendanceApplyGeneral apply) {
-        // 주 52시간 검증
-        validateWeeklyWorkingHours(apply);
+        // 신청번호 생성
+        String applyNo = "GEN" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) +
+                String.format("%04d", (int)(Math.random() * 10000));
+        apply.setApplyGeneralNo(applyNo);
 
-        if (apply.getApplyGeneralNo() == null) {
-            // 신규 등록
-            apply.setApplyGeneralNo(generateApplyNo("GA"));
-            apply.setApplyDate(DateUtil.getDateTimeNow());
-            apply.setStatus("대기");
-            attendanceApplyMapper.insertGeneralApply(apply);
-        } else {
-            // 수정
-            attendanceApplyMapper.updateGeneralApply(apply);
-        }
+        // 부서코드 설정 - 신청대상자의 부서코드로 설정
+        Employee targetEmp = attendanceApplyMapper.findEmployeeByEmpCode(apply.getEmpCode());
+        apply.setDeptCode(targetEmp.getDeptCode());
+
+        attendanceApplyMapper.insertGeneralApply(apply);
     }
 
-    /**
-     * 기타근태 신청 저장
-     */
+    // 기타근태 신청 저장
     @Transactional
     public void saveEtcApply(AttendanceApplyEtc apply) {
-        if (apply.getApplyEtcNo() == null) {
-            // 신규 등록
-            apply.setApplyEtcNo(generateApplyNo("EA"));
-            apply.setApplyDate(DateUtil.getDateTimeNow());
-            apply.setStatus("대기");
-            attendanceApplyMapper.insertEtcApply(apply);
-        } else {
-            // 수정
-            attendanceApplyMapper.updateEtcApply(apply);
-        }
+        // 신청번호 생성
+        String applyNo = "ETC" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) +
+                String.format("%04d", (int)(Math.random() * 10000));
+        apply.setApplyEtcNo(applyNo);
+
+        // 부서코드 설정
+        Employee targetEmp = attendanceApplyMapper.findEmployeeByEmpCode(apply.getEmpCode());
+        apply.setDeptCode(targetEmp.getDeptCode());
+
+        attendanceApplyMapper.insertEtcApply(apply);
     }
 
-    /**
-     * 근태신청 상신 처리
-     */
+    // 신청 상신 처리
     @Transactional
     public void submitApply(String applyNo, String applyType, String applicantCode) {
-        // 결재선 생성
-        String deptLeader = getDeptLeader(applicantCode);
+        // 상태를 '상신'으로 변경
+        if ("general".equals(applyType)) {
+            attendanceApplyMapper.updateGeneralApplyStatus(applyNo, "상신");
+        } else if ("etc".equals(applyType)) {
+            attendanceApplyMapper.updateEtcApplyStatus(applyNo, "상신");
+        }
 
-        if (applicantCode.equals(deptLeader)) {
-            // 부서장이 신청한 경우 자동 승인
-            if ("general".equals(applyType)) {
-                attendanceApplyMapper.updateGeneralStatus(applyNo, "승인완료");
-            } else {
-                attendanceApplyMapper.updateEtcStatus(applyNo, "승인완료");
-            }
+        // 결재 이력 생성 - 부서장에게 결재 요청
+        String histNo = "HIST" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) +
+                String.format("%04d", (int)(Math.random() * 10000));
 
-            // 자동 승인 이력 생성
-            ApprovalHistory history = new ApprovalHistory();
-            history.setApprovalNo(generateApplyNo("AH"));
-            history.setApproverCode(applicantCode);
-            history.setApprovalDate(DateUtil.getDateTimeNow());
-            history.setApprovalStatus("승인");
+        // 신청자의 부서장 정보 조회
+        String deptCode = attendanceApplyMapper.getDeptCodeByApplyNo(applyNo, applyType);
+        String approverCode = attendanceApplyMapper.getDeptLeaderByDeptCode(deptCode);
 
-            if ("general".equals(applyType)) {
-                history.setApplyGeneralNo(applyNo);
-            } else {
-                history.setApplyEtcNo(applyNo);
-            }
-
-            approvalMapper.insertApprovalHistory(history);
-        } else {
-            // 일반 상신 처리
-            if ("general".equals(applyType)) {
-                attendanceApplyMapper.updateGeneralStatus(applyNo, "승인중");
-            } else {
-                attendanceApplyMapper.updateEtcStatus(applyNo, "승인중");
-            }
-
-            // 결재선 생성
-            ApprovalHistory history = new ApprovalHistory();
-            history.setApprovalNo(generateApplyNo("AH"));
-            history.setApproverCode(deptLeader);
-
-            if ("general".equals(applyType)) {
-                history.setApplyGeneralNo(applyNo);
-            } else {
-                history.setApplyEtcNo(applyNo);
-            }
-
-            approvalMapper.insertApprovalHistory(history);
+        if (approverCode != null) {
+            attendanceApplyMapper.insertApprovalHistory(histNo, applyNo, applyType, approverCode);
         }
     }
 
-    /**
-     * 신청 내역 조회
-     */
-    public List<AttendanceApplyGeneral> getGeneralAppliesByApplicant(String applicantCode) {
-        return attendanceApplyMapper.findGeneralAppliesByApplicant(applicantCode);
-    }
-
-    public List<AttendanceApplyEtc> getEtcAppliesByApplicant(String applicantCode) {
-        return attendanceApplyMapper.findEtcAppliesByApplicant(applicantCode);
-    }
-
-    /**
-     * 근태신청 삭제
-     */
+    // 신청 삭제 처리
     @Transactional
-    public void deleteApply(String applyNo, String applyType) {
+    public void deleteApply(String applyNo, String applyType, String applicantCode) {
+        // 본인 신청건만 삭제 가능하도록 검증
+        boolean isOwner = attendanceApplyMapper.checkApplyOwnership(applyNo, applyType, applicantCode);
+        if (!isOwner) {
+            throw new RuntimeException("본인 신청건만 삭제할 수 있습니다.");
+        }
+
+        // 대기 상태인 경우만 삭제 가능
+        String status = attendanceApplyMapper.getApplyStatus(applyNo, applyType);
+        if (!"대기".equals(status)) {
+            throw new RuntimeException("대기 상태인 신청건만 삭제할 수 있습니다.");
+        }
+
         if ("general".equals(applyType)) {
             attendanceApplyMapper.deleteGeneralApply(applyNo);
-        } else {
+        } else if ("etc".equals(applyType)) {
             attendanceApplyMapper.deleteEtcApply(applyNo);
         }
     }
 
-    private String generateApplyNo(String prefix) {
-        return prefix + System.currentTimeMillis();
+    // 신청자별 일반근태 신청 내역 조회
+    public List<AttendanceApplyGeneral> getGeneralAppliesByApplicant(String applicantCode) {
+        return attendanceApplyMapper.findGeneralAppliesByApplicant(applicantCode);
     }
 
-    private String getDeptLeader(String empCode) {
-        // 사원의 부서장 조회 로직
-        return departmentMapper.findDepartmentLeader(empCode);
+    // 신청자별 기타근태 신청 내역 조회
+    public List<AttendanceApplyEtc> getEtcAppliesByApplicant(String applicantCode) {
+        return attendanceApplyMapper.findEtcAppliesByApplicant(applicantCode);
     }
 
-    private void validateWeeklyWorkingHours(AttendanceApplyGeneral apply) {
-        // 주 52시간 검증 로직 구현
-        // 계획된 근무시간 + 연장근로 + 휴일근로 + 신청하는 시간 <= 52시간
+    // 부서별 일반근태 신청 내역 조회 (부서장용)
+    public List<AttendanceApplyGeneral> getGeneralAppliesByDept(String deptCode) {
+        return attendanceApplyMapper.findGeneralAppliesByDept(deptCode);
+    }
+
+    // 부서별 기타근태 신청 내역 조회 (부서장용)
+    public List<AttendanceApplyEtc> getEtcAppliesByDept(String deptCode) {
+        return attendanceApplyMapper.findEtcAppliesByDept(deptCode);
     }
 }
