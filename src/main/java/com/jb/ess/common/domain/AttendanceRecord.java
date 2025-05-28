@@ -7,5 +7,7 @@ public class AttendanceRecord {
     private String empCode;      // 사원코드
     private String workDate;     // 근무일
     private String checkInTime;  // 출근시간
+    private String checkInDayType;  // 출근타입
     private String checkOutTime; // 퇴근시간
+    private String checkOutDayType;  // 퇴근타입
 }
