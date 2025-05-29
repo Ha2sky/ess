@@ -24,6 +24,20 @@ public interface EmpAttendanceMapper {
     List<Employee> getEmpAttendanceByDeptCode(String deptCode);
 
     @Select("""
+        SELECT emp.*,
+               att.*,
+               grd.POSITION_NAME,
+               dept.DEPT_NAME
+        FROM HRIMASTER emp
+        LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
+        LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
+        LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
+        WHERE emp.EMP_CODE = #{empCode}
+    """)
+    /* Employee + 실적 */
+    List<Employee> getEmpAttendanceByEmpCode(String empCode);
+
+    @Select("""
         SELECT *
         FROM ORGDEPTMASTER
         WHERE PARENT_DEPT = #{deptCode}

@@ -60,4 +60,14 @@ public interface EmpCalendarMapper {
     """)
     void deleteEmpCalendarByEmpCode(@Param("deptCode") String deptCode,
                                     @Param("empCode") String empCode);
+
+    @Select("""
+        SELECT SHIFT_CODE
+        FROM HRTWORKEMPCALENDAR
+        WHERE EMP_CODE = #{empCode}
+        AND YYYYMMDD BETWEEN #{startDate} AND #{endDate}
+    """)
+    List<String> getShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
+                                              @Param("startDate") String startDate,
+                                              @Param("endDate") String endDate);
 }
