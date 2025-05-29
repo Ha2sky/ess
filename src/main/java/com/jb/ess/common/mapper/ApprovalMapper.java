@@ -9,7 +9,7 @@ import java.util.List;
 @Mapper
 public interface ApprovalMapper {
 
-    // 결재할 문서 조회 (승인중 상태)
+    // 결재할 일반근태 문서 조회 (승인중 상태) - 수정된 부분
     @Select("""
         SELECT g.*, h.EMP_NAME, d.DEPT_NAME, applicant.EMP_NAME AS APPLICANT_NAME
         FROM HRTATTAPLGENERAL g
@@ -17,9 +17,9 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON g.DEPT_CODE = d.DEPT_CODE
         LEFT JOIN HRTAPRHIST hist ON g.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
-        WHERE g.STATUS = '승인중' 
+        WHERE g.STATUS = '상신'
           AND hist.APPROVER_CODE = #{approverCode}
-          AND hist.APPROVAL_STATUS IS NULL
+          AND hist.APPROVAL_STATUS = '대기'
           AND g.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
         ORDER BY g.APPLY_GENERAL_NO DESC
     """)
@@ -27,6 +27,7 @@ public interface ApprovalMapper {
                                                              @Param("startDate") String startDate,
                                                              @Param("endDate") String endDate);
 
+    // 결재할 기타근태 문서 조회 (승인중 상태) - 수정된 부분
     @Select("""
         SELECT e.*, h.EMP_NAME, d.DEPT_NAME, applicant.EMP_NAME AS APPLICANT_NAME
         FROM HRTATTAPLETC e
@@ -34,9 +35,9 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER applicant ON e.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON e.DEPT_CODE = d.DEPT_CODE
         LEFT JOIN HRTAPRHIST hist ON e.APPLY_ETC_NO = hist.APPLY_ETC_NO
-        WHERE e.STATUS = '승인중' 
+        WHERE e.STATUS = '상신'
           AND hist.APPROVER_CODE = #{approverCode}
-          AND hist.APPROVAL_STATUS IS NULL
+          AND hist.APPROVAL_STATUS = '대기'
           AND e.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         ORDER BY e.APPLY_ETC_NO DESC
     """)
@@ -44,7 +45,7 @@ public interface ApprovalMapper {
                                                      @Param("startDate") String startDate,
                                                      @Param("endDate") String endDate);
 
-    // 승인된 문서 조회
+    // 승인된 일반근태 문서 조회 - 수정된 부분
     @Select("""
         SELECT g.*, h.EMP_NAME, d.DEPT_NAME, applicant.EMP_NAME AS APPLICANT_NAME
         FROM HRTATTAPLGENERAL g
@@ -52,7 +53,7 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON g.DEPT_CODE = d.DEPT_CODE
         LEFT JOIN HRTAPRHIST hist ON g.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
-        WHERE g.STATUS = '승인완료' 
+        WHERE g.STATUS = '승인완료'
           AND hist.APPROVER_CODE = #{approverCode}
           AND hist.APPROVAL_STATUS = '승인'
           AND g.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
@@ -62,7 +63,7 @@ public interface ApprovalMapper {
                                                               @Param("startDate") String startDate,
                                                               @Param("endDate") String endDate);
 
-    // 반려된 문서 조회
+    // 반려된 일반근태 문서 조회 - 수정된 부분
     @Select("""
         SELECT g.*, h.EMP_NAME, d.DEPT_NAME, applicant.EMP_NAME AS APPLICANT_NAME
         FROM HRTATTAPLGENERAL g
@@ -70,7 +71,7 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON g.DEPT_CODE = d.DEPT_CODE
         LEFT JOIN HRTAPRHIST hist ON g.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
-        WHERE g.STATUS = '반려' 
+        WHERE g.STATUS = '반려'
           AND hist.APPROVER_CODE = #{approverCode}
           AND hist.APPROVAL_STATUS = '반려'
           AND g.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
@@ -80,33 +81,47 @@ public interface ApprovalMapper {
                                                               @Param("startDate") String startDate,
                                                               @Param("endDate") String endDate);
 
-    // 결재 이력 저장
-    @Insert("""
-        INSERT INTO HRTAPRHIST (
-            HIST_NO, APPLY_GENERAL_NO, APPLY_ETC_NO, APPROVER_CODE, 
-            APPROVAL_DATE, APPROVAL_STATUS, REJECT_REASON
-        ) VALUES (
-            #{histNo}, #{applyGeneralNo}, #{applyEtcNo}, #{approverCode},
-            #{approvalDate}, #{approvalStatus}, #{rejectReason}
-        )
-    """)
-    void insertApprovalHistory(ApprovalHistory history);
-
-    // 결재 처리
+    // 결재 처리 - 수정된 부분
     @Update("""
-        UPDATE HRTAPRHIST SET 
-            APPROVAL_DATE = #{approvalDate}, 
+        UPDATE HRTAPRHIST SET
+            APPROVAL_DATE = #{approvalDate},
             APPROVAL_STATUS = #{approvalStatus},
             REJECT_REASON = #{rejectReason}
-        WHERE HIST_NO = #{histNo}
+        WHERE APPROVAL_NO = #{approvalNo}
     """)
     void updateApprovalHistory(ApprovalHistory history);
 
-    // 결재 이력 조회
+    // 일반근태 결재 이력 조회 - 수정된 부분
     @Select("""
-        SELECT * FROM HRTAPRHIST 
-        WHERE APPLY_GENERAL_NO = #{applyNo} OR APPLY_ETC_NO = #{applyNo}
-        ORDER BY HIST_NO
+        SELECT * FROM HRTAPRHIST
+        WHERE APPLY_GENERAL_NO = #{applyGeneralNo}
+        ORDER BY APPROVAL_NO
     """)
-    List<ApprovalHistory> findApprovalHistoryByApplyNo(String applyNo);
+    List<ApprovalHistory> findApprovalHistoryByGeneralNo(String applyGeneralNo);
+
+    // 기타근태 결재 이력 조회 - 수정된 부분
+    @Select("""
+        SELECT * FROM HRTAPRHIST
+        WHERE APPLY_ETC_NO = #{applyEtcNo}
+        ORDER BY APPROVAL_NO
+    """)
+    List<ApprovalHistory> findApprovalHistoryByEtcNo(String applyEtcNo);
+
+    // 일반근태 결재 이력 조회 (결재자별) - 수정된 부분
+    @Select("""
+        SELECT * FROM HRTAPRHIST
+        WHERE APPLY_GENERAL_NO = #{applyGeneralNo} 
+        AND APPROVER_CODE = #{approverCode}
+    """)
+    ApprovalHistory findGeneralApprovalHistoryByApprover(@Param("applyGeneralNo") String applyGeneralNo,
+                                                         @Param("approverCode") String approverCode);
+
+    // 기타근태 결재 이력 조회 (결재자별) - 수정된 부분
+    @Select("""
+        SELECT * FROM HRTAPRHIST
+        WHERE APPLY_ETC_NO = #{applyEtcNo} 
+        AND APPROVER_CODE = #{approverCode}
+    """)
+    ApprovalHistory findEtcApprovalHistoryByApprover(@Param("applyEtcNo") String applyEtcNo,
+                                                     @Param("approverCode") String approverCode);
 }

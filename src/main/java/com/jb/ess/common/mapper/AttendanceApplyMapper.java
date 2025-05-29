@@ -33,7 +33,7 @@ public interface AttendanceApplyMapper {
                AND wc.YYYYMMDD = #{workDate}
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.DEPT_CODE = #{deptCode}
-        AND h.EMP_STATE = '재직'
+        AND h.EMP_STATE = 'WORK'
         ORDER BY h.EMP_CODE
     """)
     List<Employee> findEmployeesByDept(@Param("deptCode") String deptCode,
@@ -111,92 +111,80 @@ public interface AttendanceApplyMapper {
     void insertEtcApply(AttendanceApplyEtc apply);
 
     // 일반근태 신청 상태 변경
-    @Update("UPDATE HRTATTAPLGENERAL SET STATUS = #{status} WHERE APPLY_GENERAL_NO = #{applyNo}")
-    void updateGeneralApplyStatus(@Param("applyNo") String applyNo, @Param("status") String status);
+    @Update("UPDATE HRTATTAPLGENERAL SET STATUS = #{status} WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
+    void updateGeneralApplyStatus(@Param("applyGeneralNo") String applyNo, @Param("status") String status);
 
     // 기타근태 신청 상태 변경
-    @Update("UPDATE HRTATTAPLETC SET STATUS = #{status} WHERE APPLY_ETC_NO = #{applyNo}")
-    void updateEtcApplyStatus(@Param("applyNo") String applyNo, @Param("status") String status);
+    @Update("UPDATE HRTATTAPLETC SET STATUS = #{status} WHERE APPLY_ETC_NO = #{applyEtcNo}")
+    void updateEtcApplyStatus(@Param("applyEtcNo") String applyNo, @Param("status") String status);
 
-    // 신청번호로 부서코드 조회
-    @Select("""
-        <script>
-        <choose>
-            <when test="applyType == 'general'">
-                SELECT DEPT_CODE FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyNo}
-            </when>
-            <when test="applyType == 'etc'">
-                SELECT DEPT_CODE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyNo}
-            </when>
-        </choose>
-        </script>
-    """)
-    String getDeptCodeByApplyNo(@Param("applyNo") String applyNo, @Param("applyType") String applyType);
+    // 신청번호로 부서코드 조회 - 일반근태
+    @Select("SELECT DEPT_CODE FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
+    String getDeptCodeByGeneralApplyNo(String applyGeneralNo);
+
+    // 신청번호로 부서코드 조회 - 기타근태
+    @Select("SELECT DEPT_CODE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
+    String getDeptCodeByEtcApplyNo(String applyEtcNo);
 
     // 부서코드로 부서장 조회
     @Select("SELECT DEPT_LEADER FROM ORGDEPTMASTER WHERE DEPT_CODE = #{deptCode}")
     String getDeptLeaderByDeptCode(String deptCode);
 
-    // 결재 이력 생성
+    // 일반근태 결재 이력 생성 - 수정된 부분
     @Insert("""
         INSERT INTO HRTAPRHIST (
-            HIST_NO, 
-            <if test="applyType == 'general'">APPLY_GENERAL_NO,</if>
-            <if test="applyType == 'etc'">APPLY_ETC_NO,</if>
-            APPROVER_CODE, APPROVAL_STATUS
+            APPROVAL_NO, APPLY_GENERAL_NO, APPROVER_CODE, APPROVAL_STATUS
         ) VALUES (
-            #{histNo}, 
-            <if test="applyType == 'general'">#{applyNo},</if>
-            <if test="applyType == 'etc'">#{applyNo},</if>
-            #{approverCode}, '대기'
+            #{approvalNo}, #{applyGeneralNo}, #{approverCode}, '대기'
         )
     """)
-    void insertApprovalHistory(@Param("histNo") String histNo,
-                               @Param("applyNo") String applyNo,
-                               @Param("applyType") String applyType,
-                               @Param("approverCode") String approverCode);
+    void insertGeneralApprovalHistory(@Param("approvalNo") String approvalNo,
+                                      @Param("applyGeneralNo") String applyGeneralNo,
+                                      @Param("approverCode") String approverCode);
 
-    // 신청 소유권 확인
-    @Select("""
-        <script>
-        <choose>
-            <when test="applyType == 'general'">
-                SELECT COUNT(*) > 0 FROM HRTATTAPLGENERAL 
-                WHERE APPLY_GENERAL_NO = #{applyNo} AND APPLICANT_CODE = #{applicantCode}
-            </when>
-            <when test="applyType == 'etc'">
-                SELECT COUNT(*) > 0 FROM HRTATTAPLETC 
-                WHERE APPLY_ETC_NO = #{applyNo} AND APPLICANT_CODE = #{applicantCode}
-            </when>
-        </choose>
-        </script>
+    // 기타근태 결재 이력 생성 - 수정된 부분
+    @Insert("""
+        INSERT INTO HRTAPRHIST (
+            APPROVAL_NO, APPLY_ETC_NO, APPROVER_CODE, APPROVAL_STATUS
+        ) VALUES (
+            #{approvalNo}, #{applyEtcNo}, #{approverCode}, '대기'
+        )
     """)
-    boolean checkApplyOwnership(@Param("applyNo") String applyNo,
-                                @Param("applyType") String applyType,
-                                @Param("applicantCode") String applicantCode);
+    void insertEtcApprovalHistory(@Param("approvalNo") String approvalNo,
+                                  @Param("applyEtcNo") String applyEtcNo,
+                                  @Param("approverCode") String approverCode);
 
-    // 신청 상태 조회
+    // 신청 소유권 확인 - 일반근태
     @Select("""
-        <script>
-        <choose>
-            <when test="applyType == 'general'">
-                SELECT STATUS FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyNo}
-            </when>
-            <when test="applyType == 'etc'">
-                SELECT STATUS FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyNo}
-            </when>
-        </choose>
-        </script>
+        SELECT COUNT(*) > 0 FROM HRTATTAPLGENERAL 
+        WHERE APPLY_GENERAL_NO = #{applyGeneralNo} AND APPLICANT_CODE = #{applicantCode}
     """)
-    String getApplyStatus(@Param("applyNo") String applyNo, @Param("applyType") String applyType);
+    boolean checkGeneralApplyOwnership(@Param("applyGeneralNo") String applyGeneralNo,
+                                       @Param("applicantCode") String applicantCode);
+
+    // 신청 소유권 확인 - 기타근태
+    @Select("""
+        SELECT COUNT(*) > 0 FROM HRTATTAPLETC 
+        WHERE APPLY_ETC_NO = #{applyNo} AND APPLICANT_CODE = #{applicantCode}
+    """)
+    boolean checkEtcApplyOwnership(@Param("applyEtcNo") String applyEtcNo,
+                                   @Param("applicantCode") String applicantCode);
+
+    // 일반근태 신청 상태 조회
+    @Select("SELECT STATUS FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
+    String getGeneralApplyStatus(String applyGeneralNo);
+
+    // 기타근태 신청 상태 조회
+    @Select("SELECT STATUS FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
+    String getEtcApplyStatus(String applyEtcNo);
 
     // 일반근태 신청 삭제
-    @Delete("DELETE FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyNo}")
-    void deleteGeneralApply(String applyNo);
+    @Delete("DELETE FROM HRTATTAPLGENERAL WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
+    void deleteGeneralApply(String applyGeneralNo);
 
     // 기타근태 신청 삭제
-    @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyNo}")
-    void deleteEtcApply(String applyNo);
+    @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
+    void deleteEtcApply(String applyEtcNo);
 
     // 신청자별 일반근태 신청 내역 조회
     @Select("""
