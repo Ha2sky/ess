@@ -98,8 +98,8 @@
       <td class="border px-2 py-1" th:text="${emp.deptName}">인사팀</td>
       <td class="border px-2 py-1">주간/주간 (임시)</td>
       <td class="border px-2 py-1">(임시)</td>
-      <td class="border px-2 py-1">06:55:25 (임시)</td>
-      <td class="border px-2 py-1">16:55:16 (임시)</td>
+      <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
+      <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>
       <td class="border px-2 py-1">0.00 (임시)</td>
       <td class="border px-2 py-1">0.00 (임시)</td>
       <td class="border px-2 py-1">52.00</td>
@@ -152,5 +152,16 @@
 
   workDateInput.addEventListener("change", function () {
     updateWeekHiddenFields(this.value);
+  });
+</script>
+
+<script>
+  document.querySelectorAll(".time-value").forEach(el => {
+    const raw = el.dataset.time;
+    if (/^\d{6}$/.test(raw)) {
+      el.textContent = raw.slice(0, 2) + ":" + raw.slice(2, 4) + ":" + raw.slice(4, 6);
+    } else {
+      el.textContent = raw; // 그대로 출력
+    }
   });
 </script>

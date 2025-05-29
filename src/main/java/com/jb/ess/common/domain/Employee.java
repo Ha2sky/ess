@@ -28,11 +28,14 @@ public class Employee implements Serializable {
     private String dutyName;      // 직책명
     private String isHeader;      // 부서장(Y/N)
 
-    private String workDate;      // 근무일
-    private String checkInTime;   // 출근시간(HHmm)
-    private String checkOutTime;  // 퇴근시간(HHmm)
     private String deptName;      // 부서이름
 
     private String workHours;       // 주 근무시간
     private String remainWorkHours; // 잔여 근무시간
+
+    private String workDate;        // 근무일(yyyyMMdd)
+    private String checkInTime;     // 출근시간(HHmmSS)
+    private String checkOutTime;    // 퇴근시간(HHmmSS)
+    private String checkInDayType;  // 출근타입(N0, N1)
+    private String checkOutDayType; // 퇴근타입(N0, N1)
 }

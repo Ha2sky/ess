@@ -1,8 +1,9 @@
 package com.jb.ess.attendance.controller;
 
 import com.jb.ess.attendance.service.EmpAttService;
+import com.jb.ess.common.domain.AttendanceRecord;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.common.mapper.EmployeeMapper;
+import com.jb.ess.common.mapper.AttRecordMapper;
 import com.jb.ess.common.security.CustomUserDetails;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 /* 부서근태조회 */
 public class AttendanceListController {
     private final EmpAttService empAttService;
+    private final AttRecordMapper attRecordMapper;
 
     @GetMapping("/list")
     public String attendanceList(@AuthenticationPrincipal CustomUserDetails user,
@@ -52,6 +54,9 @@ public class AttendanceListController {
             String workHours = empAttService.getWorkHoursForWeek(emp.getEmpCode(), weekStart, weekEnd);
             emp.setWorkHours(workHours);
             emp.setRemainWorkHours(String.format("%05.2f", 52.00 - Double.parseDouble(workHours)));
+            AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(emp.getEmpCode());
+            emp.setCheckInTime(attRecord.getCheckInTime());
+            emp.setCheckOutTime(attRecord.getCheckOutTime());
         }
 
         model.addAttribute("employees", empList);
