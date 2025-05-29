@@ -27,7 +27,7 @@ public class LoginController {
     @GetMapping("/user")
     public String userPage(Model model, @AuthenticationPrincipal CustomUserDetails user) {
         model.addAttribute("deptCode", employeeMapper.getDeptCodeByEmpCode(user.getUsername()));
-        model.addAttribute("isHeader", employeeMapper.findIsHeader(user.getUsername()));
+        model.addAttribute("emp", employeeMapper.findIsHeader(user.getUsername()));
         return "user/user";
     }
 }

@@ -3,7 +3,7 @@ import lombok.Data;
 
 @Data
 public class AttendanceApplyEtc {
-    private String applyEtcNo;         // 신청코드
+    private String applyEtcNo;      // 신청코드
     private String empCode;         // 신청대상자 사원코드
     private String shiftCode;       // 근태코드
     private String applyDate;       // 신청일자

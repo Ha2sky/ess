@@ -35,19 +35,6 @@ public interface EmployeeMapper {
     /* 특정 부서에 소속된 사원 목록 조회 */
     List<Employee> findEmployeesByDeptCode(@Param("deptCode") String deptCode);
 
-    @Select("""
-        SELECT u.*,
-            p.POSITION_NAME,
-            d.DUTY_NAME
-        FROM HRIMASTER u
-        LEFT JOIN HRTGRADEINFO p ON u.POSITION_CODE = p.POSITION_CODE
-        LEFT JOIN HRTDUTYINFO d ON u.DUTY_CODE = d.DUTY_CODE
-        WHERE u.DEPT_CODE = #{deptCode}
-        ORDER BY u.EMP_CODE
-    """)
-        /* 특정 부서에 소속된 사원 조회 */
-    Employee findEmployeeByDeptCode(@Param("deptCode") String deptCode);
-
     /* 사원의 부서코드 변경 (배정 또는 삭제) */
     @Update("""
         UPDATE HRIMASTER
@@ -91,7 +78,7 @@ public interface EmployeeMapper {
         FROM HRIMASTER
         WHERE EMP_CODE = #{empCode}
     """)
-    String findIsHeader(@Param("empCode") String empCode);
+    Employee findIsHeader(@Param("empCode") String empCode);
 
     /* 부서 코드 찾기 */
     @Select("""
