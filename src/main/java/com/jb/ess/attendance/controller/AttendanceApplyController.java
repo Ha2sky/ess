@@ -72,7 +72,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 일반근태 신청 저장 API
+    // 일반근태 신청 저장 API - 수정: 저장 로직 개선
     @PostMapping("/general")
     @ResponseBody
     public String saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
@@ -95,7 +95,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 기타근태 신청 저장 API
+    // 기타근태 신청 저장 API - 수정: 저장 로직 개선
     @PostMapping("/etc")
     @ResponseBody
     public String saveEtcApply(@RequestBody AttendanceApplyEtc apply,
@@ -118,28 +118,52 @@ public class AttendanceApplyController {
         }
     }
 
-    // 신청 상신 API
-    @PostMapping("/submit")
+    // 일반근태 신청 상신 API - 수정: applyNo -> applyGeneralNo
+    @PostMapping("/submit/general")
     @ResponseBody
-    public String submitApply(@RequestParam String applyNo,
-                              @RequestParam String applyType,
-                              @AuthenticationPrincipal CustomUserDetails user) {
+    public String submitGeneralApply(@RequestParam String applyGeneralNo,
+                                     @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            attendanceApplyService.submitApply(applyNo, applyType, user.getUsername());
+            attendanceApplyService.submitGeneralApply(applyGeneralNo, user.getUsername());
             return "success";
         } catch (Exception e) {
             return "상신에 실패했습니다: " + e.getMessage();
         }
     }
 
-    // 신청 삭제 API
-    @PostMapping("/delete")
+    // 기타근태 신청 상신 API - 수정: applyNo -> applyEtcNo
+    @PostMapping("/submit/etc")
     @ResponseBody
-    public String deleteApply(@RequestParam String applyNo,
-                              @RequestParam String applyType,
-                              @AuthenticationPrincipal CustomUserDetails user) {
+    public String submitEtcApply(@RequestParam String applyEtcNo,
+                                 @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            attendanceApplyService.deleteApply(applyNo, applyType, user.getUsername());
+            attendanceApplyService.submitEtcApply(applyEtcNo, user.getUsername());
+            return "success";
+        } catch (Exception e) {
+            return "상신에 실패했습니다: " + e.getMessage();
+        }
+    }
+
+    // 일반근태 신청 삭제 API - 수정: applyNo -> applyGeneralNo
+    @PostMapping("/delete/general")
+    @ResponseBody
+    public String deleteGeneralApply(@RequestParam String applyGeneralNo,
+                                     @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            attendanceApplyService.deleteGeneralApply(applyGeneralNo, user.getUsername());
+            return "success";
+        } catch (Exception e) {
+            return "삭제에 실패했습니다: " + e.getMessage();
+        }
+    }
+
+    // 기타근태 신청 삭제 API - 수정: applyNo -> applyEtcNo
+    @PostMapping("/delete/etc")
+    @ResponseBody
+    public String deleteEtcApply(@RequestParam String applyEtcNo,
+                                 @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            attendanceApplyService.deleteEtcApply(applyEtcNo, user.getUsername());
             return "success";
         } catch (Exception e) {
             return "삭제에 실패했습니다: " + e.getMessage();

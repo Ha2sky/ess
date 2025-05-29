@@ -45,40 +45,53 @@ public class ApprovalService {
     }
 
     /**
-     * 근태 승인 처리
+     * 일반근태 승인 처리 - 수정: applyNo -> applyGeneralNo 분리
      */
     @Transactional
-    public void approveApply(String applyNo, String applyType, String approverCode) {
+    public void approveGeneralApply(String applyGeneralNo, String approverCode) {
         // 결재 이력 업데이트
-        List<ApprovalHistory> histories = approvalMapper.findApprovalHistoryByApplyNo(applyNo);
-        ApprovalHistory currentHistory = histories.stream()
-                .filter(h -> h.getApproverCode().equals(approverCode))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("결재 이력을 찾을 수 없습니다."));
+        ApprovalHistory currentHistory = approvalMapper.findGeneralApprovalHistoryByApprover(applyGeneralNo, approverCode);
+        if (currentHistory == null) {
+            throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
+        }
 
         currentHistory.setApprovalDate(DateUtil.getDateTimeNow());
         currentHistory.setApprovalStatus("승인");
         approvalMapper.updateApprovalHistory(currentHistory);
 
         // 신청 상태 업데이트
-        if ("general".equals(applyType)) {
-            attendanceApplyMapper.updateGeneralApplyStatus(applyNo, "승인완료");
-        } else {
-            attendanceApplyMapper.updateEtcApplyStatus(applyNo, "승인완료");
-        }
+        attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
     }
 
     /**
-     * 근태 반려 처리
+     * 기타근태 승인 처리 - 수정: applyNo -> applyEtcNo 분리
      */
     @Transactional
-    public void rejectApply(String applyNo, String applyType, String approverCode, String rejectReason) {
+    public void approveEtcApply(String applyEtcNo, String approverCode) {
         // 결재 이력 업데이트
-        List<ApprovalHistory> histories = approvalMapper.findApprovalHistoryByApplyNo(applyNo);
-        ApprovalHistory currentHistory = histories.stream()
-                .filter(h -> h.getApproverCode().equals(approverCode))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("결재 이력을 찾을 수 없습니다."));
+        ApprovalHistory currentHistory = approvalMapper.findEtcApprovalHistoryByApprover(applyEtcNo, approverCode);
+        if (currentHistory == null) {
+            throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
+        }
+
+        currentHistory.setApprovalDate(DateUtil.getDateTimeNow());
+        currentHistory.setApprovalStatus("승인");
+        approvalMapper.updateApprovalHistory(currentHistory);
+
+        // 신청 상태 업데이트
+        attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
+    }
+
+    /**
+     * 일반근태 반려 처리 - 수정: applyNo -> applyGeneralNo 분리
+     */
+    @Transactional
+    public void rejectGeneralApply(String applyGeneralNo, String approverCode, String rejectReason) {
+        // 결재 이력 업데이트
+        ApprovalHistory currentHistory = approvalMapper.findGeneralApprovalHistoryByApprover(applyGeneralNo, approverCode);
+        if (currentHistory == null) {
+            throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
+        }
 
         currentHistory.setApprovalDate(DateUtil.getDateTimeNow());
         currentHistory.setApprovalStatus("반려");
@@ -86,17 +99,40 @@ public class ApprovalService {
         approvalMapper.updateApprovalHistory(currentHistory);
 
         // 신청 상태 업데이트
-        if ("general".equals(applyType)) {
-            attendanceApplyMapper.updateGeneralApplyStatus(applyNo, "반려");
-        } else {
-            attendanceApplyMapper.updateEtcApplyStatus(applyNo, "반려");
-        }
+        attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "반려");
     }
 
     /**
-     * 결재 이력 조회
+     * 기타근태 반려 처리 - 수정: applyNo -> applyEtcNo 분리
      */
-    public List<ApprovalHistory> getApprovalHistory(String applyNo) {
-        return approvalMapper.findApprovalHistoryByApplyNo(applyNo);
+    @Transactional
+    public void rejectEtcApply(String applyEtcNo, String approverCode, String rejectReason) {
+        // 결재 이력 업데이트
+        ApprovalHistory currentHistory = approvalMapper.findEtcApprovalHistoryByApprover(applyEtcNo, approverCode);
+        if (currentHistory == null) {
+            throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
+        }
+
+        currentHistory.setApprovalDate(DateUtil.getDateTimeNow());
+        currentHistory.setApprovalStatus("반려");
+        currentHistory.setRejectReason(rejectReason);
+        approvalMapper.updateApprovalHistory(currentHistory);
+
+        // 신청 상태 업데이트
+        attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "반려");
+    }
+
+    /**
+     * 일반근태 결재 이력 조회 - 수정: applyNo -> applyGeneralNo 분리
+     */
+    public List<ApprovalHistory> getGeneralApprovalHistory(String applyGeneralNo) {
+        return approvalMapper.findApprovalHistoryByGeneralNo(applyGeneralNo);
+    }
+
+    /**
+     * 기타근태 결재 이력 조회 - 수정: applyNo -> applyEtcNo 분리
+     */
+    public List<ApprovalHistory> getEtcApprovalHistory(String applyEtcNo) {
+        return approvalMapper.findApprovalHistoryByEtcNo(applyEtcNo);
     }
 }

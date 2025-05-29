@@ -57,15 +57,14 @@ public class ApprovalController {
     }
 
     /**
-     * 근태 승인 처리
+     * 일반근태 승인 처리 - 수정: applyNo -> applyGeneralNo
      */
-    @PostMapping("/approve")
+    @PostMapping("/approve/general")
     @ResponseBody
-    public String approveApply(@RequestParam String applyNo,
-                               @RequestParam String applyType,
-                               @AuthenticationPrincipal CustomUserDetails user) {
+    public String approveGeneralApply(@RequestParam String applyGeneralNo,
+                                      @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            approvalService.approveApply(applyNo, applyType, user.getUsername());
+            approvalService.approveGeneralApply(applyGeneralNo, user.getUsername());
             return "success";
         } catch (Exception e) {
             return "error: " + e.getMessage();
@@ -73,16 +72,14 @@ public class ApprovalController {
     }
 
     /**
-     * 근태 반려 처리
+     * 기타근태 승인 처리 - 수정: applyNo -> applyEtcNo
      */
-    @PostMapping("/reject")
+    @PostMapping("/approve/etc")
     @ResponseBody
-    public String rejectApply(@RequestParam String applyNo,
-                              @RequestParam String applyType,
-                              @RequestParam String rejectReason,
-                              @AuthenticationPrincipal CustomUserDetails user) {
+    public String approveEtcApply(@RequestParam String applyEtcNo,
+                                  @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            approvalService.rejectApply(applyNo, applyType, user.getUsername(), rejectReason);
+            approvalService.approveEtcApply(applyEtcNo, user.getUsername());
             return "success";
         } catch (Exception e) {
             return "error: " + e.getMessage();
@@ -90,11 +87,52 @@ public class ApprovalController {
     }
 
     /**
-     * 결재 이력 조회 (AJAX)
+     * 일반근태 반려 처리 - 수정: applyNo -> applyGeneralNo
      */
-    @GetMapping("/history/{applyNo}")
+    @PostMapping("/reject/general")
     @ResponseBody
-    public List<ApprovalHistory> getApprovalHistory(@PathVariable String applyNo) {
-        return approvalService.getApprovalHistory(applyNo);
+    public String rejectGeneralApply(@RequestParam String applyGeneralNo,
+                                     @RequestParam String rejectReason,
+                                     @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            approvalService.rejectGeneralApply(applyGeneralNo, user.getUsername(), rejectReason);
+            return "success";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 기타근태 반려 처리 - 수정: applyNo -> applyEtcNo
+     */
+    @PostMapping("/reject/etc")
+    @ResponseBody
+    public String rejectEtcApply(@RequestParam String applyEtcNo,
+                                 @RequestParam String rejectReason,
+                                 @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            approvalService.rejectEtcApply(applyEtcNo, user.getUsername(), rejectReason);
+            return "success";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 일반근태 결재 이력 조회 (AJAX) - 수정: applyNo -> applyGeneralNo
+     */
+    @GetMapping("/history/general/{applyGeneralNo}")
+    @ResponseBody
+    public List<ApprovalHistory> getGeneralApprovalHistory(@PathVariable String applyGeneralNo) {
+        return approvalService.getGeneralApprovalHistory(applyGeneralNo);
+    }
+
+    /**
+     * 기타근태 결재 이력 조회 (AJAX) - 수정: applyNo -> applyEtcNo
+     */
+    @GetMapping("/history/etc/{applyEtcNo}")
+    @ResponseBody
+    public List<ApprovalHistory> getEtcApprovalHistory(@PathVariable String applyEtcNo) {
+        return approvalService.getEtcApprovalHistory(applyEtcNo);
     }
 }
