@@ -114,9 +114,9 @@
 </html>
 
 <script>
-  // month input이 바뀌면 form을 제출
-  document.querySelector('input[name="workDate"]').addEventListener('change', function() {
-    this.form.submit();
+  document.querySelector('input[name="workDate"]').addEventListener('change', function () {
+    updateWeekHiddenFields(this.value); // 날짜 업데이트 먼저
+    setTimeout(() => this.form.submit(), 0); // 값 반영 직후 form 제출
   });
 </script>
 

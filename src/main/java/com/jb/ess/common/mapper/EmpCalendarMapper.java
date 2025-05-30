@@ -62,12 +62,11 @@ public interface EmpCalendarMapper {
                                     @Param("empCode") String empCode);
 
     @Select("""
-        SELECT SHIFT_CODE
+        SELECT HOLIDAY_YN
         FROM HRTWORKEMPCALENDAR
         WHERE EMP_CODE = #{empCode}
-        AND YYYYMMDD BETWEEN #{startDate} AND #{endDate}
+        AND YYYYMMDD = #{date}
     """)
-    List<String> getShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
-                                              @Param("startDate") String startDate,
-                                              @Param("endDate") String endDate);
+    String getHolidayYnByEmpCodeAndDate(@Param("empCode") String empCode,
+                                        @Param("date") String date);
 }

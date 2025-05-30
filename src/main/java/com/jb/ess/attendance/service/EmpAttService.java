@@ -1,5 +1,8 @@
 package com.jb.ess.attendance.service;
 
+import com.jb.ess.common.domain.AttendanceRecord;
+import com.jb.ess.common.domain.ShiftMaster;
+import com.jb.ess.common.mapper.AttRecordMapper;
 import com.jb.ess.common.mapper.EmpAttendanceMapper;
 import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;
@@ -23,6 +26,7 @@ public class EmpAttService {
     private final EmployeeMapper employeeMapper;
     private final EmpCalendarMapper empCalendarMapper;
     private final ShiftMasterMapper shiftMasterMapper;
+    private final AttRecordMapper attRecordMapper;
 
     /* 사원 정보 및 실적 리스트 */
     public List<Employee> empAttendanceList(String deptCode) {
@@ -46,16 +50,32 @@ public class EmpAttService {
         return departments;
     }
 
+    /* 주단위 근무시간 계산 */
     public String getWorkHoursForWeek(String empCode, LocalDate weekStart, LocalDate weekEnd){
-        String startDate = DateUtil.reverseFormatDate(weekStart);
-        String endDate = DateUtil.reverseFormatDate(weekEnd);
-
-        List<String> shiftCodes = empCalendarMapper.getShiftCodeByEmpCodeAndDate(empCode, startDate, endDate);
         Duration workHours = Duration.ZERO;
-        for (String shiftCode : shiftCodes){
-            workHours = workHours.plus(WorkHoursCalculator.getTotalWorkTime(shiftMasterMapper.findShiftByCode(shiftCode)));
+
+        for (LocalDate date = weekStart; !date.isAfter(weekEnd); date = date.plusDays(1)) {
+            String ymd = DateUtil.reverseFormatDate(date);
+
+            // 공휴일 스킵
+            if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd))) continue;
+
+            // 실적기록 X
+            AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, ymd);
+            if (attRecord == null) continue;
+
+            String shiftCode = attRecord.getShiftCode();
+            if (shiftCode == null || shiftCode.isEmpty()) continue;
+
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode(shiftCode);
+            if (shift == null) continue;
+
+            workHours = workHours.plus(WorkHoursCalculator.getRealWorkTime(
+                attRecord.getCheckInTime(),
+                attRecord.getCheckOutTime(),
+                shift));
         }
 
-        return String.format("%05.2f", workHours.toMinutes() / 60.0);
+        return String.format("%.2f", workHours.toMinutes() / 60.0);
     }
 }

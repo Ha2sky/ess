@@ -27,20 +27,22 @@ public class WorkHoursCalculator {
 
         // 휴게1 처리
         Duration break1 = Duration.ZERO;
-        if (!shift.getBreak1StartHhmm().isEmpty() && !shift.getBreak1EndHhmm().isEmpty()) {
-            LocalTime break1Start = LocalTime.parse(shift.getBreak1StartHhmm(), formatter);
-            LocalTime break1End = LocalTime.parse(shift.getBreak1EndHhmm(), formatter);
-            LocalDateTime b1Start = LocalDateTime.of(today, break1Start);
-            LocalDateTime b1End = LocalDateTime.of(today, break1End);
-            if (!Objects.equals(shift.getBreak1StartDayType(), shift.getBreak1EndDayType())) {
-                b1End = b1End.plusDays(1); // 익일 종료
+        if (!shift.getBreak1StartHhmm().isEmpty() && !shift.getBreak1EndHhmm().isEmpty()
+            && shift.getBreak1StartHhmm().compareTo(shift.getWorkOnHhmm()) > 0) {
+                LocalTime break1Start = LocalTime.parse(shift.getBreak1StartHhmm(), formatter);
+                LocalTime break1End = LocalTime.parse(shift.getBreak1EndHhmm(), formatter);
+                LocalDateTime b1Start = LocalDateTime.of(today, break1Start);
+                LocalDateTime b1End = LocalDateTime.of(today, break1End);
+                if (!Objects.equals(shift.getBreak1StartDayType(), shift.getBreak1EndDayType())) {
+                    b1End = b1End.plusDays(1); // 익일 종료
+                }
+                break1 = Duration.between(b1Start, b1End);
             }
-            break1 = Duration.between(b1Start, b1End);
-        }
 
         // 휴게2 처리
         Duration break2 = Duration.ZERO;
-        if (!shift.getBreak2StartHhmm().isEmpty() && !shift.getBreak2EndHhmm().isEmpty()) {
+        if (!shift.getBreak2StartHhmm().isEmpty() && !shift.getBreak2EndHhmm().isEmpty()
+            && shift.getBreak2StartHhmm().compareTo(shift.getWorkOffHhmm()) < 0) {
             LocalTime break2Start = LocalTime.parse(shift.getBreak2StartHhmm(), formatter);
             LocalTime break2End = LocalTime.parse(shift.getBreak2EndHhmm(), formatter);
             LocalDateTime b2Start = LocalDateTime.of(today, break2Start);
@@ -52,5 +54,34 @@ public class WorkHoursCalculator {
         }
 
         return total.minus(break1).minus(break2);
+    }
+
+    /* 실적 근무 시간 계산 */
+    public static Duration getRealWorkTime(String checkIn, String checkOut, ShiftMaster shift) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
+
+        Duration planned = getTotalWorkTime(shift);
+
+        if (checkIn == null) return planned;
+
+        LocalTime workOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
+        LocalTime workOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+        LocalTime inTime = LocalTime.parse(checkIn.substring(0, 4), formatter);
+        LocalTime outTime = (checkOut != null) ? LocalTime.parse(checkOut.substring(0, 4), formatter) : null;
+
+        // 지각 시간 계산
+        if (inTime.isAfter(workOn)) {
+            Duration late = Duration.between(workOn, inTime);
+            planned = planned.minus(late);
+        }
+
+        // 조기 퇴근 계산
+        if (outTime != null && outTime.isBefore(workOff)) {
+            Duration earlyLeave = Duration.between(outTime, workOff);
+            planned = planned.minus(earlyLeave);
+        }
+
+        // 음수 방지
+        return planned.isNegative() ? Duration.ZERO : planned;
     }
 }
