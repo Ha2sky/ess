@@ -29,9 +29,6 @@
       <button id="etcTab" class="tab-button bg-gray-300 text-gray-700 px-4 py-2 rounded-t">
         기타근태 신청
       </button>
-      <button id="historyTab" class="tab-button bg-gray-300 text-gray-700 px-4 py-2 rounded-t">
-        신청 내역
-      </button>
     </nav>
   </div>
 
@@ -60,9 +57,21 @@
           <input type="text" id="generalDeptCode" class="mt-1 block w-full border border-gray-300 rounded p-2"
                  th:value="${currentEmp.deptCode}" readonly>
         </div>
-        <div class="flex items-end">
+        <div class="flex items-end space-x-2">
           <button id="searchGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
             조회
+          </button>
+          <button id="saveGeneralBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+            저장
+          </button>
+          <button id="deleteGeneralBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+            삭제
+          </button>
+          <button id="submitGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            상신
+          </button>
+          <button id="cancelGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            상신취소
           </button>
         </div>
       </div>
@@ -75,14 +84,16 @@
         <tr>
           <th class="border border-gray-300 px-4 py-2">선택</th>
           <th class="border border-gray-300 px-4 py-2">사번</th>
-          <th class="border border-gray-300 px-4 py-2">이름</th>
+          <th class="border border-gray-300 px-4 py-2">성명</th>
           <th class="border border-gray-300 px-4 py-2">직위</th>
           <th class="border border-gray-300 px-4 py-2">부서</th>
-          <th class="border border-gray-300 px-4 py-2">근무계획</th>
+          <th class="border border-gray-300 px-4 py-2">계획</th>
+          <th class="border border-gray-300 px-4 py-2">실적</th>
           <th class="border border-gray-300 px-4 py-2">신청근무</th>
           <th class="border border-gray-300 px-4 py-2">시작시간</th>
           <th class="border border-gray-300 px-4 py-2">종료시간</th>
           <th class="border border-gray-300 px-4 py-2">사유</th>
+          <th class="border border-gray-300 px-4 py-2">예상근로시간</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
         </tr>
         </thead>
@@ -92,17 +103,7 @@
       </table>
     </div>
 
-    <!-- 버튼 영역 -->
-    <div class="flex space-x-2">
-      <button id="saveGeneralBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-        저장
-      </button>
-      <button id="deleteGeneralBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-        삭제
-      </button>
-      <button id="submitGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-        상신
-      </button>
+
     </div>
   </div>
 
@@ -132,11 +133,25 @@
           <input type="text" id="etcDeptCode" class="mt-1 block w-full border border-gray-300 rounded p-2"
                  th:value="${currentEmp.deptCode}" readonly>
         </div>
-        <div class="flex items-end">
+        <div class="flex items-end space-x-2">
           <button id="searchEtcBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
             조회
           </button>
+          <button id="saveEtcBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+            저장
+          </button>
+          <button id="deleteEtcBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+            삭제
+          </button>
+          <button id="submitEtcBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            상신
+          </button>
+          <button id="cancelEtcBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            상신취소
+          </button>
         </div>
+
+
       </div>
     </div>
 
@@ -147,10 +162,11 @@
         <tr>
           <th class="border border-gray-300 px-4 py-2">선택</th>
           <th class="border border-gray-300 px-4 py-2">사번</th>
-          <th class="border border-gray-300 px-4 py-2">이름</th>
+          <th class="border border-gray-300 px-4 py-2">성명</th>
           <th class="border border-gray-300 px-4 py-2">직위</th>
           <th class="border border-gray-300 px-4 py-2">부서</th>
-          <th class="border border-gray-300 px-4 py-2">기존근무계획</th>
+          <th class="border border-gray-300 px-4 py-2">계획</th>
+          <th class="border border-gray-300 px-4 py-2">실적</th>
           <th class="border border-gray-300 px-4 py-2">변경근무</th>
           <th class="border border-gray-300 px-4 py-2">시작일</th>
           <th class="border border-gray-300 px-4 py-2">종료일</th>
@@ -164,84 +180,7 @@
         </tbody>
       </table>
     </div>
-
-    <!-- 버튼 영역 -->
-    <div class="flex space-x-2">
-      <button id="saveEtcBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-        저장
-      </button>
-      <button id="deleteEtcBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-        삭제
-      </button>
-      <button id="submitEtcBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-        상신
-      </button>
-    </div>
   </div>
-
-  <!-- 신청 내역 탭 -->
-  <div id="historyPanel" class="tab-panel p-6 hidden">
-    <h2 class="text-xl font-semibold mb-4">신청 내역</h2>
-
-    <!-- 일반근태 신청 내역 -->
-    <h3 class="text-lg font-medium mb-2">일반근태 신청 내역</h3>
-    <div class="overflow-x-auto mb-6">
-      <table class="min-w-full border-collapse border border-gray-300">
-        <thead class="bg-gray-100">
-        <tr>
-          <th class="border border-gray-300 px-4 py-2">신청번호</th>
-          <th class="border border-gray-300 px-4 py-2">대상자</th>
-          <th class="border border-gray-300 px-4 py-2">신청자</th>
-          <th class="border border-gray-300 px-4 py-2">신청일</th>
-          <th class="border border-gray-300 px-4 py-2">대상일</th>
-          <th class="border border-gray-300 px-4 py-2">신청유형</th>
-          <th class="border border-gray-300 px-4 py-2">상태</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="apply : ${generalApplies}">
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyGeneralNo}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.empName}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applicantName}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyDate}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetDate}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyType}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.status}"></td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- 기타근태 신청 내역 -->
-    <h3 class="text-lg font-medium mb-2">기타근태 신청 내역</h3>
-    <div class="overflow-x-auto">
-      <table class="min-w-full border-collapse border border-gray-300">
-        <thead class="bg-gray-100">
-        <tr>
-          <th class="border border-gray-300 px-4 py-2">신청번호</th>
-          <th class="border border-gray-300 px-4 py-2">대상자</th>
-          <th class="border border-gray-300 px-4 py-2">신청자</th>
-          <th class="border border-gray-300 px-4 py-2">신청일</th>
-          <th class="border border-gray-300 px-4 py-2">시작일</th>
-          <th class="border border-gray-300 px-4 py-2">종료일</th>
-          <th class="border border-gray-300 px-4 py-2">상태</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="apply : ${etcApplies}">
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyEtcNo}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.empName}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applicantName}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.applyDate}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetStartDate}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.targetEndDate}"></td>
-          <td class="border border-gray-300 px-4 py-2" th:text="${apply.status}"></td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
 
 <script>
   $(document).ready(function() {
@@ -392,8 +331,8 @@
               return;
           }
 
-          const applyNo = selectedRow.attr('data-apply-no');
-          if (!applyNo) {
+          const applyGeneralNo = selectedRow.attr('data-apply-no');
+          if (!applyGeneralNo) {
               alert('저장된 신청건만 삭제할 수 있습니다.');
               return;
           }
@@ -403,7 +342,7 @@
                   url: '/user/apply/delete',
                   method: 'POST',
                   data: {
-                      applyNo: applyNo,
+                      applyGeneralNo: applyGeneralNo,
                       applyType: 'general'
                   },
                   success: function(result) {
@@ -430,8 +369,8 @@
             return;
         }
 
-        const applyNo = selectedRow.attr('data-apply-no');
-        if (!applyNo) {
+        const applyGeneralNo = selectedRow.attr('data-apply-no');
+        if (!applyGeneralNo) {
             alert('저장된 신청건만 상신할 수 있습니다.');
             return;
         }
@@ -441,7 +380,7 @@
                 url: '/user/apply/submit',
                 method: 'POST',
                 data: {
-                    applyNo: applyNo,
+                    applyGeneralNo: applyGeneralNo,
                     applyType: 'general'
                 },
                 success: function(result) {
@@ -600,8 +539,8 @@
               return;
           }
 
-          const applyNo = selectedRow.attr('data-apply-no');
-          if (!applyNo) {
+          const applyEtcNo = selectedRow.attr('data-apply-no');
+          if (!applyEtcNo) {
               alert('저장된 신청건만 삭제할 수 있습니다.');
               return;
           }
@@ -611,8 +550,7 @@
                   url: '/user/apply/delete',
                   method: 'POST',
                   data: {
-                      applyNo: applyNo,
-                      applyType: 'etc'
+                      applyEtcNo: applyEtcNo,
                   },
                   success: function(result) {
                       if (result === 'success') {
@@ -637,8 +575,8 @@
               return;
           }
 
-          const applyNo = selectedRow.attr('data-apply-no');
-          if (!applyNo) {
+          const applyEtcNo = selectedRow.attr('data-apply-no');
+          if (!applyEtcNo) {
               alert('저장된 신청건만 상신할 수 있습니다.');
               return;
           }
@@ -648,8 +586,7 @@
                   url: '/user/apply/submit',
                   method: 'POST',
                   data: {
-                      applyNo: applyNo,
-                      applyType: 'etc'
+                      applyEtcNo: applyEtcNo,
                   },
                   success: function(result) {
                       if (result === 'success') {
