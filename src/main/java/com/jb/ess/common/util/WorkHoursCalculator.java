@@ -57,7 +57,7 @@ public class WorkHoursCalculator {
     }
 
     /* 실적 근무 시간 계산 */
-    public static Duration getRealWorkTime(String checkIn, String checkOut, ShiftMaster shift) {
+    public static Duration getRealWorkTime(String checkIn, String checkOut, ShiftMaster shift, LocalDate workDate) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
 
         Duration planned = getTotalWorkTime(shift);
@@ -69,15 +69,33 @@ public class WorkHoursCalculator {
         LocalTime inTime = LocalTime.parse(checkIn.substring(0, 4), formatter);
         LocalTime outTime = (checkOut != null) ? LocalTime.parse(checkOut.substring(0, 4), formatter) : null;
 
+        // 출근, 퇴근 시간을 LocalDateTime 으로 변환
+        LocalDateTime inDateTime = LocalDateTime.of(workDate, inTime);
+
+        // 퇴근 시간이 출근 시간보다 이전이라면 다음날로 처리
+        LocalDateTime outDateTime = null;
+        if (outTime != null) {
+            outDateTime = LocalDateTime.of(workDate, outTime);
+            if (outDateTime.isBefore(inDateTime)) {
+                outDateTime = outDateTime.plusDays(1);
+            }
+        }
+
+        LocalDateTime workOnDateTime = LocalDateTime.of(workDate, workOn);
+        LocalDateTime workOffDateTime = LocalDateTime.of(workDate, workOff);
+        if (workOffDateTime.isBefore(workOnDateTime)) {
+            workOffDateTime = workOffDateTime.plusDays(1);
+        }
+
         // 지각 시간 계산
-        if (inTime.isAfter(workOn)) {
-            Duration late = Duration.between(workOn, inTime);
+        if (inDateTime.isAfter(workOnDateTime)) {
+            Duration late = Duration.between(workOnDateTime, inDateTime);
             planned = planned.minus(late);
         }
 
         // 조기 퇴근 계산
-        if (outTime != null && outTime.isBefore(workOff)) {
-            Duration earlyLeave = Duration.between(outTime, workOff);
+        if (outDateTime != null && outDateTime.isBefore(workOffDateTime)) {
+            Duration earlyLeave = Duration.between(outDateTime, workOffDateTime);
             planned = planned.minus(earlyLeave);
         }
 
