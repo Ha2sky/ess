@@ -4,6 +4,7 @@ import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -15,13 +16,15 @@ public interface EmpAttendanceMapper {
                dept.DEPT_NAME
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
+            AND att.WORK_DATE = #{workDate}
         LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
         LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
         WHERE emp.DEPT_CODE = #{deptCode}
         ORDER BY emp.EMP_NAME
     """)
     /* Employee + 실적 목록 */
-    List<Employee> getEmpAttendanceByDeptCode(String deptCode);
+    List<Employee> getEmpAttendanceByDeptCode(@Param("deptCode") String deptCode,
+                                              @Param("workDate") String workDate);
 
     @Select("""
         SELECT emp.*,
@@ -30,12 +33,14 @@ public interface EmpAttendanceMapper {
                dept.DEPT_NAME
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
+            AND att.WORK_DATE = #{workDate}
         LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
         LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
         WHERE emp.EMP_CODE = #{empCode}
     """)
     /* Employee + 실적 */
-    List<Employee> getEmpAttendanceByEmpCode(String empCode);
+    List<Employee> getEmpAttendanceByEmpCode(@Param("empCode") String empCode,
+                                             @Param("workDate") String workDate);
 
     @Select("""
         SELECT *

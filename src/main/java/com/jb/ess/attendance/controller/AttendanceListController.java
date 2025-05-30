@@ -63,9 +63,10 @@ public class AttendanceListController {
         }
 
         // 사원 목록 조회
+        String workDateStr = workDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         List<Employee> empList = (empCode == null || empCode.isEmpty())
-            ? empAttService.empAttendanceList(deptCode)
-            : empAttService.empAttendance(empCode);
+            ? empAttService.empAttendanceList(deptCode, workDateStr)
+            : empAttService.empAttendance(empCode, workDateStr);
 
         // 근태 정보 세팅
         empList = empAttService.setAttendanceInfo(empList, weekStart, weekEnd, workDate);

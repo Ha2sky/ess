@@ -29,13 +29,13 @@ public class EmpAttService {
     private final AttRecordMapper attRecordMapper;
 
     /* 사원 정보 및 실적 리스트 */
-    public List<Employee> empAttendanceList(String deptCode) {
-        return empAttendanceMapper.getEmpAttendanceByDeptCode(deptCode);
+    public List<Employee> empAttendanceList(String deptCode, String workDate) {
+        return empAttendanceMapper.getEmpAttendanceByDeptCode(deptCode, workDate);
     }
 
     /* 사원 정보 및 실적 */
-    public List<Employee> empAttendance(String empCode) {
-        return empAttendanceMapper.getEmpAttendanceByEmpCode(empCode);
+    public List<Employee> empAttendance(String empCode, String workDate) {
+        return empAttendanceMapper.getEmpAttendanceByEmpCode(empCode, workDate);
     }
 
     /* 로그인한 사원의 부서 정보 */
