@@ -1,13 +1,14 @@
 package com.jb.ess.attendance.controller;
 
 import com.jb.ess.attendance.service.EmpAttService;
-import com.jb.ess.common.domain.AttendanceRecord;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.common.mapper.AttRecordMapper;
+import com.jb.ess.common.mapper.DepartmentMapper;
 import com.jb.ess.common.security.CustomUserDetails;
-import com.jb.ess.common.util.DateUtil;
+import com.jb.ess.pattern.service.PatternService;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 /* 부서근태조회 */
 public class AttendanceListController {
     private final EmpAttService empAttService;
-    private final AttRecordMapper attRecordMapper;
+    private final PatternService patternService;
+    private final DepartmentMapper departmentMapper;
 
     @GetMapping("/list")
     public String attendanceList(@AuthenticationPrincipal CustomUserDetails user,
@@ -40,55 +42,41 @@ public class AttendanceListController {
         if (weekStart == null) weekStart = workDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         if (weekEnd == null) weekEnd = workDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
 
-        // 부서 코드가 없으면 로그인 사용자의 부서코드 사용
+        // 부서코드 기본값 설정
         if (deptCode == null || deptCode.isEmpty()) {
             deptCode = empAttService.empDepartmentInfo(user.getUsername()).getDeptCode();
         }
 
-        // 모델에 공통값 세팅
-        model.addAttribute("workDate", workDate);
-        model.addAttribute("empCode", empCode);
-        model.addAttribute("deptCode", deptCode);
+        // 미래날짜의 경우 패턴 캘린더 자동 생성
+        if (workDate.isAfter(LocalDate.now())) {
+            String yyyymm = workDate.format(DateTimeFormatter.ofPattern("yyyyMM"));
+            String workPatternCode = departmentMapper.findWorkPatternCodeByDeptCode(deptCode);
+            String yyyymmWithDash = workDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
-        // 사원 리스트 조회
-        List<Employee> empList = (empCode == null || empCode.isEmpty()) ?
-            empAttService.empAttendanceList(deptCode) :
-            empAttService.empAttendance(empCode);
-
-        // 날짜 포맷 캐싱
-        String workYmd = DateUtil.reverseFormatDate(workDate);
-
-        // 사원별 정보 세팅
-        for (Employee emp : empList) {
-            String empCodeVal = emp.getEmpCode();
-
-            // 주간 근무시간 계산
-            String workHoursStr = empAttService.getWorkHoursForWeek(empCodeVal, weekStart, weekEnd);
-            emp.setWorkHours(workHoursStr);
-
-            // 잔여시간 계산
-            try {
-                double workHours = Double.parseDouble(workHoursStr);
-                emp.setRemainWorkHours(String.format("%05.2f", 52.00 - workHours));
-            } catch (NumberFormatException e) {
-                emp.setRemainWorkHours("00.00");
+            if (Boolean.TRUE.equals(patternService.findShiftCalendar(workPatternCode, yyyymm))){
+                patternService.generateShiftCalendar(workPatternCode, YearMonth.parse(yyyymmWithDash));
             }
 
-            // 출퇴근 정보
-            AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCodeVal, workYmd);
-            if (attRecord != null) {
-                emp.setCheckInTime(attRecord.getCheckInTime());
-                emp.setCheckOutTime(attRecord.getCheckOutTime());
-            } else {
-                emp.setCheckInTime("-");
-                emp.setCheckOutTime("-");
+            if (Boolean.TRUE.equals(patternService.findEmpCalendar(workPatternCode, yyyymm))) {
+                patternService.generateEmpCalendar(workPatternCode, YearMonth.parse(yyyymmWithDash));
             }
         }
 
+        // 사원 목록 조회
+        List<Employee> empList = (empCode == null || empCode.isEmpty())
+            ? empAttService.empAttendanceList(deptCode)
+            : empAttService.empAttendance(empCode);
+
+        // 근태 정보 세팅
+        empList = empAttService.setAttendanceInfo(empList, weekStart, weekEnd, workDate);
+
+        // 모델에 데이터 바인딩
+        model.addAttribute("workDate", workDate);
+        model.addAttribute("empCode", empCode);
+        model.addAttribute("deptCode", deptCode);
         model.addAttribute("employees", empList);
         model.addAttribute("departments", empAttService.childDepartmentList(deptCode));
 
         return "user/attendance/list";
     }
-
 }

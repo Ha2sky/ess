@@ -69,4 +69,13 @@ public interface EmpCalendarMapper {
     """)
     String getHolidayYnByEmpCodeAndDate(@Param("empCode") String empCode,
                                         @Param("date") String date);
+
+    @Select("""
+        SELECT SHIFT_CODE
+        FROM HRTWORKEMPCALENDAR
+        WHERE EMP_CODE = #{empCode}
+        AND YYYYMMDD = #{date}
+    """)
+    String findShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
+                                         @Param("date") String date);
 }
