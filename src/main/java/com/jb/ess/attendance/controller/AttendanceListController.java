@@ -71,12 +71,13 @@ public class AttendanceListController {
         // 근태 정보 세팅
         empList = empAttService.setAttendanceInfo(empList, weekStart, weekEnd, workDate);
 
-        // 모델에 데이터 바인딩
         model.addAttribute("workDate", workDate);
         model.addAttribute("empCode", empCode);
         model.addAttribute("deptCode", deptCode);
         model.addAttribute("employees", empList);
         model.addAttribute("departments", empAttService.childDepartmentList(deptCode));
+        // 계획/실적
+
 
         return "user/attendance/list";
     }

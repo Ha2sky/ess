@@ -3,11 +3,8 @@ package com.jb.ess.common.mapper;
 import com.jb.ess.common.domain.EmpCalendar;
 import com.jb.ess.common.sql.EmpCalendarSqlProvider;
 import java.util.List;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.InsertProvider;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
+
+import org.apache.ibatis.annotations.*;
 
 @Mapper
 public interface EmpCalendarMapper {
@@ -78,4 +75,25 @@ public interface EmpCalendarMapper {
     """)
     String findShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
                                          @Param("date") String date);
+
+    @Select("""
+        SELECT SHIFT_CODE,
+               SHIFT_CODE_ORIG,
+               HOLIDAY_YN
+        FROM HRTWORKEMPCALENDAR
+        WHERE EMP_CODE = #{empCode}
+        AND YYYYMMDD = #{date}
+    """)
+    EmpCalendar getCodeAndHolidayByEmpCodeAndDate(@Param("empCode") String empCode,
+                                                  @Param("date") String date);
+
+    @Update("""
+        UPDATE HRTWORKEMPCALENDAR
+        SET SHIFT_CODE = #{shiftCode}
+        WHERE EMP_CODE = #{empCode}
+        AND YYYYMMDD = #{date}
+    """)
+    void updateShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
+                                         @Param("date") String date,
+                                         @Param("shiftCode") String shiftCode);
 }

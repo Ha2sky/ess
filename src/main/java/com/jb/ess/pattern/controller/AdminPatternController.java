@@ -246,6 +246,7 @@ public class AdminPatternController {
                             workPatternCode,
                             sc.getShiftDate(),
                             sc.getShiftCode(),
+                            sc.getShiftCode(),
                             empCode,
                             deptCode,
                             holidayYn

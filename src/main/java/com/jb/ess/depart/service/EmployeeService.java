@@ -43,12 +43,14 @@ public class EmployeeService {
         for (LocalDate date : dates) {
             int dayOfWeek = date.getDayOfWeek().getValue();
             String shiftCode = shiftCodeMap.get(dayOfWeek);
+            String shiftCodeOrig = shiftCodeMap.get(dayOfWeek);
             if (shiftCode != null) {
                 String holidayYn = (dayOfWeek == 6 || dayOfWeek == 7) ? "Y" : "N";
                 batchList.add(new EmpCalendar(
                     workPatternCode,
                     date.format(FORMATTER),
                     shiftCode,
+                    shiftCodeOrig,
                     empCode,
                     deptCode,
                     holidayYn

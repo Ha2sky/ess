@@ -95,8 +95,8 @@
       <td class="border px-2 py-1" th:text="${emp.empCode}"></td>
       <td class="border px-2 py-1" th:text="${emp.empName}"></td>
       <td class="border px-2 py-1" th:text="${emp.positionName}"></td>
-      <td class="border px-2 py-1" th:text="${emp.deptName}">인사팀</td>
-      <td class="border px-2 py-1">주간/주간 (임시)</td>
+      <td class="border px-2 py-1" th:text="${emp.deptName}"></td>
+      <td class="border px-2 py-1" th:text="${emp.shiftOrigName} + '/' + ${emp.shiftName}"></td>
       <td class="border px-2 py-1">(임시)</td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>

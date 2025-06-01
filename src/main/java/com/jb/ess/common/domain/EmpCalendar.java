@@ -13,11 +13,13 @@ public class EmpCalendar {
     private String holidayYn;       // 휴일여부
     private String deptCode;        // 부서코드
 
+    public EmpCalendar() {}
     public EmpCalendar(String workPatternCode, String yyyymmdd, String shiftCode,
-                       String empCode, String deptCode, String holidayYn) {
+                       String shiftCodeOrig, String empCode, String deptCode, String holidayYn) {
         this.workPatternCode = workPatternCode;
         this.yyyymmdd = yyyymmdd;
         this.shiftCode = shiftCode;
+        this.shiftCodeOrig = shiftCodeOrig;
         this.empCode = empCode;
         this.deptCode = deptCode;
         this.holidayYn = holidayYn;

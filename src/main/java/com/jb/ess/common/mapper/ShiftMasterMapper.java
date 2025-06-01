@@ -21,4 +21,25 @@ public interface ShiftMasterMapper {
         WHERE SHIFT_CODE = #{shiftCode}
     """)
     ShiftMaster findShiftByCode(String shiftCode);
+
+    @Select("""
+        SELECT WORK_ON_HHMM
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE = #{shiftCode}
+    """)
+    String findWorkOnHourByShiftCode(String shiftCode);
+
+    @Select("""
+        SELECT WORK_OFF_HHMM
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE = #{shiftCode}
+    """)
+    String findWorkOffHourByShiftCode(String shiftCode);
+
+    @Select("""
+        SELECT SHIFT_NAME
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE = #{shiftCode}
+    """)
+    String findShiftNameByShiftCode(String shiftCode);
 }

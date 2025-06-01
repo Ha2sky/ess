@@ -38,4 +38,11 @@ public class Employee implements Serializable {
     private String checkOutTime;    // 퇴근시간(HHmmSS)
     private String checkInDayType;  // 출근타입(N0, N1)
     private String checkOutDayType; // 퇴근타입(N0, N1)
+
+    private String shiftCode;       // 근태코드
+    private String shiftCodeOrig;   // 근태코드 변경전
+    private String holidayYn;       // 휴일여부
+
+    private String shiftOrigName;   // 계획근태명
+    private String shiftName;       // 실적근태명
 }

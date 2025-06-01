@@ -13,12 +13,15 @@ public interface EmpAttendanceMapper {
         SELECT emp.*,
                att.*,
                grd.POSITION_NAME,
-               dept.DEPT_NAME
+               dept.DEPT_NAME,
+               cal.*
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
             AND att.WORK_DATE = #{workDate}
         LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
         LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRTWORKEMPCALENDAR cal ON emp.EMP_CODE = cal.EMP_CODE
+            AND cal.YYYYMMDD = #{workDate}
         WHERE emp.DEPT_CODE = #{deptCode}
         ORDER BY emp.EMP_NAME
     """)
@@ -30,12 +33,15 @@ public interface EmpAttendanceMapper {
         SELECT emp.*,
                att.*,
                grd.POSITION_NAME,
-               dept.DEPT_NAME
+               dept.DEPT_NAME,
+               cal.*
         FROM HRIMASTER emp
         LEFT JOIN HRTATTRECORD att ON emp.EMP_CODE = att.EMP_CODE
             AND att.WORK_DATE = #{workDate}
         LEFT JOIN HRTGRADEINFO grd ON emp.POSITION_CODE = grd.POSITION_CODE
         LEFT JOIN ORGDEPTMASTER dept ON emp.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRTWORKEMPCALENDAR cal ON emp.EMP_CODE = cal.EMP_CODE
+            AND cal.YYYYMMDD = #{workDate}
         WHERE emp.EMP_CODE = #{empCode}
     """)
     /* Employee + 실적 */
