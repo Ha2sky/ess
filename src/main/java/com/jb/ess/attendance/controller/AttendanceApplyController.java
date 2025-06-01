@@ -4,6 +4,7 @@ import com.jb.ess.attendance.service.AttendanceApplyService;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.Employee;
+import com.jb.ess.common.domain.Department; // 수정: 부서 정보 추가
 import com.jb.ess.common.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,26 +28,13 @@ public class AttendanceApplyController {
         String empCode = user.getUsername();
         Employee currentEmp = attendanceApplyService.getCurrentEmployee(empCode);
 
+        // 수정: 부서 정보 조회 추가
+        Department department = attendanceApplyService.getDepartmentInfo(currentEmp.getDeptCode());
+        currentEmp.setDeptName(department.getDeptName());
+
         // 현재 사용자 정보 추가
         model.addAttribute("currentEmp", currentEmp);
         model.addAttribute("today", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
-
-        // 신청 내역 조회 추가 - 부서장인 경우 부서원 전체, 일반 사원인 경우 본인만
-        List<AttendanceApplyGeneral> generalApplies;
-        List<AttendanceApplyEtc> etcApplies;
-
-        if ("Y".equals(currentEmp.getIsHeader())) {
-            // 부서장인 경우 부서 전체 신청 내역 조회
-            generalApplies = attendanceApplyService.getGeneralAppliesByDept(currentEmp.getDeptCode());
-            etcApplies = attendanceApplyService.getEtcAppliesByDept(currentEmp.getDeptCode());
-        } else {
-            // 일반 사원인 경우 본인 신청 내역만 조회
-            generalApplies = attendanceApplyService.getGeneralAppliesByApplicant(empCode);
-            etcApplies = attendanceApplyService.getEtcAppliesByApplicant(empCode);
-        }
-
-        model.addAttribute("generalApplies", generalApplies);
-        model.addAttribute("etcApplies", etcApplies);
 
         return "user/apply";
     }

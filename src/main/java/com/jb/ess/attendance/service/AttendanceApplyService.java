@@ -3,7 +3,9 @@ package com.jb.ess.attendance.service;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.Employee;
+import com.jb.ess.common.domain.Department; // 수정: 부서 정보 추가
 import com.jb.ess.common.mapper.AttendanceApplyMapper;
+import com.jb.ess.common.mapper.DepartmentMapper; // 수정: 부서 매퍼 추가
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,10 +18,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AttendanceApplyService {
     private final AttendanceApplyMapper attendanceApplyMapper;
+    private final DepartmentMapper departmentMapper; // 수정: 부서 매퍼 추가
 
     // 현재 사용자 정보 조회
     public Employee getCurrentEmployee(String empCode) {
         return attendanceApplyMapper.findEmployeeByEmpCode(empCode);
+    }
+
+    // 수정: 부서 정보 조회 메서드 추가
+    public Department getDepartmentInfo(String deptCode) {
+        return departmentMapper.findByDeptCode(deptCode);
     }
 
     // 부서별 사원 조회 (부서장용)
@@ -176,25 +184,5 @@ public class AttendanceApplyService {
         }
 
         attendanceApplyMapper.deleteEtcApply(applyEtcNo);
-    }
-
-    // 신청자별 일반근태 신청 내역 조회
-    public List<AttendanceApplyGeneral> getGeneralAppliesByApplicant(String applicantCode) {
-        return attendanceApplyMapper.findGeneralAppliesByApplicant(applicantCode);
-    }
-
-    // 신청자별 기타근태 신청 내역 조회
-    public List<AttendanceApplyEtc> getEtcAppliesByApplicant(String applicantCode) {
-        return attendanceApplyMapper.findEtcAppliesByApplicant(applicantCode);
-    }
-
-    // 부서별 일반근태 신청 내역 조회 (부서장용)
-    public List<AttendanceApplyGeneral> getGeneralAppliesByDept(String deptCode) {
-        return attendanceApplyMapper.findGeneralAppliesByDept(deptCode);
-    }
-
-    // 부서별 기타근태 신청 내역 조회 (부서장용)
-    public List<AttendanceApplyEtc> getEtcAppliesByDept(String deptCode) {
-        return attendanceApplyMapper.findEtcAppliesByDept(deptCode);
     }
 }
