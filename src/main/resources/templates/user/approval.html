@@ -74,7 +74,7 @@
           <div class="space-y-2">
             <div th:each="apply : ${pendingGenerals}"
                  class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-                 th:data-apply-no="${apply.applyGeneralNo}"
+                 th:data-apply-general-no="${apply.applyGeneralNo}"
                  th:data-apply-type="general">
               <div class="flex justify-between">
                 <span class="font-medium" th:text="${apply.applicantName}"></span>
@@ -94,7 +94,7 @@
           <div class="space-y-2">
             <div th:each="apply : ${pendingEtcs}"
                  class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-                 th:data-apply-no="${apply.applyEtcNo}"
+                 th:data-apply-etc-no="${apply.applyEtcNo}"
                  th:data-apply-type="etc">
               <div class="flex justify-between">
                 <span class="font-medium" th:text="${apply.applicantName}"></span>
@@ -115,7 +115,7 @@
         <div class="space-y-2">
           <div th:each="apply : ${approvedGenerals}"
                class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-               th:data-apply-no="${apply.applyGeneralNo}"
+               th:data-apply-general-no="${apply.applyGeneralNo}"
                th:data-apply-type="general">
             <div class="flex justify-between">
               <span class="font-medium" th:text="${apply.applicantName}"></span>
@@ -135,7 +135,7 @@
         <div class="space-y-2">
           <div th:each="apply : ${rejectedGenerals}"
                class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-               th:data-apply-no="${apply.applyGeneralNo}"
+               th:data-apply-general-no="${apply.applyGeneralNo}"
                th:data-apply-type="general">
             <div class="flex justify-between">
               <span class="font-medium" th:text="${apply.applicantName}"></span>
@@ -157,7 +157,6 @@
         <div id="detailContent" class="space-y-4">
           <p class="text-gray-500">좌측에서 문서를 선택하세요.</p>
         </div>
-
         <!-- 승인/반려 버튼 -->
         <div id="actionButtons" class="mt-6 flex space-x-2 hidden">
           <button id="approveBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
@@ -191,7 +190,9 @@
 
 <script>
   $(document).ready(function() {
-      let currentApplyNo = null;
+      // 수정: applyNo 대신 분리된 변수 사용
+      let currentApplyGeneralNo = null;
+      let currentApplyEtcNo = null;
       let currentApplyType = null;
 
       // 탭 전환
@@ -214,15 +215,22 @@
           $('#actionButtons').addClass('hidden');
       });
 
-      // 문서 선택
+      // 문서 선택 - 수정: applyGeneralNo, applyEtcNo 분리 처리
       $(document).on('click', '.document-item', function() {
           $('.document-item').removeClass('bg-blue-100');
           $(this).addClass('bg-blue-100');
 
-          currentApplyNo = $(this).data('apply-no');
+          // 수정: 신청 유형에 따라 다른 번호 설정
           currentApplyType = $(this).data('apply-type');
+          if (currentApplyType === 'general') {
+              currentApplyGeneralNo = $(this).data('apply-general-no');
+              currentApplyEtcNo = null;
+          } else {
+              currentApplyEtcNo = $(this).data('apply-etc-no');
+              currentApplyGeneralNo = null;
+          }
 
-          loadDocumentDetail(currentApplyNo, currentApplyType);
+          loadDocumentDetail(currentApplyType === 'general' ? currentApplyGeneralNo : currentApplyEtcNo, currentApplyType);
 
           // 결재할 문서에서만 버튼 표시
           if ($('#pendingTab').hasClass('active')) {
@@ -232,21 +240,28 @@
           }
       });
 
-      // 승인 처리
+      // 승인 처리 - 수정: 신청 유형에 따라 다른 URL 호출
       $('#approveBtn').click(function() {
-          if (!currentApplyNo) {
+          if (!currentApplyGeneralNo && !currentApplyEtcNo) {
               alert('선택된 문서가 없습니다.');
               return;
           }
 
           if (confirm('승인하시겠습니까?')) {
+              let url, data;
+
+              if (currentApplyType === 'general') {
+                  url = '/user/approval/approve/general';
+                  data = { applyGeneralNo: currentApplyGeneralNo };
+              } else {
+                  url = '/user/approval/approve/etc';
+                  data = { applyEtcNo: currentApplyEtcNo };
+              }
+
               $.ajax({
-                  url: '/user/approval/approve',
+                  url: url,
                   method: 'POST',
-                  data: {
-                      applyNo: currentApplyNo,
-                      applyType: currentApplyType
-                  },
+                  data: data,
                   success: function(result) {
                       if (result === 'success') {
                           alert('승인되었습니다.');
@@ -262,9 +277,9 @@
           }
       });
 
-      // 반려 처리
+      // 반려 처리 - 수정: 신청 유형에 따라 다른 URL 호출
       $('#rejectBtn').click(function() {
-          if (!currentApplyNo) {
+          if (!currentApplyGeneralNo && !currentApplyEtcNo) {
               alert('선택된 문서가 없습니다.');
               return;
           }
@@ -279,14 +294,26 @@
               return;
           }
 
-          $.ajax({
-              url: '/user/approval/reject',
-              method: 'POST',
-              data: {
-                  applyNo: currentApplyNo,
-                  applyType: currentApplyType,
+          let url, data;
+
+          if (currentApplyType === 'general') {
+              url = '/user/approval/reject/general';
+              data = {
+                  applyGeneralNo: currentApplyGeneralNo,
                   rejectReason: rejectReason
-              },
+              };
+          } else {
+              url = '/user/approval/reject/etc';
+              data = {
+                  applyEtcNo: currentApplyEtcNo,
+                  rejectReason: rejectReason
+              };
+          }
+
+          $.ajax({
+              url: url,
+              method: 'POST',
+              data: data,
               success: function(result) {
                   if (result === 'success') {
                       alert('반려되었습니다.');
@@ -308,10 +335,8 @@
           $('#rejectReason').val('');
       });
 
-      // 문서 상세 정보 로드
+      // 문서 상세 정보 로드 - 수정: 신청 유형에 따라 다른 URL 호출
       function loadDocumentDetail(applyNo, applyType) {
-          // 상세 정보 로드 AJAX 호출
-          // 결재 이력과 함께 표시
           $('#detailContent').html(`
               <div class="space-y-4">
                   <div class="bg-gray-50 p-4 rounded">
@@ -326,9 +351,13 @@
               </div>
           `);
 
-          // 결재 이력 로드
+          // 결재 이력 로드 - 수정: 신청 유형에 따라 다른 URL 호출
+          const historyUrl = applyType === 'general'
+              ? `/user/approval/history/general/${applyNo}`
+              : `/user/approval/history/etc/${applyNo}`;
+
           $.ajax({
-              url: `/user/approval/history/${applyNo}`,
+              url: historyUrl,
               method: 'GET',
               success: function(histories) {
                   let historyHtml = '';

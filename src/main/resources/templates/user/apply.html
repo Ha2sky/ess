@@ -41,9 +41,10 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700">근태신청종류</label>
+          <!-- 수정: 근태신청종류 드롭다운 연동을 위한 ID 추가 -->
           <select id="generalApplyType" class="mt-1 block w-full border border-gray-300 rounded p-2">
-            <option value="연장">연장근로</option>
-            <option value="휴일">휴일근로</option>
+            <option value="연장근로">연장근로</option>
+            <option value="휴일근로">휴일근로</option>
             <option value="조퇴외출반차">조퇴/외출/반차</option>
           </select>
         </div>
@@ -53,9 +54,11 @@
                  th:value="${today}">
         </div>
         <div>
+          <!-- 수정: 부서명 표시 -->
           <label class="block text-sm font-medium text-gray-700">부서</label>
-          <input type="text" id="generalDeptCode" class="mt-1 block w-full border border-gray-300 rounded p-2"
-                 th:value="${currentEmp.deptCode}" readonly>
+          <input type="text" id="generalDeptName" class="mt-1 block w-full border border-gray-300 rounded p-2"
+                 th:value="${currentEmp.deptName}" readonly>
+          <input type="hidden" id="generalDeptCode" th:value="${currentEmp.deptCode}">
         </div>
         <div class="flex items-end space-x-2">
           <button id="searchGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
@@ -93,7 +96,8 @@
           <th class="border border-gray-300 px-4 py-2">시작시간</th>
           <th class="border border-gray-300 px-4 py-2">종료시간</th>
           <th class="border border-gray-300 px-4 py-2">사유</th>
-          <th class="border border-gray-300 px-4 py-2">예상근로시간</th>
+          <!-- 수정: 예상근로시간 필드 조건부 표시 -->
+          <th id="expectedWorkHoursHeader" class="border border-gray-300 px-4 py-2">예상근로시간</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
         </tr>
         </thead>
@@ -101,9 +105,6 @@
         <!-- 동적으로 생성 -->
         </tbody>
       </table>
-    </div>
-
-
     </div>
   </div>
 
@@ -129,9 +130,11 @@
           </select>
         </div>
         <div>
+          <!-- 수정: 부서명 표시 -->
           <label class="block text-sm font-medium text-gray-700">부서</label>
-          <input type="text" id="etcDeptCode" class="mt-1 block w-full border border-gray-300 rounded p-2"
-                 th:value="${currentEmp.deptCode}" readonly>
+          <input type="text" id="etcDeptName" class="mt-1 block w-full border border-gray-300 rounded p-2"
+                 th:value="${currentEmp.deptName}" readonly>
+          <input type="hidden" id="etcDeptCode" th:value="${currentEmp.deptCode}">
         </div>
         <div class="flex items-end space-x-2">
           <button id="searchEtcBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
@@ -150,8 +153,6 @@
             상신취소
           </button>
         </div>
-
-
       </div>
     </div>
 
@@ -181,6 +182,7 @@
       </table>
     </div>
   </div>
+</div>
 
 <script>
   $(document).ready(function() {
@@ -195,15 +197,57 @@
               $('#generalPanel').removeClass('hidden');
           } else if ($(this).attr('id') === 'etcTab') {
               $('#etcPanel').removeClass('hidden');
-          } else {
-              $('#historyPanel').removeClass('hidden');
           }
       });
 
-      // 일반근태 사원 조회 - 수정: 에러 처리 및 데이터 표시 개선
+      // 수정: 근태신청종류 드롭다운 변경시 신청근무 옵션 업데이트 및 예상근로시간 필드 제어
+      $('#generalApplyType').change(function() {
+          const selectedType = $(this).val();
+          updateApplyTypeOptions(selectedType);
+          toggleExpectedWorkHours(selectedType);
+      });
+
+      // 수정: 신청근무 옵션 업데이트 함수
+      function updateApplyTypeOptions(applyType) {
+          const rows = $('#generalEmployeeTable tbody tr');
+          rows.each(function() {
+              const applyTypeSelect = $(this).find('.apply-type');
+              applyTypeSelect.empty();
+              applyTypeSelect.append('<option value="">선택</option>');
+
+              if (applyType === '연장근로') {
+                  applyTypeSelect.append('<option value="연장">연장</option>');
+                  applyTypeSelect.append('<option value="조출연장">조출연장</option>');
+              } else if (applyType === '휴일근로') {
+                  applyTypeSelect.append('<option value="휴일근로">휴일근로</option>');
+              } else if (applyType === '조퇴외출반차') {
+                  applyTypeSelect.append('<option value="조퇴">조퇴</option>');
+                  applyTypeSelect.append('<option value="외출">외출</option>');
+                  applyTypeSelect.append('<option value="전반차">전반차</option>');
+                  applyTypeSelect.append('<option value="후반차">후반차</option>');
+              }
+          });
+      }
+
+      // 수정: 예상근로시간 필드 표시/숨김 함수
+      function toggleExpectedWorkHours(applyType) {
+          const header = $('#expectedWorkHoursHeader');
+          const cells = $('.expected-work-hours-cell');
+
+          if (applyType === '조퇴외출반차') {
+              header.hide();
+              cells.hide();
+          } else {
+              header.show();
+              cells.show();
+          }
+      }
+
+      // 일반근태 사원 조회 - 수정: 부서코드 대신 hidden 필드에서 가져오기
       $('#searchGeneralBtn').click(function() {
           const deptCode = $('#generalDeptCode').val();
           const workDate = $('#generalWorkDate').val().replace(/-/g, '');
+          const applyType = $('#generalApplyType').val();
 
           if (!workDate) {
               alert('근무일을 선택해주세요.');
@@ -222,11 +266,14 @@
                   tbody.empty();
 
                   if (employees.length === 0) {
-                      tbody.append('<tr><td colspan="11" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
+                      tbody.append('<tr><td colspan="13" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
                       return;
                   }
 
                   employees.forEach(function(emp) {
+                      // 수정: 예상근로시간 필드 조건부 표시
+                      const expectedWorkHoursCell = applyType === '조퇴외출반차' ? 'style="display:none"' : '';
+
                       const row = `
                           <tr data-emp-code="${emp.empCode}">
                               <td class="border border-gray-300 px-4 py-2">
@@ -237,16 +284,10 @@
                               <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                               <td class="border border-gray-300 px-4 py-2">${emp.deptName || emp.deptCode}</td>
                               <td class="border border-gray-300 px-4 py-2">${emp.workPlanName || emp.workPlan || '-'}</td>
+                              <td class="border border-gray-300 px-4 py-2">실적</td>
                               <td class="border border-gray-300 px-4 py-2">
                                   <select class="apply-type border rounded p-1 w-full">
                                       <option value="">선택</option>
-                                      <option value="연장">연장</option>
-                                      <option value="조출연장">조출연장</option>
-                                      <option value="휴일근로">휴일근로</option>
-                                      <option value="조퇴">조퇴</option>
-                                      <option value="외출">외출</option>
-                                      <option value="전반차">전반차</option>
-                                      <option value="후반차">후반차</option>
                                   </select>
                               </td>
                               <td class="border border-gray-300 px-4 py-2">
@@ -258,11 +299,17 @@
                               <td class="border border-gray-300 px-4 py-2">
                                   <input type="text" class="reason border rounded p-1 w-full" placeholder="사유">
                               </td>
+                              <td class="expected-work-hours-cell border border-gray-300 px-4 py-2" ${expectedWorkHoursCell}>
+                                  <span class="expected-hours">0.00</span>
+                              </td>
                               <td class="border border-gray-300 px-4 py-2">대기</td>
                           </tr>
                       `;
                       tbody.append(row);
                   });
+
+                  // 신청근무 옵션 업데이트
+                  updateApplyTypeOptions(applyType);
               },
               error: function(xhr, status, error) {
                   console.error('사원 조회 실패:', error);
@@ -271,7 +318,7 @@
           });
       });
 
-      // 일반근태 저장
+      // 일반근태 저장 - 수정: applyGeneralNo 사용
       $('#saveGeneralBtn').click(function() {
           const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
@@ -311,7 +358,7 @@
               success: function(result) {
                   if (result === 'success') {
                       alert('저장되었습니다.');
-                      location.reload(); // 페이지 새로고침으로 신청 내역 업데이트
+                      location.reload();
                   } else {
                       alert(result);
                   }
@@ -323,7 +370,7 @@
           });
       });
 
-      // 삭제 처리
+      // 삭제 처리 - 수정: applyGeneralNo 사용
       $('#deleteGeneralBtn').click(function() {
           const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
@@ -331,7 +378,7 @@
               return;
           }
 
-          const applyGeneralNo = selectedRow.attr('data-apply-no');
+          const applyGeneralNo = selectedRow.attr('data-apply-general-no');
           if (!applyGeneralNo) {
               alert('저장된 신청건만 삭제할 수 있습니다.');
               return;
@@ -339,11 +386,10 @@
 
           if (confirm('정말 삭제하시겠습니까?')) {
               $.ajax({
-                  url: '/user/apply/delete',
+                  url: '/user/apply/delete/general',
                   method: 'POST',
                   data: {
-                      applyGeneralNo: applyGeneralNo,
-                      applyType: 'general'
+                      applyGeneralNo: applyGeneralNo
                   },
                   success: function(result) {
                       if (result === 'success') {
@@ -361,45 +407,44 @@
           }
       });
 
-      // 상신 처리 - 수정: 저장된 신청건 식별 로직 개선
+      // 상신 처리 - 수정: applyGeneralNo 사용
       $('#submitGeneralBtn').click(function() {
-        const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-        if (selectedRow.length === 0) {
-            alert('상신할 항목을 선택해주세요.');
-            return;
-        }
+          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
+          if (selectedRow.length === 0) {
+              alert('상신할 항목을 선택해주세요.');
+              return;
+          }
 
-        const applyGeneralNo = selectedRow.attr('data-apply-no');
-        if (!applyGeneralNo) {
-            alert('저장된 신청건만 상신할 수 있습니다.');
-            return;
-        }
+          const applyGeneralNo = selectedRow.attr('data-apply-general-no');
+          if (!applyGeneralNo) {
+              alert('저장된 신청건만 상신할 수 있습니다.');
+              return;
+          }
 
-        if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
-            $.ajax({
-                url: '/user/apply/submit',
-                method: 'POST',
-                data: {
-                    applyGeneralNo: applyGeneralNo,
-                    applyType: 'general'
-                },
-                success: function(result) {
-                    if (result === 'success') {
-                        alert('상신되었습니다.');
-                        location.reload();
-                    } else {
-                        alert('상신 실패: ' + result);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('상신 실패:', error);
-                    alert('상신에 실패했습니다.');
-                }
-            });
-        }
+          if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
+              $.ajax({
+                  url: '/user/apply/submit/general',
+                  method: 'POST',
+                  data: {
+                      applyGeneralNo: applyGeneralNo
+                  },
+                  success: function(result) {
+                      if (result === 'success') {
+                          alert('상신되었습니다.');
+                          location.reload();
+                      } else {
+                          alert('상신 실패: ' + result);
+                      }
+                  },
+                  error: function(xhr, status, error) {
+                      console.error('상신 실패:', error);
+                      alert('상신에 실패했습니다.');
+                  }
+              });
+          }
       });
 
-      // 기타근태 사원 조회
+      // 기타근태 사원 조회 - 수정: 부서코드 대신 hidden 필드에서 가져오기
       $('#searchEtcBtn').click(function() {
           const deptCode = $('#etcDeptCode').val();
           const workDate = $('#etcWorkDate').val().replace(/-/g, '');
@@ -423,7 +468,7 @@
                   tbody.empty();
 
                   if (employees.length === 0) {
-                      tbody.append('<tr><td colspan="12" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
+                      tbody.append('<tr><td colspan="13" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
                       return;
                   }
 
@@ -438,6 +483,7 @@
                               <td class="border px-4 py-2">${emp.positionName || ''}</td>
                               <td class="border px-4 py-2">${emp.deptName || emp.deptCode}</td>
                               <td class="border px-4 py-2">${emp.workPlanName || emp.workPlan || '-'}</td>
+                              <td class="border px-4 py-2">실적</td>
                               <td class="border px-4 py-2">
                                   <select class="etc-shift border rounded p-1 w-full">
                                       <option value="">선택</option>
@@ -474,7 +520,7 @@
           });
       });
 
-      // 기타근태 저장
+      // 기타근태 저장 - 수정: applyEtcNo 사용
       $('#saveEtcBtn').click(function() {
           const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
@@ -531,7 +577,7 @@
           });
       });
 
-      // 기타근태 삭제 및 상신
+      // 기타근태 삭제 - 수정: applyEtcNo 사용
       $('#deleteEtcBtn').click(function() {
           const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
@@ -539,7 +585,7 @@
               return;
           }
 
-          const applyEtcNo = selectedRow.attr('data-apply-no');
+          const applyEtcNo = selectedRow.attr('data-apply-etc-no');
           if (!applyEtcNo) {
               alert('저장된 신청건만 삭제할 수 있습니다.');
               return;
@@ -547,10 +593,10 @@
 
           if (confirm('정말 삭제하시겠습니까?')) {
               $.ajax({
-                  url: '/user/apply/delete',
+                  url: '/user/apply/delete/etc',
                   method: 'POST',
                   data: {
-                      applyEtcNo: applyEtcNo,
+                      applyEtcNo: applyEtcNo
                   },
                   success: function(result) {
                       if (result === 'success') {
@@ -568,6 +614,7 @@
           }
       });
 
+      // 기타근태 상신 - 수정: applyEtcNo 사용
       $('#submitEtcBtn').click(function() {
           const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
           if (selectedRow.length === 0) {
@@ -575,7 +622,7 @@
               return;
           }
 
-          const applyEtcNo = selectedRow.attr('data-apply-no');
+          const applyEtcNo = selectedRow.attr('data-apply-etc-no');
           if (!applyEtcNo) {
               alert('저장된 신청건만 상신할 수 있습니다.');
               return;
@@ -583,10 +630,10 @@
 
           if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
               $.ajax({
-                  url: '/user/apply/submit',
+                  url: '/user/apply/submit/etc',
                   method: 'POST',
                   data: {
-                      applyEtcNo: applyEtcNo,
+                      applyEtcNo: applyEtcNo
                   },
                   success: function(result) {
                       if (result === 'success') {
@@ -608,6 +655,10 @@
       if ($('#generalWorkDate').val()) {
           $('#searchGeneralBtn').click();
       }
+
+      // 수정: 초기 로드시 예상근로시간 필드 제어
+      const initialApplyType = $('#generalApplyType').val();
+      toggleExpectedWorkHours(initialApplyType);
   });
 </script>
 
