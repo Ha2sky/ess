@@ -52,7 +52,7 @@
           <input type="date" id="generalWorkDate" class="mt-1 block w-full border border-gray-300 rounded p-2"
                  th:value="${today}">
         </div>
-        <!-- 수정: 부서 드롭다운 추가 (요청사항 5) -->
+        <!-- 부서 드롭다운 -->
         <div>
           <label class="block text-sm font-medium text-gray-700">부서</label>
           <select id="generalDeptSelect" class="mt-1 block w-full border border-gray-300 rounded p-2">
@@ -99,16 +99,13 @@
           <th class="border border-gray-300 px-4 py-2">신청근무</th>
           <th class="border border-gray-300 px-4 py-2">시작시간</th>
           <th class="border border-gray-300 px-4 py-2">종료시간</th>
-          <th class="border border-gray-300 px-4 py-2">사유</th>
-          <!-- 수정: 예상근로시간 필드 조건부 표시 -->
-          <th id="expectedWorkHoursHeader" class="border border-gray-300 px-4 py-2">예상근로시간</th>
+          <th class="border border-gray-300 px-4 py-2">예상근로시간</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
-          <!-- 수정: 상신자 필드 추가 (요청사항 1) -->
           <th class="border border-gray-300 px-4 py-2">상신자</th>
         </tr>
         </thead>
-        <tbody>
-        <!-- 동적으로 생성 -->
+        <tbody id="generalEmployeeBody">
+        <!-- 동적으로 로드될 사원 목록 -->
         </tbody>
       </table>
     </div>
@@ -130,12 +127,12 @@
           <label class="block text-sm font-medium text-gray-700">근무계획</label>
           <select id="etcWorkPlan" class="mt-1 block w-full border border-gray-300 rounded p-2">
             <option value="">전체</option>
-            <option value="정상근무">정상근무</option>
+            <option value="주간">주간</option>
             <option value="휴일">휴일</option>
-            <option value="휴무">휴무</option>
+            <option value="휴무일">휴무일</option>
           </select>
         </div>
-        <!-- 수정: 부서 드롭다운 추가 (요청사항 5) -->
+        <!-- 부서 드롭다운 -->
         <div>
           <label class="block text-sm font-medium text-gray-700">부서</label>
           <select id="etcDeptSelect" class="mt-1 block w-full border border-gray-300 rounded p-2">
@@ -182,17 +179,14 @@
           <th class="border border-gray-300 px-4 py-2">변경근무</th>
           <th class="border border-gray-300 px-4 py-2">시작일</th>
           <th class="border border-gray-300 px-4 py-2">종료일</th>
-          <!-- 수정: 연차잔여 필드 추가 (요청사항 2) -->
           <th class="border border-gray-300 px-4 py-2">연차잔여</th>
           <th class="border border-gray-300 px-4 py-2">신청시각</th>
-          <th class="border border-gray-300 px-4 py-2">사유</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
-          <!-- 수정: 상신자 필드 추가 (요청사항 1) -->
           <th class="border border-gray-300 px-4 py-2">상신자</th>
         </tr>
         </thead>
-        <tbody>
-        <!-- 동적으로 생성 -->
+        <tbody id="etcEmployeeBody">
+        <!-- 동적으로 로드될 사원 목록 -->
         </tbody>
       </table>
     </div>
@@ -201,24 +195,38 @@
 
 <script>
   $(document).ready(function() {
-      // 수정: 근태 마스터 데이터를 전역 변수로 저장 (요청사항 3)
-      let shiftMasterData = [];
+      // 전역 변수에 현재 사용자 정보 저장
+      const currentUser = {
+          empCode: '[[${currentEmp.empCode}]]',
+          empName: '[[${currentEmp.empName}]]',
+          isHeader: '[[${currentEmp.isHeader}]]',
+          deptCode: '[[${currentEmp.deptCode}]]'  // 수정: 부서코드 추가
+      };
 
-      // 페이지 로드시 근태 마스터 데이터 로드
-      loadShiftMasters();
+      // 연차잔여 정보 저장
+      const currentAnnual = {
+          balanceDay: '[[${annualDetail?.balanceDay} ?: 0]]'
+      };
 
-      function loadShiftMasters() {
-          $.ajax({
-              url: '/user/apply/shift-masters',
-              method: 'GET',
-              success: function(data) {
-                  shiftMasterData = data;
-              },
-              error: function(xhr, status, error) {
-                  console.error('근태 마스터 로드 실패:', error);
-              }
-          });
-      }
+      let shiftMasters = [];
+
+      // 신청근무 옵션 정의
+      const workTypeOptions = {
+          '연장근로': [
+              { value: '조출연장', text: '조출연장' },
+              { value: '연장', text: '연장' }
+          ],
+          '휴일근로': [
+              { value: '휴일근무', text: '휴일근무' }
+          ],
+          '조퇴외출반차': [
+              { value: '조퇴', text: '조퇴' },
+              { value: '외근', text: '외근' },
+              { value: '외출', text: '외출' },
+              { value: '전반차', text: '전반차' },
+              { value: '후반차', text: '후반차' }
+          ]
+      };
 
       // 탭 전환 기능
       $('.tab-button').click(function() {
@@ -227,612 +235,637 @@
 
           $('.tab-panel').addClass('hidden');
 
-          if ($(this).attr('id') === 'generalTab') {
+          if (this.id === 'generalTab') {
               $('#generalPanel').removeClass('hidden');
-          } else if ($(this).attr('id') === 'etcTab') {
+          } else {
               $('#etcPanel').removeClass('hidden');
           }
       });
 
-      // 수정: 근태신청종류 드롭다운 변경시 신청근무 옵션 업데이트 및 예상근로시간 필드 제어
+      // 근태 마스터 로드
+      loadShiftMasters();
+
+      // 초기 데이터 로드
+      setTimeout(function() {
+          // 부서코드와 날짜 유효성 검사 후 실행
+          if (currentUser.deptCode && $('#generalWorkDate').val()) {
+              searchGeneralEmployees();
+          } else {
+              console.warn('부서코드 또는 날짜가 설정되지 않음');
+              // 수동으로 값 설정 후 재시도
+              if (!$('#generalDeptSelect').val() && currentUser.deptCode) {
+                  $('#generalDeptSelect').val(currentUser.deptCode);
+              }
+              if ($('#generalWorkDate').val()) {
+                  searchGeneralEmployees();
+              }
+          }
+      }, 100);
+
+      // 이벤트 핸들러
+      $('#searchGeneralBtn').click(searchGeneralEmployees);
+      $('#searchEtcBtn').click(searchEtcEmployees);
+      $('#saveGeneralBtn').click(saveGeneralApply);
+      $('#saveEtcBtn').click(saveEtcApply);
+      $('#deleteGeneralBtn').click(deleteGeneralApply);
+      $('#deleteEtcBtn').click(deleteEtcApply);
+      $('#submitGeneralBtn').click(submitGeneralApply);
+      $('#submitEtcBtn').click(submitEtcApply);
+      $('#cancelGeneralBtn').click(cancelGeneralApply);
+      $('#cancelEtcBtn').click(cancelEtcApply);
+
+      // 근태신청종류 변경 시 신청근무 옵션 업데이트
       $('#generalApplyType').change(function() {
           const selectedType = $(this).val();
-          updateApplyTypeOptions(selectedType);
-          toggleExpectedWorkHours(selectedType);
+          updateWorkTypeOptions(selectedType);
+
+          const isLeaveType = selectedType === '조퇴외출반차';
+          $('.expected-hours').closest('td').toggleClass('hidden', isLeaveType);
+          $('.expected-hours').closest('th').toggleClass('hidden', isLeaveType);
       });
 
-      // 수정: 신청근무 옵션 업데이트 함수
-      function updateApplyTypeOptions(applyType) {
-          const rows = $('#generalEmployeeTable tbody tr');
-          rows.each(function() {
-              const applyTypeSelect = $(this).find('.apply-type');
-              applyTypeSelect.empty();
-              applyTypeSelect.append('<option value="">선택</option>');
+      // 근태 마스터 로드 함수
+      function loadShiftMasters() {
+          $.get('/user/apply/shift-masters')
+              .done(function(data) {
+                  shiftMasters = data;
+              })
+              .fail(function() {
+                  console.error('근태 마스터 로드 실패');
+              });
+      }
 
-              if (applyType === '연장근로') {
-                  applyTypeSelect.append('<option value="연장">연장</option>');
-                  applyTypeSelect.append('<option value="조출연장">조출연장</option>');
-              } else if (applyType === '휴일근로') {
-                  applyTypeSelect.append('<option value="휴일근로">휴일근로</option>');
-              } else if (applyType === '조퇴외출반차') {
-                  applyTypeSelect.append('<option value="조퇴">조퇴</option>');
-                  applyTypeSelect.append('<option value="외출">외출</option>');
-                  applyTypeSelect.append('<option value="전반차">전반차</option>');
-                  applyTypeSelect.append('<option value="후반차">후반차</option>');
+      // 신청근무 옵션 업데이트 함수
+      function updateWorkTypeOptions(applyType) {
+          const options = workTypeOptions[applyType] || [];
+
+          // 모든 신청근무 드롭다운 업데이트
+          $('#generalEmployeeTable .work-select').each(function() {
+              const currentValue = $(this).val();
+              $(this).empty();
+
+              options.forEach(function(option) {
+                  $(this).append(`<option value="${option.value}">${option.text}</option>`);
+              }.bind(this));
+
+              // 이전 선택값이 새 옵션에 있으면 유지
+              if (options.some(opt => opt.value === currentValue)) {
+                  $(this).val(currentValue);
               }
           });
       }
 
-      // 수정: 예상근로시간 필드 표시/숨김 함수
-      function toggleExpectedWorkHours(applyType) {
-          const header = $('#expectedWorkHoursHeader');
-          const cells = $('.expected-work-hours-cell');
+      // 일반근태 사원 조회
+      function searchGeneralEmployees() {
+          const deptCode = $('#generalDeptSelect').val();
+          const workDate = $('#generalWorkDate').val();
 
-          if (applyType === '조퇴외출반차') {
-              header.hide();
-              cells.hide();
-          } else {
-              header.show();
-              cells.show();
+          // 입력값 유효성 검사
+          if (!deptCode) {
+              console.error('부서코드가 선택되지 않았습니다.');
+              alert('부서를 선택해주세요.');
+              return;
           }
+
+          if (!workDate) {
+              console.error('근무일이 설정되지 않았습니다.');
+              alert('근무일을 선택해주세요.');
+              return;
+          }
+
+          const formattedWorkDate = workDate.replace(/-/g, '');
+
+          console.log('사원 조회 요청:', { deptCode, workDate: formattedWorkDate });
+
+          $.get('/user/apply/employees', {
+              deptCode: deptCode,
+              workDate: formattedWorkDate
+          })
+          .done(function(employees) {
+              console.log('사원 조회 성공:', employees);
+              displayGeneralEmployees(employees);
+          })
+          .fail(function(xhr, status, error) {
+              console.error('사원 조회 실패:', { xhr, status, error });
+              console.error('응답 내용:', xhr.responseText);
+              alert('사원 조회에 실패했습니다: ' + (xhr.responseText || error));
+          });
       }
 
-      // 일반근태 사원 조회 - 수정: 부서 드롭다운에서 선택된 부서코드 사용 (요청사항 5)
-      $('#searchGeneralBtn').click(function() {
-          const deptCode = $('#generalDeptSelect').val();
-          const workDate = $('#generalWorkDate').val().replace(/-/g, '');
-          const applyType = $('#generalApplyType').val();
+      // 기타근태 사원 조회
+      function searchEtcEmployees() {
+          const deptCode = $('#etcDeptSelect').val();
+          const workDate = $('#etcWorkDate').val();
+          const workPlan = $('#etcWorkPlan').val();
+
+          // 입력값 유효성 검사
+          if (!deptCode) {
+              alert('부서를 선택해주세요.');
+              return;
+          }
 
           if (!workDate) {
               alert('근무일을 선택해주세요.');
               return;
           }
 
-          $.ajax({
-              url: '/user/apply/employees',
-              method: 'GET',
-              data: {
-                  deptCode: deptCode,
-                  workDate: workDate
-              },
-              success: function(employees) {
-                  const tbody = $('#generalEmployeeTable tbody');
-                  tbody.empty();
+          const formattedWorkDate = workDate.replace(/-/g, '');
 
-                  if (employees.length === 0) {
-                      tbody.append('<tr><td colspan="14" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
-                      return;
-                  }
-
-                  employees.forEach(function(emp) {
-                      // 수정: 예상근로시간 필드 조건부 표시
-                      const expectedWorkHoursCell = applyType === '조퇴외출반차' ? 'style="display:none"' : '';
-
-                      // 수정: 실제 데이터 연동 (요청사항 4)
-                      const row = `
-                          <tr data-emp-code="${emp.empCode}" data-apply-general-no="${emp.applyGeneralNo || ''}">
-                              <td class="border border-gray-300 px-4 py-2">
-                                  <input type="radio" name="selectedEmp" value="${emp.empCode}">
-                              </td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.empCode}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.empName}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.deptName || emp.deptCode}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.planWorkTime || '-'}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.actualWorkTime || '-'}</td>
-                              <td class="border border-gray-300 px-4 py-2">
-                                  <select class="apply-type border rounded p-1 w-full">
-                                      <option value="">선택</option>
-                                  </select>
-                              </td>
-                              <td class="border border-gray-300 px-4 py-2">
-                                  <input type="time" class="start-time border rounded p-1 w-full" value="${emp.startTime || ''}">
-                              </td>
-                              <td class="border border-gray-300 px-4 py-2">
-                                  <input type="time" class="end-time border rounded p-1 w-full" value="${emp.endTime || ''}">
-                              </td>
-                              <td class="border border-gray-300 px-4 py-2">
-                                  <input type="text" class="reason border rounded p-1 w-full" placeholder="사유" value="${emp.reason || ''}">
-                              </td>
-                              <td class="expected-work-hours-cell border border-gray-300 px-4 py-2" ${expectedWorkHoursCell}>
-                                  <span class="expected-hours">${emp.expectedWorkHours || '0.00'}</span>
-                              </td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.status || '대기'}</td>
-                              <td class="border border-gray-300 px-4 py-2">${emp.applicantName || '-'}</td>
-                          </tr>
-                      `;
-                      tbody.append(row);
-                  });
-
-                  // 신청근무 옵션 업데이트
-                  updateApplyTypeOptions(applyType);
-
-                  // 수정: 예상근로시간 계산 이벤트 추가
-                  bindExpectedWorkHoursCalculation();
-              },
-              error: function(xhr, status, error) {
-                  console.error('사원 조회 실패:', error);
-                  alert('사원 조회에 실패했습니다.');
-              }
-          });
-      });
-
-      // 수정: 예상근로시간 자동 계산 함수 (요청사항 4)
-      function bindExpectedWorkHoursCalculation() {
-          $('.start-time, .end-time').on('change', function() {
-              const row = $(this).closest('tr');
-              const startTime = row.find('.start-time').val();
-              const endTime = row.find('.end-time').val();
-
-              if (startTime && endTime) {
-                  const start = new Date(`2000-01-01 ${startTime}`);
-                  const end = new Date(`2000-01-01 ${endTime}`);
-                  const diffHours = (end - start) / (1000 * 60 * 60);
-
-                  if (diffHours > 0) {
-                      row.find('.expected-hours').text(diffHours.toFixed(2));
-                  }
-              }
+          $.get('/user/apply/employees', {
+              deptCode: deptCode,
+              workDate: formattedWorkDate,
+              workPlan: workPlan
+          })
+          .done(function(employees) {
+              displayEtcEmployees(employees);
+          })
+          .fail(function(xhr, status, error) {
+              console.error('사원 조회 실패:', { xhr, status, error });
+              alert('사원 조회에 실패했습니다: ' + (xhr.responseText || error));
           });
       }
 
-      // 일반근태 저장 - 수정: 개선된 저장 로직 (요청사항 6)
-      $('#saveGeneralBtn').click(function() {
-          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('신청할 사원을 선택해주세요.');
-              return;
-          }
+      // 일반근태 사원 목록 표시
+      function displayGeneralEmployees(employees) {
+          const tbody = $('#generalEmployeeBody');
+          tbody.empty();
 
-          const applyType = selectedRow.find('.apply-type').val();
-          const startTime = selectedRow.find('.start-time').val();
-          const endTime = selectedRow.find('.end-time').val();
-          const reason = selectedRow.find('.reason').val();
+          employees.forEach(function(emp) {
+              // 근무정보 조회 추가
+              loadWorkInfo(emp.empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(workInfo) {
+                  const applyType = $('#generalApplyType').val();
+                  const isLeaveType = applyType === '조퇴외출반차';
 
-          if (!applyType) {
-              alert('신청근무를 선택해주세요.');
-              return;
-          }
+                  // 신청근무 드롭다운 옵션 생성
+                  const workOptions = workTypeOptions[applyType] || [];
+                  let workSelectHtml = '';
+                  workOptions.forEach(function(option) {
+                      workSelectHtml += `<option value="${option.value}">${option.text}</option>`;
+                  });
 
-          if (!startTime || !endTime) {
-              alert('시작시간과 종료시간을 입력해주세요.');
-              return;
-          }
+                  // 실제 신청번호와 상태 사용
+                  const applyNo = emp.applyGeneralNo || '';
+                  const status = emp.generalApplyStatus || '대기';
 
-          const applyData = {
-              empCode: selectedRow.find('input[name="selectedEmp"]').val(),
-              timeItemCode: '01', // 기본값
-              targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
-              startTime: startTime.replace(':', ''),
-              endTime: endTime.replace(':', ''),
-              applyType: applyType,
-              deptCode: $('#generalDeptSelect').val(),
-              reason: reason
-          };
-
-          $.ajax({
-              url: '/user/apply/general',
-              method: 'POST',
-              contentType: 'application/json',
-              data: JSON.stringify(applyData),
-              success: function(result) {
-                  if (result === 'success') {
-                      alert('저장되었습니다.');
-                      $('#searchGeneralBtn').click(); // 저장 후 재조회
-                  } else {
-                      alert(result);
-                  }
-              },
-              error: function(xhr, status, error) {
-                  console.error('저장 실패:', error);
-                  alert('저장에 실패했습니다.');
-              }
+                  const row = `
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="checkbox" class="emp-checkbox">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.empCode}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.empName}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${workInfo.record ? workInfo.record.checkInTime + '-' + workInfo.record.checkOutTime : ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <select class="work-select w-full border rounded px-2 py-1">
+                                  ${workSelectHtml}
+                              </select>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="time" class="start-time w-full border rounded px-2 py-1">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="time" class="end-time w-full border rounded px-2 py-1">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2 ${isLeaveType ? 'hidden' : ''}">
+                              <span class="expected-hours">${workInfo.expectedHours || '0'}</span>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <span class="status-field">${status}</span>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <span class="applicant-field">${currentUser.empName}</span>
+                          </td>
+                      </tr>
+                  `;
+                  tbody.append(row);
+              });
           });
-      });
+      }
 
-      // 삭제 처리 - 수정: 개선된 삭제 로직 (요청사항 6)
-      $('#deleteGeneralBtn').click(function() {
-          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('삭제할 항목을 선택해주세요.');
+      // 기타근태 사원 목록 표시
+      function displayEtcEmployees(employees) {
+          const tbody = $('#etcEmployeeBody');
+          tbody.empty();
+
+          employees.forEach(function(emp) {
+              // 근무정보 조회 추가
+              loadWorkInfo(emp.empCode, $('#etcWorkDate').val().replace(/-/g, ''), function(workInfo) {
+                  // 실제 신청번호와 상태 사용
+                  const applyNo = emp.applyEtcNo || '';
+                  const status = emp.etcApplyStatus || '대기';
+
+                  const row = `
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="checkbox" class="emp-checkbox">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.empCode}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.empName}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${workInfo.record ? workInfo.record.checkInTime + '-' + workInfo.record.checkOutTime : ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <select class="shift-select w-full border rounded px-2 py-1">
+                                  <option value="">선택</option>
+                              </select>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="date" class="start-date w-full border rounded px-2 py-1">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="date" class="end-date w-full border rounded px-2 py-1">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <span class="annual-balance">${parseFloat(currentAnnual.balanceDay).toFixed(2)}</span>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <select class="apply-time w-full border rounded px-2 py-1">
+                                  <option value="1일이전신청">1일이전신청</option>
+                                  <option value="당일신청">당일신청</option>
+                              </select>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <span class="status-field">${status}</span>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <span class="applicant-field">${currentUser.empName}</span>
+                          </td>
+                      </tr>
+                  `;
+                  tbody.append(row);
+
+                  // 근태 마스터 옵션 추가
+                  const shiftSelect = tbody.find('tr:last .shift-select');
+                  shiftMasters.forEach(function(shift) {
+                      shiftSelect.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
+                  });
+
+                  // 수정: 연차잔여 업데이트 (요청사항 2) - 소수점 2자리까지 표시
+                  loadAnnualBalance(emp.empCode, function(annual) {
+                      const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
+                      tbody.find('tr:last .annual-balance').text(balanceDay);
+                  });
+              });
+          });
+      }
+
+      // 근무정보 조회 함수 추가
+      function loadWorkInfo(empCode, workDate, callback) {
+          $.get(`/user/apply/workInfo/${empCode}/${workDate}`)
+              .done(function(workInfo) {
+                  callback(workInfo);
+              })
+              .fail(function() {
+                  callback({plan: '', record: null, expectedHours: '0'});
+              });
+      }
+
+      // 연차잔여 조회 함수 추가
+      function loadAnnualBalance(empCode, callback) {
+          $.get(`/user/apply/annual/${empCode}`)
+              .done(function(annual) {
+                  callback(annual);
+              })
+              .fail(function() {
+                  callback({balanceDay: '0'});
+              });
+      }
+
+      // 일반근태 저장
+      function saveGeneralApply() {
+          const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('저장할 사원을 선택해주세요.');
               return;
           }
 
-          const applyGeneralNo = selectedRow.attr('data-apply-general-no');
-          if (!applyGeneralNo) {
-              alert('저장된 신청건만 삭제할 수 있습니다.');
+          selectedRows.each(function() {
+              const row = $(this);
+              const empCode = row.data('emp-code');
+              const workSelect = row.find('.work-select').val();
+              const startTime = row.find('.start-time').val().replace(':', '');
+              const endTime = row.find('.end-time').val().replace(':', '');
+
+              const data = {
+                  empCode: empCode,
+                  timeItemCode: 'T001', // 기본값
+                  targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
+                  startTime: startTime,
+                  endTime: endTime,
+                  applyType: $('#generalApplyType').val()
+              };
+
+              $.ajax({
+                  url: '/user/apply/general',
+                  method: 'POST',
+                  contentType: 'application/json',
+                  data: JSON.stringify(data),
+                  success: function(response) {
+                      if (response === 'success') {
+                          // 수정: 상태 필드 업데이트 (요청사항 5)
+                          row.find('.status-field').text('저장');
+                          alert('저장되었습니다.');
+                          // 새로고침으로 신청번호 갱신
+                          searchGeneralEmployees();
+                      } else {
+                          alert('저장 실패: ' + response);
+                      }
+                  },
+                  error: function() {
+                      alert('저장에 실패했습니다.');
+                  }
+              });
+          });
+      }
+
+      // 기타근태 저장
+      function saveEtcApply() {
+          const selectedRows = $('#etcEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('저장할 사원을 선택해주세요.');
               return;
           }
 
-          if (confirm('정말 삭제하시겠습니까?')) {
+          selectedRows.each(function() {
+              const row = $(this);
+              const empCode = row.data('emp-code');
+              const shiftCode = row.find('.shift-select').val();
+              const startDate = row.find('.start-date').val().replace(/-/g, '');
+              const endDate = row.find('.end-date').val().replace(/-/g, '');
+              const applyDateTime = row.find('.apply-time').val();
+
+              if (!shiftCode || !startDate || !endDate) {
+                  alert('필수 항목을 모두 입력해주세요.');
+                  return;
+              }
+
+              const data = {
+                  empCode: empCode,
+                  shiftCode: shiftCode,
+                  targetStartDate: startDate,
+                  targetEndDate: endDate,
+                  applyDateTime: applyDateTime,
+                  reason: '근태변경'
+              };
+
+              $.ajax({
+                  url: '/user/apply/etc',
+                  method: 'POST',
+                  contentType: 'application/json',
+                  data: JSON.stringify(data),
+                  success: function(response) {
+                      if (response === 'success') {
+                          // 수정: 상태 필드 업데이트 (요청사항 5)
+                          row.find('.status-field').text('저장');
+                          alert('저장되었습니다.');
+                          // 새로고침으로 신청번호 갱신
+                          searchEtcEmployees();
+                      } else {
+                          alert('저장 실패: ' + response);
+                      }
+                  },
+                  error: function() {
+                      alert('저장에 실패했습니다.');
+                  }
+              });
+          });
+      }
+
+      // 일반근태 삭제
+      function deleteGeneralApply() {
+          const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('삭제할 사원을 선택해주세요.');
+              return;
+          }
+
+          if (!confirm('선택된 신청을 삭제하시겠습니까?')) {
+              return;
+          }
+
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no'); // 수정: 실제 신청번호 사용
+
+              if (!applyNo) {
+                  alert('삭제할 신청이 없습니다.');
+                  return;
+              }
+
               $.ajax({
                   url: '/user/apply/delete/general',
                   method: 'POST',
-                  data: {
-                      applyGeneralNo: applyGeneralNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
+                  data: { applyGeneralNo: applyNo }, // 수정: 실제 신청번호 전송
+                  success: function(response) {
+                      if (response === 'success') {
                           alert('삭제되었습니다.');
-                          $('#searchGeneralBtn').click(); // 삭제 후 재조회
+                          searchGeneralEmployees(); // 새로고침
                       } else {
-                          alert(result);
+                          alert('삭제 실패: ' + response);
                       }
                   },
-                  error: function(xhr, status, error) {
-                      console.error('삭제 실패:', error);
+                  error: function() {
                       alert('삭제에 실패했습니다.');
                   }
               });
-          }
-      });
-
-      // 상신 처리 - 수정: 개선된 상신 로직 (요청사항 6)
-      $('#submitGeneralBtn').click(function() {
-          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('상신할 항목을 선택해주세요.');
-              return;
-          }
-
-          const applyGeneralNo = selectedRow.attr('data-apply-general-no');
-          if (!applyGeneralNo) {
-              alert('저장된 신청건만 상신할 수 있습니다.');
-              return;
-          }
-
-          if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
-              $.ajax({
-                  url: '/user/apply/submit/general',
-                  method: 'POST',
-                  data: {
-                      applyGeneralNo: applyGeneralNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
-                          alert('상신되었습니다.');
-                          $('#searchGeneralBtn').click(); // 상신 후 재조회
-                      } else {
-                          alert('상신 실패: ' + result);
-                      }
-                  },
-                  error: function(xhr, status, error) {
-                      console.error('상신 실패:', error);
-                      alert('상신에 실패했습니다.');
-                  }
-              });
-          }
-      });
-
-      // 수정: 상신취소 처리 추가 (요청사항 6)
-      $('#cancelGeneralBtn').click(function() {
-          const selectedRow = $('input[name="selectedEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('상신취소할 항목을 선택해주세요.');
-              return;
-          }
-
-          const applyGeneralNo = selectedRow.attr('data-apply-general-no');
-          if (!applyGeneralNo) {
-              alert('상신된 신청건만 상신취소할 수 있습니다.');
-              return;
-          }
-
-          if (confirm('정말 상신취소하시겠습니까?')) {
-              $.ajax({
-                  url: '/user/apply/cancel/general',
-                  method: 'POST',
-                  data: {
-                      applyGeneralNo: applyGeneralNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
-                          alert('상신취소되었습니다.');
-                          $('#searchGeneralBtn').click(); // 상신취소 후 재조회
-                      } else {
-                          alert('상신취소 실패: ' + result);
-                      }
-                  },
-                  error: function(xhr, status, error) {
-                      console.error('상신취소 실패:', error);
-                      alert('상신취소에 실패했습니다.');
-                  }
-              });
-          }
-      });
-
-      // 기타근태 사원 조회 - 수정: 부서 드롭다운에서 선택된 부서코드 사용 (요청사항 5)
-      $('#searchEtcBtn').click(function() {
-          const deptCode = $('#etcDeptSelect').val();
-          const workDate = $('#etcWorkDate').val().replace(/-/g, '');
-          const workPlan = $('#etcWorkPlan').val();
-
-          if (!workDate) {
-              alert('근무일을 선택해주세요.');
-              return;
-          }
-
-          $.ajax({
-              url: '/user/apply/employees',
-              method: 'GET',
-              data: {
-                  deptCode: deptCode,
-                  workDate: workDate,
-                  workPlan: workPlan
-              },
-              success: function(employees) {
-                  const tbody = $('#etcEmployeeTable tbody');
-                  tbody.empty();
-
-                  if (employees.length === 0) {
-                      tbody.append('<tr><td colspan="15" class="text-center py-4">조회된 사원이 없습니다.</td></tr>');
-                      return;
-                  }
-
-                  employees.forEach(function(emp) {
-                      // 수정: 실제 데이터 연동 (요청사항 4)
-                      const row = `
-                          <tr data-emp-code="${emp.empCode}" data-apply-etc-no="${emp.applyEtcNo || ''}">
-                              <td class="border px-4 py-2">
-                                  <input type="radio" name="selectedEtcEmp" value="${emp.empCode}">
-                              </td>
-                              <td class="border px-4 py-2">${emp.empCode}</td>
-                              <td class="border px-4 py-2">${emp.empName}</td>
-                              <td class="border px-4 py-2">${emp.positionName || ''}</td>
-                              <td class="border px-4 py-2">${emp.deptName || emp.deptCode}</td>
-                              <td class="border px-4 py-2">${emp.planWorkTime || '-'}</td>
-                              <td class="border px-4 py-2">${emp.actualWorkTime || '-'}</td>
-                              <td class="border px-4 py-2">
-                                  <select class="etc-shift border rounded p-1 w-full">
-                                      <option value="">선택</option>
-                                      <!-- 수정: 근태 마스터 데이터에서 동적 로드 (요청사항 3) -->
-                                  </select>
-                              </td>
-                              <td class="border px-4 py-2">
-                                  <input type="date" class="start-date border rounded p-1 w-full" value="${emp.targetStartDate || $('#etcWorkDate').val()}">
-                              </td>
-                              <td class="border px-4 py-2">
-                                  <input type="date" class="end-date border rounded p-1 w-full" value="${emp.targetEndDate || $('#etcWorkDate').val()}">
-                              </td>
-                              <td class="border px-4 py-2 annual-balance">${emp.annualBalance || '0.0'}</td>
-                              <td class="border px-4 py-2">
-                                  <select class="apply-time border rounded p-1 w-full">
-                                      <option value="1일이전신청" ${emp.applyDateTime === '1일이전신청' ? 'selected' : ''}>1일이전신청</option>
-                                      <option value="당일신청" ${emp.applyDateTime === '당일신청' ? 'selected' : ''}>당일신청</option>
-                                  </select>
-                              </td>
-                              <td class="border px-4 py-2">
-                                  <input type="text" class="reason border rounded p-1 w-full" placeholder="사유" value="${emp.reason || ''}">
-                              </td>
-                              <td class="border px-4 py-2">${emp.status || '대기'}</td>
-                              <td class="border px-4 py-2">${emp.applicantName || '-'}</td>
-                          </tr>
-                      `;
-                      tbody.append(row);
-                  });
-
-                  // 수정: 근태 마스터 옵션 동적 로드 (요청사항 3)
-                  loadShiftMasterOptions();
-
-                  // 수정: 연차잔여 정보 로드 (요청사항 2)
-                  bindAnnualBalanceUpdate();
-              },
-              error: function(xhr, status, error) {
-                  console.error('사원 조회 실패:', error);
-                  alert('사원 조회에 실패했습니다.');
-              }
-          });
-      });
-
-      // 수정: 근태 마스터 옵션 로드 함수 (요청사항 3)
-      function loadShiftMasterOptions() {
-          $('.etc-shift').each(function() {
-              const select = $(this);
-              select.empty();
-              select.append('<option value="">선택</option>');
-
-              shiftMasterData.forEach(function(shift) {
-                  select.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
-              });
           });
       }
 
-      // 수정: 연차잔여 정보 업데이트 함수 (요청사항 2)
-      function bindAnnualBalanceUpdate() {
-          $('input[name="selectedEtcEmp"]').on('change', function() {
-              const empCode = $(this).val();
-              const row = $(this).closest('tr');
+      // 기타근태 삭제
+      function deleteEtcApply() {
+          const selectedRows = $('#etcEmployeeTable .emp-checkbox:checked').closest('tr');
 
-              $.ajax({
-                  url: `/user/apply/annual/${empCode}`,
-                  method: 'GET',
-                  success: function(annualDetail) {
-                      row.find('.annual-balance').text(annualDetail.balanceDay || '0.0');
-                  },
-                  error: function(xhr, status, error) {
-                      console.error('연차잔여 조회 실패:', error);
-                  }
-              });
-          });
-      }
-
-      // 기타근태 저장 - 수정: 개선된 저장 로직 (요청사항 6)
-      $('#saveEtcBtn').click(function() {
-          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('신청할 사원을 선택해주세요.');
+          if (selectedRows.length === 0) {
+              alert('삭제할 사원을 선택해주세요.');
               return;
           }
 
-          const shiftCode = selectedRow.find('.etc-shift').val();
-          const startDate = selectedRow.find('.start-date').val();
-          const endDate = selectedRow.find('.end-date').val();
-          const reason = selectedRow.find('.reason').val();
-
-          if (!shiftCode) {
-              alert('변경근무를 선택해주세요.');
+          if (!confirm('선택된 신청을 삭제하시겠습니까?')) {
               return;
           }
 
-          if (!startDate || !endDate) {
-              alert('시작일과 종료일을 입력해주세요.');
-              return;
-          }
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no');
 
-          if (!reason.trim()) {
-              alert('사유를 입력해주세요.');
-              return;
-          }
-
-          const applyData = {
-              empCode: selectedRow.find('input[name="selectedEtcEmp"]').val(),
-              shiftCode: shiftCode,
-              targetStartDate: startDate.replace(/-/g, ''),
-              targetEndDate: endDate.replace(/-/g, ''),
-              applyDateTime: selectedRow.find('.apply-time').val(),
-              reason: reason,
-              deptCode: $('#etcDeptSelect').val()
-          };
-
-          $.ajax({
-              url: '/user/apply/etc',
-              method: 'POST',
-              contentType: 'application/json',
-              data: JSON.stringify(applyData),
-              success: function(result) {
-                  if (result === 'success') {
-                      alert('저장되었습니다.');
-                      $('#searchEtcBtn').click(); // 저장 후 재조회
-                  } else {
-                      alert(result);
-                  }
-              },
-              error: function(xhr, status, error) {
-                  console.error('저장 실패:', error);
-                  alert('저장에 실패했습니다.');
+              if (!applyNo) {
+                  alert('삭제할 신청이 없습니다.');
+                  return;
               }
-          });
-      });
 
-      // 기타근태 삭제 - 수정: 개선된 삭제 로직 (요청사항 6)
-      $('#deleteEtcBtn').click(function() {
-          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('삭제할 항목을 선택해주세요.');
-              return;
-          }
-
-          const applyEtcNo = selectedRow.attr('data-apply-etc-no');
-          if (!applyEtcNo) {
-              alert('저장된 신청건만 삭제할 수 있습니다.');
-              return;
-          }
-
-          if (confirm('정말 삭제하시겠습니까?')) {
               $.ajax({
                   url: '/user/apply/delete/etc',
                   method: 'POST',
-                  data: {
-                      applyEtcNo: applyEtcNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
+                  data: { applyEtcNo: applyNo },
+                  success: function(response) {
+                      if (response === 'success') {
                           alert('삭제되었습니다.');
-                          $('#searchEtcBtn').click(); // 삭제 후 재조회
+                          searchEtcEmployees();
                       } else {
-                          alert(result);
+                          alert('삭제 실패: ' + response);
                       }
                   },
-                  error: function(xhr, status, error) {
-                      console.error('삭제 실패:', error);
+                  error: function() {
                       alert('삭제에 실패했습니다.');
                   }
               });
-          }
-      });
+          });
+      }
 
-      // 기타근태 상신 - 수정: 개선된 상신 로직 (요청사항 6)
-      $('#submitEtcBtn').click(function() {
-          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('상신할 항목을 선택해주세요.');
+      // 일반근태 상신
+      function submitGeneralApply() {
+          const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('상신할 사원을 선택해주세요.');
               return;
           }
 
-          const applyEtcNo = selectedRow.attr('data-apply-etc-no');
-          if (!applyEtcNo) {
-              alert('저장된 신청건만 상신할 수 있습니다.');
-              return;
-          }
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no');
 
-          if (confirm('정말 상신하시겠습니까? 상신 후에는 수정이 불가능합니다.')) {
+              if (!applyNo) {
+                  alert('상신할 신청이 없습니다.');
+                  return;
+              }
+
               $.ajax({
-                  url: '/user/apply/submit/etc',
+                  url: '/user/apply/submit/general',
                   method: 'POST',
-                  data: {
-                      applyEtcNo: applyEtcNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
+                  data: { applyGeneralNo: applyNo },
+                  success: function(response) {
+                      if (response === 'success') {
+                          row.find('.status-field').text('상신');
                           alert('상신되었습니다.');
-                          $('#searchEtcBtn').click(); // 상신 후 재조회
                       } else {
-                          alert('상신 실패: ' + result);
+                          alert('상신 실패: ' + response);
                       }
                   },
-                  error: function(xhr, status, error) {
-                      console.error('상신 실패:', error);
+                  error: function() {
                       alert('상신에 실패했습니다.');
                   }
               });
-          }
-      });
+          });
+      }
 
-      // 수정: 기타근태 상신취소 처리 추가 (요청사항 6)
-      $('#cancelEtcBtn').click(function() {
-          const selectedRow = $('input[name="selectedEtcEmp"]:checked').closest('tr');
-          if (selectedRow.length === 0) {
-              alert('상신취소할 항목을 선택해주세요.');
+      // 기타근태 상신
+      function submitEtcApply() {
+          const selectedRows = $('#etcEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('상신할 사원을 선택해주세요.');
               return;
           }
 
-          const applyEtcNo = selectedRow.attr('data-apply-etc-no');
-          if (!applyEtcNo) {
-              alert('상신된 신청건만 상신취소할 수 있습니다.');
-              return;
-          }
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no');
 
-          if (confirm('정말 상신취소하시겠습니까?')) {
+              if (!applyNo) {
+                  alert('상신할 신청이 없습니다.');
+                  return;
+              }
+
               $.ajax({
-                  url: '/user/apply/cancel/etc',
+                  url: '/user/apply/submit/etc',
                   method: 'POST',
-                  data: {
-                      applyEtcNo: applyEtcNo
-                  },
-                  success: function(result) {
-                      if (result === 'success') {
-                          alert('상신취소되었습니다.');
-                          $('#searchEtcBtn').click(); // 상신취소 후 재조회
+                  data: { applyEtcNo: applyNo },
+                  success: function(response) {
+                      if (response === 'success') {
+                          row.find('.status-field').text('상신');
+                          alert('상신되었습니다.');
                       } else {
-                          alert('상신취소 실패: ' + result);
+                          alert('상신 실패: ' + response);
                       }
                   },
-                  error: function(xhr, status, error) {
-                      console.error('상신취소 실패:', error);
+                  error: function() {
+                      alert('상신에 실패했습니다.');
+                  }
+              });
+          });
+      }
+
+      // 일반근태 상신취소
+      function cancelGeneralApply() {
+          const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('상신취소할 사원을 선택해주세요.');
+              return;
+          }
+
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no');
+
+              if (!applyNo) {
+                  alert('상신취소할 신청이 없습니다.');
+                  return;
+              }
+
+              $.ajax({
+                  url: '/user/apply/cancel/general',
+                  method: 'POST',
+                  data: { applyGeneralNo: applyNo },
+                  success: function(response) {
+                      if (response === 'success') {
+                          row.find('.status-field').text('저장');
+                          alert('상신취소되었습니다.');
+                      } else {
+                          alert('상신취소 실패: ' + response);
+                      }
+                  },
+                  error: function() {
                       alert('상신취소에 실패했습니다.');
                   }
               });
-          }
-      });
-
-      // 페이지 로드 시 자동으로 당일 사원 조회
-      if ($('#generalWorkDate').val()) {
-          $('#searchGeneralBtn').click();
+          });
       }
 
-      // 수정: 초기 로드시 예상근로시간 필드 제어
-      const initialApplyType = $('#generalApplyType').val();
-      toggleExpectedWorkHours(initialApplyType);
+      // 기타근태 상신취소
+      function cancelEtcApply() {
+          const selectedRows = $('#etcEmployeeTable .emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              alert('상신취소할 사원을 선택해주세요.');
+              return;
+          }
+
+          selectedRows.each(function() {
+              const row = $(this);
+              const applyNo = row.data('apply-no');
+
+              if (!applyNo) {
+                  alert('상신취소할 신청이 없습니다.');
+                  return;
+              }
+
+              $.ajax({
+                  url: '/user/apply/cancel/etc',
+                  method: 'POST',
+                  data: { applyEtcNo: applyNo },
+                  success: function(response) {
+                      if (response === 'success') {
+                          row.find('.status-field').text('저장');
+                          alert('상신취소되었습니다.');
+                      } else {
+                          alert('상신취소 실패: ' + response);
+                      }
+                  },
+                  error: function() {
+                      alert('상신취소에 실패했습니다.');
+                  }
+              });
+          });
+      }
   });
 </script>
 

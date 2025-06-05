@@ -23,7 +23,7 @@ public interface AttendanceApplyMapper {
     """)
     Employee findEmployeeByEmpCode(String empCode);
 
-    // 수정: 하위부서 조회 메서드 추가 (요청사항 5)
+    // 하위부서 조회 메서드 추가
     @Select("""
         SELECT DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER, DEPT_CATEGORY
         FROM ORGDEPTMASTER 
@@ -32,7 +32,7 @@ public interface AttendanceApplyMapper {
     """)
     List<Department> findSubDepartments(String parentDeptCode);
 
-    // 수정: 필터링된 근태 마스터 조회 (요청사항 3)
+    // 필터링된 근태 마스터 조회
     @Select("""
         <script>
         SELECT * FROM HRTSHIFTMASTER 
@@ -46,18 +46,22 @@ public interface AttendanceApplyMapper {
     """)
     List<ShiftMaster> findShiftMastersByNames(@Param("shiftNames") List<String> shiftNames);
 
-    // 수정: 계획 근태코드 조회 (요청사항 4)
+    // 유효한 TIME_ITEM_CODE 조회
+    @Select("SELECT TOP 1 TIME_ITEM_CODE FROM HRTTIMEITEM ORDER BY TIME_ITEM_CODE")
+    String getValidTimeItemCode();
+
+    // 계획 근태코드 조회
     @Select("""
         SELECT SHIFT_CODE FROM HRTWORKEMPCALENDAR 
         WHERE EMP_CODE = #{empCode} AND YYYYMMDD = #{workDate}
     """)
     String getPlannedShiftCode(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 수정: 근태코드로 근태명 조회 (요청사항 4)
+    // 근태코드로 근태명 조회
     @Select("SELECT SHIFT_NAME FROM HRTSHIFTMASTER WHERE SHIFT_CODE = #{shiftCode}")
     String getShiftNameByCode(String shiftCode);
 
-    // 수정: 실적 조회 (요청사항 4)
+    // 실적 조회
     @Select("""
         SELECT CHECK_IN_TIME as checkInTime, CHECK_OUT_TIME as checkOutTime 
         FROM HRTATTRECORD 
@@ -65,7 +69,7 @@ public interface AttendanceApplyMapper {
     """)
     Map<String, String> getAttendanceRecord(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 수정: 예상근로시간 조회 (요청사항 4)
+    // 예상근로시간 조회
     @Select("""
         SELECT 
             CASE 
@@ -78,6 +82,27 @@ public interface AttendanceApplyMapper {
         WHERE SHIFT_CODE = #{shiftCode}
     """)
     String getExpectedWorkHours(String shiftCode);
+
+    // 기존 일반근태 신청 조회
+    @Select("""
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS 
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
+        AND STATUS != '삭제'
+        ORDER BY APPLY_DATE DESC
+    """)
+    AttendanceApplyGeneral findGeneralApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 기존 기타근태 신청 조회
+    @Select("""
+        SELECT TOP 1 APPLY_ETC_NO, STATUS 
+        FROM HRTATTAPLETC 
+        WHERE EMP_CODE = #{empCode} 
+        AND TARGET_START_DATE <= #{workDate} AND TARGET_END_DATE >= #{workDate}
+        AND STATUS != '삭제'
+        ORDER BY APPLY_DATE DESC
+    """)
+    AttendanceApplyEtc findEtcApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
     // 부서별 사원 조회 (근무계획 포함) - 부서장용
     @Select("""
@@ -116,7 +141,7 @@ public interface AttendanceApplyMapper {
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
 
-    // 일반근태 중복 신청 확인 - 수정: SQL 구문 오류 수정
+    // 일반근태 중복 신청 확인
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLGENERAL
@@ -129,7 +154,7 @@ public interface AttendanceApplyMapper {
                                        @Param("targetDate") String targetDate,
                                        @Param("applyType") String applyType);
 
-    // 기타근태 중복 신청 확인 - 수정: SQL 구문 오류 수정
+    // 기타근태 중복 신청 확인
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLETC
@@ -213,15 +238,15 @@ public interface AttendanceApplyMapper {
                                   @Param("applyEtcNo") String applyEtcNo,
                                   @Param("approverCode") String approverCode);
 
-    // 수정: 일반근태 결재 이력 삭제 추가
+    // 일반근태 결재 이력 삭제
     @Delete("DELETE FROM HRTAPRHIST WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
     void deleteGeneralApprovalHistory(String applyGeneralNo);
 
-    // 수정: 기타근태 결재 이력 삭제 추가
+    // 기타근태 결재 이력 삭제
     @Delete("DELETE FROM HRTAPRHIST WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApprovalHistory(String applyEtcNo);
 
-    // 신청 소유권 확인 - 일반근태 - 수정: SQL 구문 오류 수정
+    // 신청 소유권 확인 - 일반근태
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END 
         FROM HRTATTAPLGENERAL 
@@ -231,7 +256,7 @@ public interface AttendanceApplyMapper {
     boolean checkGeneralApplyOwnership(@Param("applyGeneralNo") String applyGeneralNo,
                                        @Param("applicantCode") String applicantCode);
 
-    // 신청 소유권 확인 - 기타근태 - 수정: SQL 구문 오류 수정
+    // 신청 소유권 확인 - 기타근태
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END 
         FROM HRTATTAPLETC 
