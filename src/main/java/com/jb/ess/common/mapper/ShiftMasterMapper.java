@@ -42,4 +42,11 @@ public interface ShiftMasterMapper {
         WHERE SHIFT_CODE = #{shiftCode}
     """)
     String findShiftNameByShiftCode(String shiftCode);
+
+    @Select("""
+        SELECT SHIFT_CODE
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_NAME = #{planType}
+    """)
+    String findShiftCodeByPlanType(String planType);
 }

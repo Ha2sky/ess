@@ -91,9 +91,21 @@ public interface EmpCalendarMapper {
         UPDATE HRTWORKEMPCALENDAR
         SET SHIFT_CODE = #{shiftCode}
         WHERE EMP_CODE = #{empCode}
-        AND YYYYMMDD = #{date}
+        AND YYYYMMDD = #{workDate}
     """)
     void updateShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
-                                         @Param("date") String date,
+                                         @Param("workDate") String workDate,
                                          @Param("shiftCode") String shiftCode);
+
+    @Select("""
+        SELECT SHIFT_NAME
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE IN (
+            SELECT DISTINCT SHIFT_CODE_ORIG
+            FROM HRTWORKEMPCALENDAR
+            WHERE DEPT_CODE = #{deptCode}
+            AND YYYYMMDD = #{workDate})
+    """)
+    List<String> getShiftCodeByDeptCodeAndWorkDate(@Param("deptCode") String deptCode,
+                                                   @Param("workDate") String workDate);
 }

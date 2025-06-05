@@ -1,16 +1,22 @@
 package com.jb.ess.attendance.controller;
 
 import com.jb.ess.attendance.service.EmpAttService;
+import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;
 import com.jb.ess.common.mapper.DepartmentMapper;
+import com.jb.ess.common.mapper.EmpCalendarMapper;
+import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.security.CustomUserDetails;
 import com.jb.ess.pattern.service.PatternService;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -24,9 +30,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 /* 부서근태조회 */
 public class AttendanceListController {
-    private final EmpAttService empAttService;
     private final PatternService patternService;
+    private final EmpAttService empAttService;
     private final DepartmentMapper departmentMapper;
+    private final EmpCalendarMapper empCalendarMapper;
+    private final ShiftMasterMapper shiftMasterMapper;
 
     @GetMapping("/list")
     public String attendanceList(@AuthenticationPrincipal CustomUserDetails user,
@@ -35,7 +43,8 @@ public class AttendanceListController {
         @RequestParam(value = "deptCode", required = false) String deptCode,
         @RequestParam(value = "weekStart", required = false) LocalDate weekStart,
         @RequestParam(value = "weekEnd", required = false) LocalDate weekEnd,
-        Model model) {
+        @RequestParam(value = "planType", required = false) String planType,
+        Model model, HttpSession session) {
 
         // 날짜 기본값 설정
         if (workDate == null) workDate = LocalDate.now();
@@ -65,8 +74,8 @@ public class AttendanceListController {
         // 사원 목록 조회
         String workDateStr = workDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         List<Employee> empList = (empCode == null || empCode.isEmpty())
-            ? empAttService.empAttendanceList(deptCode, workDateStr)
-            : empAttService.empAttendance(empCode, workDateStr);
+            ? empAttService.empAttendanceList(deptCode, workDateStr, shiftMasterMapper.findShiftCodeByPlanType(planType))
+            : empAttService.empAttendance(empCode, workDateStr, shiftMasterMapper.findShiftCodeByPlanType(planType));
 
         // 근태 정보 세팅
         empList = empAttService.setAttendanceInfo(empList, weekStart, weekEnd, workDate);
@@ -75,9 +84,18 @@ public class AttendanceListController {
         model.addAttribute("empCode", empCode);
         model.addAttribute("deptCode", deptCode);
         model.addAttribute("employees", empList);
-        model.addAttribute("departments", empAttService.childDepartmentList(deptCode));
         // 계획/실적
+        model.addAttribute("shiftList", empCalendarMapper.getShiftCodeByDeptCodeAndWorkDate(deptCode, workDateStr));
+        // 로그인한 사원 부서 + 하위부서 목록을 세션에서 꺼내거나 최초 생성
+        @SuppressWarnings("unchecked")
+        List<Department> departments = (List<Department>) session.getAttribute("departments");
+        if (departments == null) {
+            String loginDeptCode = empAttService.empDepartmentInfo(user.getUsername()).getDeptCode();
+            departments = empAttService.childDepartmentList(loginDeptCode);
+            session.setAttribute("departments", departments);
+        }
 
+        model.addAttribute("departments", departments);
 
         return "user/attendance/list";
     }

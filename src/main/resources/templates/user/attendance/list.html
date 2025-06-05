@@ -33,8 +33,11 @@
       <label class="block text-sm font-medium text-gray-700">근무계획</label>
       <select name="planType" class="border rounded px-2 py-1">
         <option value="">전체</option>
-        <option value="계획" th:selected="${planType == '계획'}">계획</option>
-        <option value="실적" th:selected="${planType == '실적'}">실적</option>
+        <option th:each="shift : ${shiftList}"
+                th:value="${shift}"
+                th:text="${shift}"
+                th:selected="${shift == planType}">
+        </option>
       </select>
     </div>
 
@@ -96,7 +99,9 @@
       <td class="border px-2 py-1" th:text="${emp.empName}"></td>
       <td class="border px-2 py-1" th:text="${emp.positionName}"></td>
       <td class="border px-2 py-1" th:text="${emp.deptName}"></td>
-      <td class="border px-2 py-1" th:text="${emp.shiftOrigName} + '/' + ${emp.shiftName}"></td>
+      <td class="border px-2 py-1"
+          th:text="(${emp.shiftOrigName} ?: '-') + '/' + (${emp.shiftName} ?: '-')">
+      </td>
       <td class="border px-2 py-1">(임시)</td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>
