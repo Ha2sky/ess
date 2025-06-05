@@ -3,9 +3,12 @@ package com.jb.ess.common.mapper;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.Employee;
+import com.jb.ess.common.domain.Department;
+import com.jb.ess.common.domain.ShiftMaster;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface AttendanceApplyMapper {
@@ -19,6 +22,62 @@ public interface AttendanceApplyMapper {
         WHERE h.EMP_CODE = #{empCode}
     """)
     Employee findEmployeeByEmpCode(String empCode);
+
+    // 수정: 하위부서 조회 메서드 추가 (요청사항 5)
+    @Select("""
+        SELECT DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER, DEPT_CATEGORY
+        FROM ORGDEPTMASTER 
+        WHERE PARENT_DEPT = #{parentDeptCode} OR DEPT_CODE = #{parentDeptCode}
+        ORDER BY DEPT_CODE
+    """)
+    List<Department> findSubDepartments(String parentDeptCode);
+
+    // 수정: 필터링된 근태 마스터 조회 (요청사항 3)
+    @Select("""
+        <script>
+        SELECT * FROM HRTSHIFTMASTER 
+        WHERE USE_YN = 'Y' 
+        AND SHIFT_NAME IN 
+        <foreach collection="shiftNames" item="name" open="(" close=")" separator=",">
+            #{name}
+        </foreach>
+        ORDER BY SHIFT_CODE
+        </script>
+    """)
+    List<ShiftMaster> findShiftMastersByNames(@Param("shiftNames") List<String> shiftNames);
+
+    // 수정: 계획 근태코드 조회 (요청사항 4)
+    @Select("""
+        SELECT SHIFT_CODE FROM HRTWORKEMPCALENDAR 
+        WHERE EMP_CODE = #{empCode} AND YYYYMMDD = #{workDate}
+    """)
+    String getPlannedShiftCode(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 수정: 근태코드로 근태명 조회 (요청사항 4)
+    @Select("SELECT SHIFT_NAME FROM HRTSHIFTMASTER WHERE SHIFT_CODE = #{shiftCode}")
+    String getShiftNameByCode(String shiftCode);
+
+    // 수정: 실적 조회 (요청사항 4)
+    @Select("""
+        SELECT CHECK_IN_TIME as checkInTime, CHECK_OUT_TIME as checkOutTime 
+        FROM HRTATTRECORD 
+        WHERE EMP_CODE = #{empCode} AND WORK_DATE = #{workDate}
+    """)
+    Map<String, String> getAttendanceRecord(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 수정: 예상근로시간 조회 (요청사항 4)
+    @Select("""
+        SELECT 
+            CASE 
+                WHEN WORK_TYPE_CODE = 'FULL' THEN '8.00'
+                WHEN WORK_TYPE_CODE = 'HALF' THEN '4.00'
+                WHEN WORK_TYPE_CODE = 'NOFF' OR WORK_TYPE_CODE = 'POFF' THEN '0.00'
+                ELSE '8.00'
+            END as expectedHours
+        FROM HRTSHIFTMASTER 
+        WHERE SHIFT_CODE = #{shiftCode}
+    """)
+    String getExpectedWorkHours(String shiftCode);
 
     // 부서별 사원 조회 (근무계획 포함) - 부서장용
     @Select("""
@@ -57,9 +116,9 @@ public interface AttendanceApplyMapper {
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
 
-    // 일반근태 중복 신청 확인
+    // 일반근태 중복 신청 확인 - 수정: SQL 구문 오류 수정
     @Select("""
-        SELECT COUNT(*) > 0
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLGENERAL
         WHERE EMP_CODE = #{empCode}
         AND TARGET_DATE = #{targetDate}
@@ -70,9 +129,9 @@ public interface AttendanceApplyMapper {
                                        @Param("targetDate") String targetDate,
                                        @Param("applyType") String applyType);
 
-    // 기타근태 중복 신청 확인
+    // 기타근태 중복 신청 확인 - 수정: SQL 구문 오류 수정
     @Select("""
-        SELECT COUNT(*) > 0
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLETC
         WHERE EMP_CODE = #{empCode}
         AND ((TARGET_START_DATE <= #{endDate} AND TARGET_END_DATE >= #{startDate}))
@@ -130,7 +189,7 @@ public interface AttendanceApplyMapper {
     @Select("SELECT DEPT_LEADER FROM ORGDEPTMASTER WHERE DEPT_CODE = #{deptCode}")
     String getDeptLeaderByDeptCode(String deptCode);
 
-    // 일반근태 결재 이력 생성 - 수정된 부분
+    // 일반근태 결재 이력 생성
     @Insert("""
         INSERT INTO HRTAPRHIST (
             APPROVAL_NO, APPLY_GENERAL_NO, APPROVER_CODE, APPROVAL_STATUS
@@ -142,7 +201,7 @@ public interface AttendanceApplyMapper {
                                       @Param("applyGeneralNo") String applyGeneralNo,
                                       @Param("approverCode") String approverCode);
 
-    // 기타근태 결재 이력 생성 - 수정된 부분
+    // 기타근태 결재 이력 생성
     @Insert("""
         INSERT INTO HRTAPRHIST (
             APPROVAL_NO, APPLY_ETC_NO, APPROVER_CODE, APPROVAL_STATUS
@@ -154,18 +213,30 @@ public interface AttendanceApplyMapper {
                                   @Param("applyEtcNo") String applyEtcNo,
                                   @Param("approverCode") String approverCode);
 
-    // 신청 소유권 확인 - 일반근태
+    // 수정: 일반근태 결재 이력 삭제 추가
+    @Delete("DELETE FROM HRTAPRHIST WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")
+    void deleteGeneralApprovalHistory(String applyGeneralNo);
+
+    // 수정: 기타근태 결재 이력 삭제 추가
+    @Delete("DELETE FROM HRTAPRHIST WHERE APPLY_ETC_NO = #{applyEtcNo}")
+    void deleteEtcApprovalHistory(String applyEtcNo);
+
+    // 신청 소유권 확인 - 일반근태 - 수정: SQL 구문 오류 수정
     @Select("""
-        SELECT COUNT(*) > 0 FROM HRTATTAPLGENERAL 
-        WHERE APPLY_GENERAL_NO = #{applyGeneralNo} AND APPLICANT_CODE = #{applicantCode}
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END 
+        FROM HRTATTAPLGENERAL 
+        WHERE APPLY_GENERAL_NO = #{applyGeneralNo} 
+        AND APPLICANT_CODE = #{applicantCode}
     """)
     boolean checkGeneralApplyOwnership(@Param("applyGeneralNo") String applyGeneralNo,
                                        @Param("applicantCode") String applicantCode);
 
-    // 신청 소유권 확인 - 기타근태
+    // 신청 소유권 확인 - 기타근태 - 수정: SQL 구문 오류 수정
     @Select("""
-        SELECT COUNT(*) > 0 FROM HRTATTAPLETC 
-        WHERE APPLY_ETC_NO = #{applyNo} AND APPLICANT_CODE = #{applicantCode}
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END 
+        FROM HRTATTAPLETC 
+        WHERE APPLY_ETC_NO = #{applyEtcNo} 
+        AND APPLICANT_CODE = #{applicantCode}
     """)
     boolean checkEtcApplyOwnership(@Param("applyEtcNo") String applyEtcNo,
                                    @Param("applicantCode") String applicantCode);
@@ -185,48 +256,4 @@ public interface AttendanceApplyMapper {
     // 기타근태 신청 삭제
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
-
-    // 신청자별 일반근태 신청 내역 조회
-    @Select("""
-        SELECT g.*, h.EMP_NAME, applicant.EMP_NAME as applicantName
-        FROM HRTATTAPLGENERAL g
-        LEFT JOIN HRIMASTER h ON g.EMP_CODE = h.EMP_CODE
-        LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
-        WHERE g.APPLICANT_CODE = #{applicantCode}
-        ORDER BY g.APPLY_DATE DESC, g.APPLY_GENERAL_NO DESC
-    """)
-    List<AttendanceApplyGeneral> findGeneralAppliesByApplicant(String applicantCode);
-
-    // 신청자별 기타근태 신청 내역 조회
-    @Select("""
-        SELECT e.*, h.EMP_NAME, applicant.EMP_NAME as applicantName
-        FROM HRTATTAPLETC e
-        LEFT JOIN HRIMASTER h ON e.EMP_CODE = h.EMP_CODE
-        LEFT JOIN HRIMASTER applicant ON e.APPLICANT_CODE = applicant.EMP_CODE
-        WHERE e.APPLICANT_CODE = #{applicantCode}
-        ORDER BY e.APPLY_DATE DESC, e.APPLY_ETC_NO DESC
-    """)
-    List<AttendanceApplyEtc> findEtcAppliesByApplicant(String applicantCode);
-
-    // 부서별 일반근태 신청 내역 조회 (부서장용)
-    @Select("""
-        SELECT g.*, h.EMP_NAME, applicant.EMP_NAME as applicantName
-        FROM HRTATTAPLGENERAL g
-        LEFT JOIN HRIMASTER h ON g.EMP_CODE = h.EMP_CODE
-        LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
-        WHERE g.DEPT_CODE = #{deptCode}
-        ORDER BY g.APPLY_DATE DESC, g.APPLY_GENERAL_NO DESC
-    """)
-    List<AttendanceApplyGeneral> findGeneralAppliesByDept(String deptCode);
-
-    // 부서별 기타근태 신청 내역 조회 (부서장용)
-    @Select("""
-        SELECT e.*, h.EMP_NAME, applicant.EMP_NAME as applicantName
-        FROM HRTATTAPLETC e
-        LEFT JOIN HRIMASTER h ON e.EMP_CODE = h.EMP_CODE
-        LEFT JOIN HRIMASTER applicant ON e.APPLICANT_CODE = applicant.EMP_CODE
-        WHERE e.DEPT_CODE = #{deptCode}
-        ORDER BY e.APPLY_DATE DESC, e.APPLY_ETC_NO DESC
-    """)
-    List<AttendanceApplyEtc> findEtcAppliesByDept(String deptCode);
 }
