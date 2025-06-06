@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap; // 추가: 저장 후 응답 데이터 구성용
 
 @Slf4j
 @Controller
@@ -125,7 +126,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 연차잔여 조회 API 추가
+    // 연차잔여 조회 API
     @GetMapping("/annual/{empCode}")
     @ResponseBody
     public AnnualDetail getAnnualDetail(@PathVariable String empCode) {
@@ -141,7 +142,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 근무계획/실적/예상근로시간 조회 API 추가
+    // 근무계획/실적/예상근로시간 조회 API
     @GetMapping("/workInfo/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
@@ -149,11 +150,11 @@ public class AttendanceApplyController {
             return attendanceApplyService.getWorkInfo(empCode, workDate);
         } catch (Exception e) {
             log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
-            return Map.of("plan", "", "record", null, "expectedHours", "0");
+            return Map.of("plan", "", "record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "", "shiftName", ""), "expectedHours", "0.00");
         }
     }
 
-    // 수정: 근태 마스터 목록 조회 API 추가
+    // 근태 마스터 목록 조회 API
     @GetMapping("/shift-masters")
     @ResponseBody
     public List<ShiftMaster> getShiftMasters() {
@@ -165,11 +166,36 @@ public class AttendanceApplyController {
         }
     }
 
-    // 일반근태 신청 저장 API
+    // 추가: 저장된 일반근태 신청 조회 API
+    @GetMapping("/general/{applyGeneralNo}")
+    @ResponseBody
+    public AttendanceApplyGeneral getSavedGeneralApply(@PathVariable String applyGeneralNo) {
+        try {
+            return attendanceApplyService.getSavedGeneralApply(applyGeneralNo);
+        } catch (Exception e) {
+            log.error("저장된 일반근태 신청 조회 실패: applyGeneralNo={}", applyGeneralNo, e);
+            return null;
+        }
+    }
+
+    // 추가: 저장된 기타근태 신청 조회 API
+    @GetMapping("/etc/{applyEtcNo}")
+    @ResponseBody
+    public AttendanceApplyEtc getSavedEtcApply(@PathVariable String applyEtcNo) {
+        try {
+            return attendanceApplyService.getSavedEtcApply(applyEtcNo);
+        } catch (Exception e) {
+            log.error("저장된 기타근태 신청 조회 실패: applyEtcNo={}", applyEtcNo, e);
+            return null;
+        }
+    }
+
+    // 수정: 일반근태 신청 저장 API - 저장 후 데이터 반환
     @PostMapping("/general")
     @ResponseBody
-    public String saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
-                                   @AuthenticationPrincipal CustomUserDetails user) {
+    public Map<String, Object> saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
+                                                @AuthenticationPrincipal CustomUserDetails user) {
+        Map<String, Object> response = new HashMap<>();
         try {
             apply.setApplicantCode(user.getUsername());
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
@@ -187,22 +213,34 @@ public class AttendanceApplyController {
             // 신청 유효성 검증
             String validationResult = attendanceApplyService.validateGeneralApply(apply);
             if (!"valid".equals(validationResult)) {
-                return validationResult;
+                response.put("result", "error");
+                response.put("message", validationResult);
+                return response;
             }
 
             attendanceApplyService.saveGeneralApply(apply);
-            return "success";
+
+            // 수정: 저장된 데이터 조회 및 반환
+            AttendanceApplyGeneral savedApply = attendanceApplyService.getSavedGeneralApply(apply.getApplyGeneralNo());
+            response.put("result", "success");
+            response.put("message", "저장되었습니다.");
+            response.put("data", savedApply);
+
+            return response;
         } catch (Exception e) {
             log.error("일반근태 저장 실패", e);
-            return "저장에 실패했습니다: " + e.getMessage();
+            response.put("result", "error");
+            response.put("message", "저장에 실패했습니다: " + e.getMessage());
+            return response;
         }
     }
 
-    // 기타근태 신청 저장 API
+    // 수정: 기타근태 신청 저장 API - 저장 후 데이터 반환
     @PostMapping("/etc")
     @ResponseBody
-    public String saveEtcApply(@RequestBody AttendanceApplyEtc apply,
-                               @AuthenticationPrincipal CustomUserDetails user) {
+    public Map<String, Object> saveEtcApply(@RequestBody AttendanceApplyEtc apply,
+                                            @AuthenticationPrincipal CustomUserDetails user) {
+        Map<String, Object> response = new HashMap<>();
         try {
             apply.setApplicantCode(user.getUsername());
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
@@ -211,14 +249,25 @@ public class AttendanceApplyController {
             // 신청 유효성 검증
             String validationResult = attendanceApplyService.validateEtcApply(apply);
             if (!"valid".equals(validationResult)) {
-                return validationResult;
+                response.put("result", "error");
+                response.put("message", validationResult);
+                return response;
             }
 
             attendanceApplyService.saveEtcApply(apply);
-            return "success";
+
+            // 수정: 저장된 데이터 조회 및 반환
+            AttendanceApplyEtc savedApply = attendanceApplyService.getSavedEtcApply(apply.getApplyEtcNo());
+            response.put("result", "success");
+            response.put("message", "저장되었습니다.");
+            response.put("data", savedApply);
+
+            return response;
         } catch (Exception e) {
             log.error("기타근태 저장 실패", e);
-            return "저장에 실패했습니다: " + e.getMessage();
+            response.put("result", "error");
+            response.put("message", "저장에 실패했습니다: " + e.getMessage());
+            return response;
         }
     }
 
@@ -264,7 +313,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 기타근태 신청 상신취소 API
+    // 기타근태 신청 상신취소 API
     @PostMapping("/cancel/etc")
     @ResponseBody
     public String cancelEtcApply(@RequestParam String applyEtcNo,

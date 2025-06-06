@@ -200,7 +200,7 @@
           empCode: '[[${currentEmp.empCode}]]',
           empName: '[[${currentEmp.empName}]]',
           isHeader: '[[${currentEmp.isHeader}]]',
-          deptCode: '[[${currentEmp.deptCode}]]'  // 수정: 부서코드 추가
+          deptCode: '[[${currentEmp.deptCode}]]'
       };
 
       // 연차잔여 정보 저장
@@ -247,12 +247,10 @@
 
       // 초기 데이터 로드
       setTimeout(function() {
-          // 부서코드와 날짜 유효성 검사 후 실행
           if (currentUser.deptCode && $('#generalWorkDate').val()) {
               searchGeneralEmployees();
           } else {
               console.warn('부서코드 또는 날짜가 설정되지 않음');
-              // 수동으로 값 설정 후 재시도
               if (!$('#generalDeptSelect').val() && currentUser.deptCode) {
                   $('#generalDeptSelect').val(currentUser.deptCode);
               }
@@ -320,7 +318,6 @@
           const deptCode = $('#generalDeptSelect').val();
           const workDate = $('#generalWorkDate').val();
 
-          // 입력값 유효성 검사
           if (!deptCode) {
               console.error('부서코드가 선택되지 않았습니다.');
               alert('부서를 선택해주세요.');
@@ -358,7 +355,6 @@
           const workDate = $('#etcWorkDate').val();
           const workPlan = $('#etcWorkPlan').val();
 
-          // 입력값 유효성 검사
           if (!deptCode) {
               alert('부서를 선택해주세요.');
               return;
@@ -385,13 +381,13 @@
           });
       }
 
-      // 일반근태 사원 목록 표시
+      // 수정: 일반근태 사원 목록 표시 - apply.txt 기반 실적 표시 수정
       function displayGeneralEmployees(employees) {
           const tbody = $('#generalEmployeeBody');
           tbody.empty();
 
           employees.forEach(function(emp) {
-              // 근무정보 조회 추가
+              // 근무정보 조회 추가 (수정: 실적 데이터 강화)
               loadWorkInfo(emp.empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(workInfo) {
                   const applyType = $('#generalApplyType').val();
                   const isLeaveType = applyType === '조퇴외출반차';
@@ -407,6 +403,16 @@
                   const applyNo = emp.applyGeneralNo || '';
                   const status = emp.generalApplyStatus || '대기';
 
+                  // 수정: apply.txt 기반 실적 표시 - "출근 시각이 존재하면 계획 그대로의 값"
+                  let recordDisplay = '';
+                  if (workInfo.record && workInfo.record.checkInTime && workInfo.record.checkInTime !== '-') {
+                      // apply.txt: 출근 시각이 존재하면 계획 그대로의 값 (근태명 표시)
+                      recordDisplay = workInfo.record.shiftName || workInfo.plan || '-';
+                  } else {
+                      // apply.txt: 출근이 존재하지 않으면 결근
+                      recordDisplay = '결근';
+                  }
+
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
                           <td class="border border-gray-300 px-4 py-2">
@@ -417,7 +423,7 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2">${workInfo.record ? workInfo.record.checkInTime + '-' + workInfo.record.checkOutTime : ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
                               <select class="work-select w-full border rounded px-2 py-1">
                                   ${workSelectHtml}
@@ -441,21 +447,39 @@
                       </tr>
                   `;
                   tbody.append(row);
+
+                  // 수정: 기존 신청 데이터가 있으면 복원
+                  if (applyNo) {
+                      loadSavedGeneralData(applyNo, tbody.find('tr:last'));
+                  }
+
+                  // 수정: 상태별 버튼 활성화/비활성화
+                  updateButtonStates();
               });
           });
       }
 
-      // 기타근태 사원 목록 표시
+      // 수정: 기타근태 사원 목록 표시 - apply.txt 기반 실적 표시 수정
       function displayEtcEmployees(employees) {
           const tbody = $('#etcEmployeeBody');
           tbody.empty();
 
           employees.forEach(function(emp) {
-              // 근무정보 조회 추가
+              // 근무정보 조회 추가 (수정: 실적 데이터 강화)
               loadWorkInfo(emp.empCode, $('#etcWorkDate').val().replace(/-/g, ''), function(workInfo) {
                   // 실제 신청번호와 상태 사용
                   const applyNo = emp.applyEtcNo || '';
                   const status = emp.etcApplyStatus || '대기';
+
+                  // 수정: apply.txt 기반 실적 표시
+                  let recordDisplay = '';
+                  if (workInfo.record && workInfo.record.checkInTime && workInfo.record.checkInTime !== '-') {
+                      // apply.txt: 출근 시각이 존재하면 계획 그대로의 값 (근태명 표시)
+                      recordDisplay = workInfo.record.shiftName || workInfo.plan || '-';
+                  } else {
+                      // apply.txt: 출근이 존재하지 않으면 결근
+                      recordDisplay = '결근';
+                  }
 
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
@@ -467,7 +491,7 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2">${workInfo.record ? workInfo.record.checkInTime + '-' + workInfo.record.checkOutTime : ''}</td>
+                          <td class="border border-gray-300 px-4 py-2">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
                               <select class="shift-select w-full border rounded px-2 py-1">
                                   <option value="">선택</option>
@@ -504,27 +528,123 @@
                       shiftSelect.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
                   });
 
-                  // 수정: 연차잔여 업데이트 (요청사항 2) - 소수점 2자리까지 표시
+                  // 수정: 연차잔여 업데이트 - 정확한 개인별 연차 조회
                   loadAnnualBalance(emp.empCode, function(annual) {
                       const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
                       tbody.find('tr:last .annual-balance').text(balanceDay);
                   });
+
+                  // 수정: 기존 신청 데이터가 있으면 복원
+                  if (applyNo) {
+                      loadSavedEtcData(applyNo, tbody.find('tr:last'));
+                  }
+
+                  // 수정: 상태별 버튼 활성화/비활성화
+                  updateButtonStates();
               });
           });
       }
 
-      // 근무정보 조회 함수 추가
+      // 추가: 저장된 일반근태 데이터 복원 함수
+      function loadSavedGeneralData(applyNo, row) {
+          $.get(`/user/apply/general/${applyNo}`)
+              .done(function(data) {
+                  if (data) {
+                      // 저장된 데이터로 폼 필드 복원
+                      row.find('.work-select').val(data.applyType || '');
+                      if (data.startTime) {
+                          row.find('.start-time').val(formatTimeDisplay(data.startTime));
+                      }
+                      if (data.endTime) {
+                          row.find('.end-time').val(formatTimeDisplay(data.endTime));
+                      }
+                      row.find('.status-field').text(data.status || '대기');
+                  }
+              })
+              .fail(function() {
+                  console.log('저장된 일반근태 데이터 없음: ' + applyNo);
+              });
+      }
+
+      // 추가: 저장된 기타근태 데이터 복원 함수
+      function loadSavedEtcData(applyNo, row) {
+          $.get(`/user/apply/etc/${applyNo}`)
+              .done(function(data) {
+                  if (data) {
+                      // 저장된 데이터로 폼 필드 복원
+                      row.find('.shift-select').val(data.shiftCode || '');
+                      if (data.targetStartDate) {
+                          row.find('.start-date').val(formatDateDisplay(data.targetStartDate));
+                      }
+                      if (data.targetEndDate) {
+                          row.find('.end-date').val(formatDateDisplay(data.targetEndDate));
+                      }
+                      row.find('.apply-time').val(data.applyDateTime || '1일이전신청');
+                      row.find('.status-field').text(data.status || '대기');
+                  }
+              })
+              .fail(function() {
+                  console.log('저장된 기타근태 데이터 없음: ' + applyNo);
+              });
+      }
+
+      // 추가: 시간 포맷 변환 함수 (HHMM -> HH:MM)
+      function formatTimeDisplay(timeStr) {
+          if (!timeStr || timeStr.length !== 4) return '';
+          return timeStr.substring(0, 2) + ':' + timeStr.substring(2, 4);
+      }
+
+      // 추가: 날짜 포맷 변환 함수 (YYYYMMDD -> YYYY-MM-DD)
+      function formatDateDisplay(dateStr) {
+          if (!dateStr || dateStr.length !== 8) return '';
+          return dateStr.substring(0, 4) + '-' + dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
+      }
+
+      // 추가: 상태별 버튼 활성화/비활성화 함수
+      function updateButtonStates() {
+          // 선택된 행들의 상태 확인
+          const selectedRows = $('.emp-checkbox:checked').closest('tr');
+
+          if (selectedRows.length === 0) {
+              // 선택된 행이 없으면 조회, 저장만 활성화
+              $('#saveGeneralBtn, #saveEtcBtn').prop('disabled', false);
+              $('#deleteGeneralBtn, #deleteEtcBtn, #submitGeneralBtn, #submitEtcBtn, #cancelGeneralBtn, #cancelEtcBtn').prop('disabled', true);
+              return;
+          }
+
+          let hasWaiting = false, hasSaved = false, hasSubmitted = false;
+
+          selectedRows.each(function() {
+              const status = $(this).find('.status-field').text();
+              if (status === '대기') hasWaiting = true;
+              else if (status === '저장') hasSaved = true;
+              else if (status === '상신') hasSubmitted = true;
+          });
+
+          // 대기 상태: 저장만 가능
+          // 저장 상태: 삭제, 상신 가능
+          // 상신 상태: 상신취소만 가능
+          $('#saveGeneralBtn, #saveEtcBtn').prop('disabled', !hasWaiting);
+          $('#deleteGeneralBtn, #deleteEtcBtn').prop('disabled', !hasSaved);
+          $('#submitGeneralBtn, #submitEtcBtn').prop('disabled', !hasSaved);
+          $('#cancelGeneralBtn, #cancelEtcBtn').prop('disabled', !hasSubmitted);
+      }
+
+      // 체크박스 변경 시 버튼 상태 업데이트
+      $(document).on('change', '.emp-checkbox', updateButtonStates);
+
+      // 근무정보 조회 함수 (수정: 실적 데이터 강화)
       function loadWorkInfo(empCode, workDate, callback) {
           $.get(`/user/apply/workInfo/${empCode}/${workDate}`)
               .done(function(workInfo) {
                   callback(workInfo);
               })
               .fail(function() {
-                  callback({plan: '', record: null, expectedHours: '0'});
+                  callback({plan: '', record: {checkInTime: '-', checkOutTime: '-', shiftCode: '', shiftName: ''}, expectedHours: '0'});
               });
       }
 
-      // 연차잔여 조회 함수 추가
+      // 연차잔여 조회 함수
       function loadAnnualBalance(empCode, callback) {
           $.get(`/user/apply/annual/${empCode}`)
               .done(function(annual) {
@@ -535,7 +655,7 @@
               });
       }
 
-      // 일반근태 저장
+      // 수정: 일반근태 저장 - 저장 후 데이터 유지
       function saveGeneralApply() {
           const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
 
@@ -553,11 +673,11 @@
 
               const data = {
                   empCode: empCode,
-                  timeItemCode: 'T001', // 기본값
+                  timeItemCode: 'T001',
                   targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
                   startTime: startTime,
                   endTime: endTime,
-                  applyType: $('#generalApplyType').val()
+                  applyType: workSelect
               };
 
               $.ajax({
@@ -566,14 +686,15 @@
                   contentType: 'application/json',
                   data: JSON.stringify(data),
                   success: function(response) {
-                      if (response === 'success') {
-                          // 수정: 상태 필드 업데이트 (요청사항 5)
+                      if (response.result === 'success') {
+                          // 수정: 상태 업데이트 및 신청번호 설정
                           row.find('.status-field').text('저장');
+                          row.attr('data-apply-no', response.data.applyGeneralNo);
                           alert('저장되었습니다.');
-                          // 새로고침으로 신청번호 갱신
-                          searchGeneralEmployees();
+                          // 수정: 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
-                          alert('저장 실패: ' + response);
+                          alert('저장 실패: ' + response.message);
                       }
                   },
                   error: function() {
@@ -583,7 +704,7 @@
           });
       }
 
-      // 기타근태 저장
+      // 수정: 기타근태 저장 - 저장 후 데이터 유지
       function saveEtcApply() {
           const selectedRows = $('#etcEmployeeTable .emp-checkbox:checked').closest('tr');
 
@@ -620,14 +741,15 @@
                   contentType: 'application/json',
                   data: JSON.stringify(data),
                   success: function(response) {
-                      if (response === 'success') {
-                          // 수정: 상태 필드 업데이트 (요청사항 5)
+                      if (response.result === 'success') {
+                          // 수정: 상태 업데이트 및 신청번호 설정
                           row.find('.status-field').text('저장');
+                          row.attr('data-apply-no', response.data.applyEtcNo);
                           alert('저장되었습니다.');
-                          // 새로고침으로 신청번호 갱신
-                          searchEtcEmployees();
+                          // 수정: 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
-                          alert('저장 실패: ' + response);
+                          alert('저장 실패: ' + response.message);
                       }
                   },
                   error: function() {
@@ -652,7 +774,7 @@
 
           selectedRows.each(function() {
               const row = $(this);
-              const applyNo = row.data('apply-no'); // 수정: 실제 신청번호 사용
+              const applyNo = row.data('apply-no');
 
               if (!applyNo) {
                   alert('삭제할 신청이 없습니다.');
@@ -662,11 +784,11 @@
               $.ajax({
                   url: '/user/apply/delete/general',
                   method: 'POST',
-                  data: { applyGeneralNo: applyNo }, // 수정: 실제 신청번호 전송
+                  data: { applyGeneralNo: applyNo },
                   success: function(response) {
                       if (response === 'success') {
                           alert('삭제되었습니다.');
-                          searchGeneralEmployees(); // 새로고침
+                          searchGeneralEmployees();
                       } else {
                           alert('삭제 실패: ' + response);
                       }
@@ -745,6 +867,7 @@
                       if (response === 'success') {
                           row.find('.status-field').text('상신');
                           alert('상신되었습니다.');
+                          updateButtonStates(); // 버튼 상태 업데이트
                       } else {
                           alert('상신 실패: ' + response);
                       }
@@ -782,6 +905,7 @@
                       if (response === 'success') {
                           row.find('.status-field').text('상신');
                           alert('상신되었습니다.');
+                          updateButtonStates(); // 버튼 상태 업데이트
                       } else {
                           alert('상신 실패: ' + response);
                       }
@@ -819,6 +943,7 @@
                       if (response === 'success') {
                           row.find('.status-field').text('저장');
                           alert('상신취소되었습니다.');
+                          updateButtonStates(); // 버튼 상태 업데이트
                       } else {
                           alert('상신취소 실패: ' + response);
                       }
@@ -856,6 +981,7 @@
                       if (response === 'success') {
                           row.find('.status-field').text('저장');
                           alert('상신취소되었습니다.');
+                          updateButtonStates(); // 버튼 상태 업데이트
                       } else {
                           alert('상신취소 실패: ' + response);
                       }

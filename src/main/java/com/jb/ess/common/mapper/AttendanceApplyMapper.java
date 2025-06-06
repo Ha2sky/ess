@@ -61,7 +61,7 @@ public interface AttendanceApplyMapper {
     @Select("SELECT SHIFT_NAME FROM HRTSHIFTMASTER WHERE SHIFT_CODE = #{shiftCode}")
     String getShiftNameByCode(String shiftCode);
 
-    // 실적 조회
+    // 실적 조회 (기존 방식 유지)
     @Select("""
         SELECT CHECK_IN_TIME as checkInTime, CHECK_OUT_TIME as checkOutTime 
         FROM HRTATTRECORD 
@@ -103,6 +103,20 @@ public interface AttendanceApplyMapper {
         ORDER BY APPLY_DATE DESC
     """)
     AttendanceApplyEtc findEtcApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 추가: 저장된 일반근태 신청 조회
+    @Select("""
+        SELECT * FROM HRTATTAPLGENERAL 
+        WHERE APPLY_GENERAL_NO = #{applyGeneralNo}
+    """)
+    AttendanceApplyGeneral findGeneralApplyByNo(String applyGeneralNo);
+
+    // 추가: 저장된 기타근태 신청 조회
+    @Select("""
+        SELECT * FROM HRTATTAPLETC 
+        WHERE APPLY_ETC_NO = #{applyEtcNo}
+    """)
+    AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
     // 부서별 사원 조회 (근무계획 포함) - 부서장용
     @Select("""

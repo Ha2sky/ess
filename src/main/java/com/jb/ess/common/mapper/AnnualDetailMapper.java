@@ -3,6 +3,9 @@ package com.jb.ess.common.mapper;
 import com.jb.ess.common.domain.AnnualDetail;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
+import java.math.BigDecimal;
 
 @Mapper
 public interface AnnualDetailMapper {
@@ -17,4 +20,12 @@ public interface AnnualDetailMapper {
         ORDER BY ANNUAL_START_DATE DESC
     """)
     AnnualDetail findByEmpCode(String empCode);
+
+    // 추가: apply.txt 기반 연차 잔여량 업데이트 (완전 구현)
+    @Update("""
+        UPDATE HRTANNUALDETAIL 
+        SET BALANCE_DAY = #{balanceDay}
+        WHERE EMP_CODE = #{empCode}
+    """)
+    void updateBalanceDay(@Param("empCode") String empCode, @Param("balanceDay") BigDecimal balanceDay);
 }
