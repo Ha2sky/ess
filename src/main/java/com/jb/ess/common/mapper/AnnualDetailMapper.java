@@ -21,7 +21,7 @@ public interface AnnualDetailMapper {
     """)
     AnnualDetail findByEmpCode(String empCode);
 
-    // 추가: apply.txt 기반 연차 잔여량 업데이트 (완전 구현)
+    // 연차 잔여량 업데이트
     @Update("""
         UPDATE HRTANNUALDETAIL 
         SET BALANCE_DAY = #{balanceDay}

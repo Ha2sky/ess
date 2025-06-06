@@ -21,7 +21,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap; // 추가: 저장 후 응답 데이터 구성용
+import java.util.HashMap;
 
 @Slf4j
 @Controller
@@ -48,7 +48,7 @@ public class AttendanceApplyController {
                 currentEmp.setDeptName(department.getDeptName());
             }
 
-            // 수정: 부서장인 경우 하위부서 목록도 포함
+            // 부서장인 경우 하위부서 목록도 포함
             List<Department> availableDepartments;
             if ("Y".equals(currentEmp.getIsHeader())) {
                 availableDepartments = attendanceApplyService.getSubDepartments(currentEmp.getDeptCode());
@@ -56,10 +56,10 @@ public class AttendanceApplyController {
                 availableDepartments = List.of(department);
             }
 
-            // 수정: 연차잔여 정보 추가
+            // 연차잔여 정보 추가
             AnnualDetail annualDetail = attendanceApplyService.getAnnualDetail(empCode);
 
-            // 수정: 근태 마스터 목록 조회
+            // 근태 마스터 목록 조회
             List<ShiftMaster> shiftMasters = attendanceApplyService.getFilteredShiftMasters();
 
             // 현재 사용자 정보 추가
@@ -190,7 +190,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 일반근태 신청 저장 API - 저장 후 데이터 반환
+    // 일반근태 신청 저장 API
     @PostMapping("/general")
     @ResponseBody
     public Map<String, Object> saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
@@ -235,7 +235,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 기타근태 신청 저장 API - 저장 후 데이터 반환
+    // 기타근태 신청 저장 API
     @PostMapping("/etc")
     @ResponseBody
     public Map<String, Object> saveEtcApply(@RequestBody AttendanceApplyEtc apply,
@@ -256,7 +256,7 @@ public class AttendanceApplyController {
 
             attendanceApplyService.saveEtcApply(apply);
 
-            // 수정: 저장된 데이터 조회 및 반환
+            // 저장된 데이터 조회 및 반환
             AttendanceApplyEtc savedApply = attendanceApplyService.getSavedEtcApply(apply.getApplyEtcNo());
             response.put("result", "success");
             response.put("message", "저장되었습니다.");

@@ -110,14 +110,12 @@ public class AttendanceApplyService {
         }
     }
 
-    // 수정: apply.txt 기반으로 근무정보 조회 - 실적 표시 로직 수정
+    // 실적 표시
     public Map<String, Object> getWorkInfo(String empCode, String workDate) {
         Map<String, Object> workInfo = new HashMap<>();
 
         try {
-            // apply.txt: "실제 근무는 출근 시각이 존재하면 계획 그대로의 값을 갖게 되고, 출근이 존재하지 않으면 결근으로 가져오게 됨"
-
-            // 계획 조회 (EmpCalendar에서)
+            // 계획 조회
             EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
             String planShiftCode = empCalendar != null ? empCalendar.getShiftCode() : null;
             String planShiftName = "";
@@ -125,28 +123,25 @@ public class AttendanceApplyService {
                 planShiftName = shiftMasterMapper.findShiftNameByShiftCode(planShiftCode);
             }
 
-            // 수정: apply.txt 기반 실적 조회 로직 - 올바른 실적 표시
+            // 실적 조회
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, workDate);
             Map<String, String> record = new HashMap<>();
 
             if (attRecord != null && attRecord.getCheckInTime() != null) {
-                // apply.txt: "출근 시각이 존재하면 계획 그대로의 값"
-                // 수정: 출퇴근 시간이 아닌 계획된 근태명을 표시
                 String checkInTime = attRecord.getCheckInTime();
                 String checkOutTime = attRecord.getCheckOutTime() != null ? attRecord.getCheckOutTime() : "-";
 
                 record.put("checkInTime", checkInTime);
                 record.put("checkOutTime", checkOutTime);
-                record.put("shiftCode", planShiftCode); // 계획 코드
-                record.put("shiftName", planShiftName); // 계획 근태명
+                record.put("shiftCode", planShiftCode);
+                record.put("shiftName", planShiftName);
 
                 log.debug("출근 시각 존재 - 계획 그대로: empCode={}, date={}, plan={}", empCode, workDate, planShiftName);
             } else {
-                // apply.txt: "출근이 존재하지 않으면 결근으로 가져오게 됨"
                 record.put("checkInTime", "-");
                 record.put("checkOutTime", "-");
-                record.put("shiftCode", "00"); // 결근 코드
-                record.put("shiftName", "결근"); // 결근
+                record.put("shiftCode", "00");
+                record.put("shiftName", "결근");
 
                 log.debug("출근 시각 없음 - 결근 처리: empCode={}, date={}", empCode, workDate);
             }
@@ -249,7 +244,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 주 52시간 검증용 주간 예상근로시간 계산 (기존 로직 유지)
+    // 주 52시간 검증용 주간 예상근로시간 계산
     private String calculateWeeklyExpectedHours(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -353,14 +348,12 @@ public class AttendanceApplyService {
                     emp.setEtcApplyStatus(etcApply.getStatus());
                 }
 
-                // 수정: apply.txt 기준 실적 정보 설정
+                // 실적 정보
                 AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(emp.getEmpCode(), workDate);
                 if (attRecord != null && attRecord.getCheckInTime() != null) {
-                    // apply.txt: "출근 시각이 존재하면 계획 그대로의 값"
                     emp.setCheckInTime(attRecord.getCheckInTime());
                     emp.setCheckOutTime(attRecord.getCheckOutTime() != null ? attRecord.getCheckOutTime() : "-");
                 } else {
-                    // apply.txt: "출근이 존재하지 않으면 결근"
                     emp.setCheckInTime("-");
                     emp.setCheckOutTime("-");
                 }
@@ -392,14 +385,12 @@ public class AttendanceApplyService {
                     emp.setEtcApplyStatus(etcApply.getStatus());
                 }
 
-                // 수정: apply.txt 기준 실적 정보 설정
+                // 실적 정보
                 AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(emp.getEmpCode(), workDate);
                 if (attRecord != null && attRecord.getCheckInTime() != null) {
-                    // apply.txt: "출근 시각이 존재하면 계획 그대로의 값"
                     emp.setCheckInTime(attRecord.getCheckInTime());
                     emp.setCheckOutTime(attRecord.getCheckOutTime() != null ? attRecord.getCheckOutTime() : "-");
                 } else {
-                    // apply.txt: "출근이 존재하지 않으면 결근"
                     emp.setCheckInTime("-");
                     emp.setCheckOutTime("-");
                 }
@@ -425,7 +416,7 @@ public class AttendanceApplyService {
                 }
             }
 
-            // apply.txt: 주 52시간 초과 검증 (주간 계산 사용)
+            //  주 52시간 초과 검증
             String weeklyHours = calculateWeeklyExpectedHours(apply.getEmpCode(), apply.getTargetDate());
             double currentWeekHours = Double.parseDouble(weeklyHours);
 
@@ -573,11 +564,10 @@ public class AttendanceApplyService {
         }
     }
 
-    // apply.txt 기반 기타근태 신청 상신 처리 (연차 차감 포함)
+    // 기타근태 신청 상신
     @Transactional
     public void submitEtcApply(String applyEtcNo, String applicantCode) {
         try {
-            // apply.txt: 부서장이 신청할 경우 자동으로 승인완료 처리
             Employee applicant = attendanceApplyMapper.findEmployeeByEmpCode(applicantCode);
             AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
 
@@ -585,7 +575,6 @@ public class AttendanceApplyService {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
-                // apply.txt: "연차 사용의 경우 상신 시 신청한 연차 갯수 만큼 줄어야 한다"
                 if (etcApply != null) {
                     deductAnnualLeave(etcApply);
                 }
@@ -595,7 +584,6 @@ public class AttendanceApplyService {
                 // 일반 사원인 경우 상신 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "상신");
 
-                // apply.txt: "연차 사용의 경우 상신 시 신청한 연차 갯수 만큼 줄어야 한다"
                 if (etcApply != null) {
                     deductAnnualLeave(etcApply);
                 }
@@ -620,7 +608,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // apply.txt 기반 연차 차감 로직
+    // 연차 차감 로직
     @Transactional
     private void deductAnnualLeave(AttendanceApplyEtc etcApply) {
         try {
@@ -631,7 +619,7 @@ public class AttendanceApplyService {
                     String shiftName = shift.getShiftName();
                     BigDecimal deductDays = BigDecimal.ZERO;
 
-                    // apply.txt: 연차 유형에 따른 차감 일수 계산
+                    // 연차 유형에 따른 차감 일수 계산
                     if ("연차".equals(shiftName)) {
                         deductDays = BigDecimal.ONE; // 연차는 1일 차감
                     } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
