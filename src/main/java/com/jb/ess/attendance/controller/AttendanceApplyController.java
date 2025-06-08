@@ -56,13 +56,13 @@ public class AttendanceApplyController {
                 availableDepartments = List.of(department);
             }
 
-            // 연차잔여 정보 추가
+            // 연차잔여 정보
             AnnualDetail annualDetail = attendanceApplyService.getAnnualDetail(empCode);
 
             // 근태 마스터 목록 조회
             List<ShiftMaster> shiftMasters = attendanceApplyService.getFilteredShiftMasters();
 
-            // 현재 사용자 정보 추가
+            // 현재 사용자 정보
             model.addAttribute("currentEmp", currentEmp);
             model.addAttribute("availableDepartments", availableDepartments);
             model.addAttribute("annualDetail", annualDetail);
@@ -166,7 +166,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 추가: 저장된 일반근태 신청 조회 API
+    // 저장된 일반근태 신청 조회 API
     @GetMapping("/general/{applyGeneralNo}")
     @ResponseBody
     public AttendanceApplyGeneral getSavedGeneralApply(@PathVariable String applyGeneralNo) {
@@ -178,7 +178,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 추가: 저장된 기타근태 신청 조회 API
+    // 저장된 기타근태 신청 조회 API
     @GetMapping("/etc/{applyEtcNo}")
     @ResponseBody
     public AttendanceApplyEtc getSavedEtcApply(@PathVariable String applyEtcNo) {
@@ -220,7 +220,7 @@ public class AttendanceApplyController {
 
             attendanceApplyService.saveGeneralApply(apply);
 
-            // 수정: 저장된 데이터 조회 및 반환
+            // 저장된 데이터 조회 및 반환
             AttendanceApplyGeneral savedApply = attendanceApplyService.getSavedGeneralApply(apply.getApplyGeneralNo());
             response.put("result", "success");
             response.put("message", "저장되었습니다.");

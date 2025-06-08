@@ -114,7 +114,6 @@
   <!-- 기타근태 신청 탭 -->
   <div id="etcPanel" class="tab-panel p-6 hidden">
     <h2 class="text-xl font-semibold mb-4">기타근태 신청 (근태 변경)</h2>
-
     <!-- 검색 조건 -->
     <div class="bg-gray-50 p-4 rounded mb-6">
       <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -278,8 +277,12 @@
           updateWorkTypeOptions(selectedType);
 
           const isLeaveType = selectedType === '조퇴외출반차';
-          $('.expected-hours').closest('td').toggleClass('hidden', isLeaveType);
-          $('.expected-hours').closest('th').toggleClass('hidden', isLeaveType);
+
+          // 테이블 데이터 셀 숨기기/보이기
+          $('#generalEmployeeTable .expected-hours').closest('td').toggleClass('hidden', isLeaveType);
+
+          // 테이블 헤더 숨기기/보이기 (11번째 컬럼)
+          $('#generalEmployeeTable thead th:eq(10)').toggleClass('hidden', isLeaveType);
       });
 
       // 근태 마스터 로드 함수
@@ -387,7 +390,7 @@
           tbody.empty();
 
           employees.forEach(function(emp) {
-              // 근무정보 조회 추가 (수정: 실적 데이터 강화)
+              // 근무정보 조회
               loadWorkInfo(emp.empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(workInfo) {
                   const applyType = $('#generalApplyType').val();
                   const isLeaveType = applyType === '조퇴외출반차';
@@ -403,15 +406,8 @@
                   const applyNo = emp.applyGeneralNo || '';
                   const status = emp.generalApplyStatus || '대기';
 
-                  // 실적 표시
-                  let recordDisplay = '';
-                  if (workInfo.record && workInfo.record.checkInTime && workInfo.record.checkInTime !== '-') {
-                      // apply.txt: 출근 시각이 존재하면 계획 그대로의 값 (근태명 표시)
-                      recordDisplay = workInfo.record.shiftName || workInfo.plan || '-';
-                  } else {
-                      // apply.txt: 출근이 존재하지 않으면 결근
-                      recordDisplay = '결근';
-                  }
+                  // 실적
+                  let recordDisplay = workInfo.record.shiftName || '-';
 
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
@@ -474,21 +470,14 @@
           tbody.empty();
 
           employees.forEach(function(emp) {
-              // 근무정보 조회 추가
+              // 근무정보 조회
               loadWorkInfo(emp.empCode, $('#etcWorkDate').val().replace(/-/g, ''), function(workInfo) {
                   // 실제 신청번호와 상태 사용
                   const applyNo = emp.applyEtcNo || '';
                   const status = emp.etcApplyStatus || '대기';
 
-                  // 실적 표시
-                  let recordDisplay = '';
-                  if (workInfo.record && workInfo.record.checkInTime && workInfo.record.checkInTime !== '-') {
-                      // apply.txt: 출근 시각이 존재하면 계획 그대로의 값 (근태명 표시)
-                      recordDisplay = workInfo.record.shiftName || workInfo.plan || '-';
-                  } else {
-                      // apply.txt: 출근이 존재하지 않으면 결근
-                      recordDisplay = '결근';
-                  }
+                  // 실적
+                  let recordDisplay = workInfo.record.shiftName || '-';
 
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
@@ -531,7 +520,7 @@
                   `;
                   tbody.append(row);
 
-                  // 근태 마스터 옵션 추가
+                  // 근태 마스터 옵션
                   const shiftSelect = tbody.find('tr:last .shift-select');
                   shiftMasters.forEach(function(shift) {
                       shiftSelect.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
@@ -726,14 +715,14 @@
       // 체크박스 변경 시 버튼 상태 업데이트
       $(document).on('change', '.emp-checkbox', updateButtonStates);
 
-      // 근무정보 조회 함수 (수정: 실적 데이터 강화)
+      // 근무정보 조회 함수
       function loadWorkInfo(empCode, workDate, callback) {
           $.get(`/user/apply/workInfo/${empCode}/${workDate}`)
               .done(function(workInfo) {
                   callback(workInfo);
               })
               .fail(function() {
-                  callback({plan: '', record: {checkInTime: '-', checkOutTime: '-', shiftCode: '', shiftName: ''}, expectedHours: '0.00'});
+                  callback({plan: '', record: {checkInTime: '-', checkOutTime: '-', shiftCode: '', shiftName: '-'}, expectedHours: '0.00'});
               });
       }
 
@@ -854,11 +843,11 @@
                   data: JSON.stringify(data),
                   success: function(response) {
                       if (response.result === 'success') {
-                          // 수정: 상태 업데이트 및 신청번호 설정
+                          // 상태 업데이트 및 신청번호 설정
                           row.find('.status-field').text('저장');
                           row.attr('data-apply-no', response.data.applyEtcNo);
                           alert('저장되었습니다.');
-                          // 수정: 버튼 상태 업데이트
+                          // 버튼 상태 업데이트
                           updateButtonStates();
                       } else {
                           alert('저장 실패: ' + response.message);
@@ -989,7 +978,6 @@
                   },
                   success: function(response) {
                       if (response === 'success') {
-                          // 신규 추가: apply.txt 로직 - "부서장이 신청할 경우 자동으로 승인완료 처리"
                           const finalStatus = currentUser.isHeader === 'Y' ? '승인완료' : '상신';
                           row.find('.status-field').text(finalStatus);
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');

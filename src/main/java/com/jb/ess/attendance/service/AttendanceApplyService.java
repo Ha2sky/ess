@@ -110,6 +110,7 @@ public class AttendanceApplyService {
         }
     }
 
+    // *** 수정: 실적 표시 로직 개선 - 휴무일/휴일 처리 및 미래 날짜 처리 ***
     // 실적 표시
     public Map<String, Object> getWorkInfo(String empCode, String workDate) {
         Map<String, Object> workInfo = new HashMap<>();
@@ -122,6 +123,11 @@ public class AttendanceApplyService {
             if (planShiftCode != null) {
                 planShiftName = shiftMasterMapper.findShiftNameByShiftCode(planShiftCode);
             }
+
+            // 미래 날짜 체크
+            LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            LocalDate today = LocalDate.now();
+            boolean isFutureDate = targetDate.isAfter(today);
 
             // 실적 조회
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, workDate);
@@ -138,12 +144,41 @@ public class AttendanceApplyService {
 
                 log.debug("출근 시각 존재 - 계획 그대로: empCode={}, date={}, plan={}", empCode, workDate, planShiftName);
             } else {
-                record.put("checkInTime", "-");
-                record.put("checkOutTime", "-");
-                record.put("shiftCode", "00");
-                record.put("shiftName", "결근");
-
-                log.debug("출근 시각 없음 - 결근 처리: empCode={}, date={}", empCode, workDate);
+                // *** 수정: 계획에 따른 실적 표시 로직 개선 ***
+                if (isFutureDate) {
+                    // 미래 날짜는 - 표시
+                    record.put("checkInTime", "-");
+                    record.put("checkOutTime", "-");
+                    record.put("shiftCode", planShiftCode != null ? planShiftCode : "");
+                    record.put("shiftName", "-");
+                    log.debug("미래 날짜 - 표시: empCode={}, date={}", empCode, workDate);
+                } else {
+                    // 과거/현재 날짜 처리
+                    if (planShiftCode != null && planShiftName != null) {
+                        // *** 수정: 휴무일/휴일인 경우 계획 그대로 표시 ***
+                        if ("휴무일".equals(planShiftName) || "휴일".equals(planShiftName)) {
+                            // 휴무일/휴일인 경우 계획 그대로
+                            record.put("checkInTime", "-");
+                            record.put("checkOutTime", "-");
+                            record.put("shiftCode", planShiftCode);
+                            record.put("shiftName", planShiftName);
+                            log.debug("휴무일/휴일 계획 그대로: empCode={}, date={}, plan={}", empCode, workDate, planShiftName);
+                        } else {
+                            // 근무일인데 출근 기록 없으면 결근
+                            record.put("checkInTime", "-");
+                            record.put("checkOutTime", "-");
+                            record.put("shiftCode", "00");
+                            record.put("shiftName", "결근");
+                            log.debug("근무일 결근 처리: empCode={}, date={}", empCode, workDate);
+                        }
+                    } else {
+                        // 계획 정보가 없으면 결근
+                        record.put("checkInTime", "-");
+                        record.put("checkOutTime", "-");
+                        record.put("shiftCode", "00");
+                        record.put("shiftName", "결근");
+                    }
+                }
             }
 
             // 일별 예상근로시간 계산
@@ -218,7 +253,7 @@ public class AttendanceApplyService {
                 }
             }
 
-            // 해당 일자의 일반근태 신청 내역 추가
+            // 해당 일자의 일반근태 신청 내역
             AttendanceApplyGeneral generalApply = attendanceApplyMapper.findGeneralApplyByEmpAndDate(empCode, workDate);
             if (generalApply != null && ("승인완료".equals(generalApply.getStatus()) || "상신".equals(generalApply.getStatus()))) {
                 Duration applyHours = calculateApplyHours(generalApply);
@@ -530,12 +565,23 @@ public class AttendanceApplyService {
         }
     }
 
+    // *** 수정: 일반근태 신청 상신 처리 강화 ***
     // 일반근태 신청 상신 처리
     @Transactional
     public void submitGeneralApply(String applyGeneralNo, String applicantCode) {
         try {
-            // apply.txt: 부서장이 신청할 경우 자동으로 승인완료 처리
+            log.debug("일반근태 상신 시작: applyGeneralNo={}, applicantCode={}", applyGeneralNo, applicantCode);
+
+            // 신청자 정보 조회
             Employee applicant = attendanceApplyMapper.findEmployeeByEmpCode(applicantCode);
+            if (applicant == null) {
+                throw new RuntimeException("신청자 정보를 찾을 수 없습니다.");
+            }
+
+            log.debug("신청자 정보: empCode={}, isHeader={}, deptCode={}",
+                    applicant.getEmpCode(), applicant.getIsHeader(), applicant.getDeptCode());
+
+            // *** 수정: 부서장 여부 확인 강화 ***
             if ("Y".equals(applicant.getIsHeader())) {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
@@ -544,67 +590,96 @@ public class AttendanceApplyService {
                 // 일반 사원인 경우 상신 처리
                 attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "상신");
 
-                // 결재 이력 생성 - 부서장에게 결재 요청
+                // *** 수정: 결재 이력 생성 강화 ***
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-                String approvalNo = "APPROVAL" + timestamp;
+                String approvalNo = "APR" + timestamp;
 
                 // 신청자의 부서장 정보 조회
                 String deptCode = attendanceApplyMapper.getDeptCodeByGeneralApplyNo(applyGeneralNo);
-                String approverCode = attendanceApplyMapper.getDeptLeaderByDeptCode(deptCode);
-
-                if (approverCode != null) {
-                    attendanceApplyMapper.insertGeneralApprovalHistory(approvalNo, applyGeneralNo, approverCode);
+                if (deptCode == null || deptCode.trim().isEmpty()) {
+                    throw new RuntimeException("신청의 부서코드를 찾을 수 없습니다.");
                 }
 
-                log.debug("일반근태 상신 완료: applyGeneralNo={}", applyGeneralNo);
+                String approverCode = attendanceApplyMapper.getDeptLeaderByDeptCode(deptCode);
+                if (approverCode == null || approverCode.trim().isEmpty()) {
+                    throw new RuntimeException("부서장 정보를 찾을 수 없습니다. 부서코드: " + deptCode);
+                }
+
+                log.debug("결재자 정보: deptCode={}, approverCode={}", deptCode, approverCode);
+
+                // 결재 이력 생성
+                attendanceApplyMapper.insertGeneralApprovalHistory(approvalNo, applyGeneralNo, approverCode);
+                log.debug("일반근태 상신 완료: applyGeneralNo={}, approvalNo={}, approverCode={}",
+                        applyGeneralNo, approvalNo, approverCode);
             }
         } catch (Exception e) {
             log.error("일반근태 상신 실패: applyGeneralNo={}", applyGeneralNo, e);
-            throw new RuntimeException("상신에 실패했습니다.", e);
+            throw new RuntimeException("상신에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
+    // *** 수정: 기타근태 신청 상신 처리 강화 ***
     // 기타근태 신청 상신
     @Transactional
     public void submitEtcApply(String applyEtcNo, String applicantCode) {
         try {
-            Employee applicant = attendanceApplyMapper.findEmployeeByEmpCode(applicantCode);
-            AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
+            log.debug("기타근태 상신 시작: applyEtcNo={}, applicantCode={}", applyEtcNo, applicantCode);
 
+            Employee applicant = attendanceApplyMapper.findEmployeeByEmpCode(applicantCode);
+            if (applicant == null) {
+                throw new RuntimeException("신청자 정보를 찾을 수 없습니다.");
+            }
+
+            AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
+            if (etcApply == null) {
+                throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
+            }
+
+            log.debug("신청자 정보: empCode={}, isHeader={}, deptCode={}",
+                    applicant.getEmpCode(), applicant.getIsHeader(), applicant.getDeptCode());
+
+            // *** 수정: 부서장 여부 확인 강화 ***
             if ("Y".equals(applicant.getIsHeader())) {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
-                if (etcApply != null) {
-                    deductAnnualLeave(etcApply);
-                }
+                // 연차 차감 처리
+                deductAnnualLeave(etcApply);
 
                 log.debug("부서장 기타근태 자동 승인완료: applyEtcNo={}", applyEtcNo);
             } else {
                 // 일반 사원인 경우 상신 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "상신");
 
-                if (etcApply != null) {
-                    deductAnnualLeave(etcApply);
-                }
+                // *** 수정: 연차 차감을 상신 시가 아닌 승인 완료 시에만 처리하도록 변경 ***
+                // 일반 사원의 경우 상신 시에는 연차를 차감하지 않고 승인 완료 시에만 차감
+                // deductAnnualLeave(etcApply); // 이 부분을 제거
 
-                // 결재 이력 생성 - 부서장에게 결재 요청
+                // *** 수정: 결재 이력 생성 강화 ***
                 String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-                String approvalNo = "APPROVAL" + timestamp;
+                String approvalNo = "APR" + timestamp;
 
                 // 신청자의 부서장 정보 조회
                 String deptCode = attendanceApplyMapper.getDeptCodeByEtcApplyNo(applyEtcNo);
-                String approverCode = attendanceApplyMapper.getDeptLeaderByDeptCode(deptCode);
-
-                if (approverCode != null) {
-                    attendanceApplyMapper.insertEtcApprovalHistory(approvalNo, applyEtcNo, approverCode);
+                if (deptCode == null || deptCode.trim().isEmpty()) {
+                    throw new RuntimeException("신청의 부서코드를 찾을 수 없습니다.");
                 }
 
-                log.debug("기타근태 상신 완료: applyEtcNo={}", applyEtcNo);
+                String approverCode = attendanceApplyMapper.getDeptLeaderByDeptCode(deptCode);
+                if (approverCode == null || approverCode.trim().isEmpty()) {
+                    throw new RuntimeException("부서장 정보를 찾을 수 없습니다. 부서코드: " + deptCode);
+                }
+
+                log.debug("결재자 정보: deptCode={}, approverCode={}", deptCode, approverCode);
+
+                // 결재 이력 생성
+                attendanceApplyMapper.insertEtcApprovalHistory(approvalNo, applyEtcNo, approverCode);
+                log.debug("기타근태 상신 완료: applyEtcNo={}, approvalNo={}, approverCode={}",
+                        applyEtcNo, approvalNo, approverCode);
             }
         } catch (Exception e) {
             log.error("기타근태 상신 실패: applyEtcNo={}", applyEtcNo, e);
-            throw new RuntimeException("상신에 실패했습니다.", e);
+            throw new RuntimeException("상신에 실패했습니다: " + e.getMessage(), e);
         }
     }
 
@@ -694,10 +769,12 @@ public class AttendanceApplyService {
                 throw new RuntimeException("상신 상태인 신청건만 취소할 수 있습니다.");
             }
 
-            // 연차 복원 처리 (상신 시 차감된 연차를 다시 복원)
-            AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
-            if (etcApply != null) {
-                restoreAnnualLeave(etcApply);
+            // *** 수정: 연차 복원 처리를 상신취소 시에만 처리 (상신 시 차감하지 않으므로) ***
+            // 부서장이 아닌 일반 사원의 경우에만 연차 복원 처리
+            Employee applicant = attendanceApplyMapper.findEmployeeByEmpCode(applicantCode);
+            if (applicant != null && !"Y".equals(applicant.getIsHeader())) {
+                // 일반 사원의 상신취소인 경우에는 연차 복원하지 않음 (상신 시 차감하지 않았으므로)
+                // 부서장의 경우에만 상신취소 시 연차 복원 필요
             }
 
             // 결재 이력 삭제
