@@ -4,39 +4,76 @@ import com.jb.ess.attendance.service.AttendanceApplyService;
 import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.AttendanceApplyGeneral;
 import com.jb.ess.common.domain.Employee;
-import com.jb.ess.common.domain.Department; // 수정: 부서 정보 추가
+import com.jb.ess.common.domain.Department;
+import com.jb.ess.common.domain.AnnualDetail;
+import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
+@Slf4j
 @Controller
 @RequestMapping("/user/apply")
 @RequiredArgsConstructor
 public class AttendanceApplyController {
     private final AttendanceApplyService attendanceApplyService;
 
-    // 근태 신청 페이지 로드 - 현재 사용자 정보와 신청 내역 포함
+    // 근태 신청 페이지 로드
     @GetMapping("/")
     public String attendanceApplyPage(Model model, @AuthenticationPrincipal CustomUserDetails user) {
-        String empCode = user.getUsername();
-        Employee currentEmp = attendanceApplyService.getCurrentEmployee(empCode);
+        try {
+            String empCode = user.getUsername();
+            Employee currentEmp = attendanceApplyService.getCurrentEmployee(empCode);
 
-        // 수정: 부서 정보 조회 추가
-        Department department = attendanceApplyService.getDepartmentInfo(currentEmp.getDeptCode());
-        currentEmp.setDeptName(department.getDeptName());
+            if (currentEmp == null) {
+                log.error("사용자 정보를 찾을 수 없음: {}", empCode);
+                throw new RuntimeException("사용자 정보를 찾을 수 없습니다.");
+            }
 
-        // 현재 사용자 정보 추가
-        model.addAttribute("currentEmp", currentEmp);
-        model.addAttribute("today", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+            // 부서 정보 조회
+            Department department = attendanceApplyService.getDepartmentInfo(currentEmp.getDeptCode());
+            if (department != null) {
+                currentEmp.setDeptName(department.getDeptName());
+            }
 
-        return "user/apply";
+            // 부서장인 경우 하위부서 목록도 포함
+            List<Department> availableDepartments;
+            if ("Y".equals(currentEmp.getIsHeader())) {
+                availableDepartments = attendanceApplyService.getSubDepartments(currentEmp.getDeptCode());
+            } else {
+                availableDepartments = List.of(department);
+            }
+
+            // 연차잔여 정보
+            AnnualDetail annualDetail = attendanceApplyService.getAnnualDetail(empCode);
+
+            // 근태 마스터 목록 조회
+            List<ShiftMaster> shiftMasters = attendanceApplyService.getFilteredShiftMasters();
+
+            // 현재 사용자 정보
+            model.addAttribute("currentEmp", currentEmp);
+            model.addAttribute("availableDepartments", availableDepartments);
+            model.addAttribute("annualDetail", annualDetail);
+            model.addAttribute("shiftMasters", shiftMasters);
+            model.addAttribute("today", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE));
+
+            return "user/apply";
+        } catch (Exception e) {
+            log.error("근태신청 페이지 로드 실패", e);
+            throw new RuntimeException("페이지 로드에 실패했습니다.");
+        }
     }
 
     // 부서별 사원 조회 API - 부서장과 일반사원에 따른 다른 로직 적용
@@ -47,66 +84,194 @@ public class AttendanceApplyController {
                                              @RequestParam(required = false) String workPlan,
                                              @AuthenticationPrincipal CustomUserDetails user) {
 
-        String empCode = user.getUsername();
-        Employee currentEmp = attendanceApplyService.getCurrentEmployee(empCode);
+        try {
+            // 파라미터 유효성 검사
+            if (deptCode == null || deptCode.trim().isEmpty()) {
+                throw new IllegalArgumentException("부서코드가 필요합니다.");
+            }
 
-        // 부서장인 경우 부서원 전체, 일반 사원인 경우 본인만 조회
-        if ("Y".equals(currentEmp.getIsHeader())) {
-            // 부서장: 부서 전체 사원 조회
-            return attendanceApplyService.getEmployeesByDept(deptCode, workDate, workPlan);
-        } else {
-            // 일반 사원: 본인만 조회
-            return attendanceApplyService.getCurrentEmployeeList(empCode, workDate);
+            if (workDate == null || workDate.trim().isEmpty()) {
+                throw new IllegalArgumentException("근무일이 필요합니다.");
+            }
+
+            // 날짜 형식 검증 (yyyyMMdd)
+            if (!workDate.matches("\\d{8}")) {
+                throw new IllegalArgumentException("날짜 형식이 올바르지 않습니다. (yyyyMMdd)");
+            }
+
+            String empCode = user.getUsername();
+            Employee currentEmp = attendanceApplyService.getCurrentEmployee(empCode);
+
+            // 현재 사용자 정보 검증
+            if (currentEmp == null) {
+                throw new RuntimeException("현재 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            log.debug("사원 조회 요청: empCode={}, deptCode={}, workDate={}", empCode, deptCode, workDate);
+
+            // 부서장인 경우 부서원 전체, 일반 사원인 경우 본인만 조회
+            if ("Y".equals(currentEmp.getIsHeader())) {
+                // 부서장: 부서 전체 사원 조회
+                return attendanceApplyService.getEmployeesByDept(deptCode, workDate, workPlan);
+            } else {
+                // 일반 사원: 본인만 조회
+                return attendanceApplyService.getCurrentEmployeeList(empCode, workDate);
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("사원 조회 파라미터 오류: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (Exception e) {
+            log.error("사원 조회 중 오류 발생", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "사원 조회에 실패했습니다.");
         }
     }
 
-    // 일반근태 신청 저장 API - 수정: 저장 로직 개선
+    // 연차잔여 조회 API
+    @GetMapping("/annual/{empCode}")
+    @ResponseBody
+    public AnnualDetail getAnnualDetail(@PathVariable String empCode) {
+        try {
+            return attendanceApplyService.getAnnualDetail(empCode);
+        } catch (Exception e) {
+            log.error("연차잔여 조회 실패: empCode={}", empCode, e);
+            // 기본값 반환
+            AnnualDetail defaultDetail = new AnnualDetail();
+            defaultDetail.setEmpCode(empCode);
+            defaultDetail.setBalanceDay(java.math.BigDecimal.ZERO);
+            return defaultDetail;
+        }
+    }
+
+    // 근무계획/실적/예상근로시간 조회 API
+    @GetMapping("/workInfo/{empCode}/{workDate}")
+    @ResponseBody
+    public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
+        try {
+            return attendanceApplyService.getWorkInfo(empCode, workDate);
+        } catch (Exception e) {
+            log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
+            return Map.of("plan", "", "record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "", "shiftName", ""), "expectedHours", "0.00");
+        }
+    }
+
+    // 근태 마스터 목록 조회 API
+    @GetMapping("/shift-masters")
+    @ResponseBody
+    public List<ShiftMaster> getShiftMasters() {
+        try {
+            return attendanceApplyService.getFilteredShiftMasters();
+        } catch (Exception e) {
+            log.error("근태 마스터 조회 실패", e);
+            return List.of();
+        }
+    }
+
+    // 저장된 일반근태 신청 조회 API
+    @GetMapping("/general/{applyGeneralNo}")
+    @ResponseBody
+    public AttendanceApplyGeneral getSavedGeneralApply(@PathVariable String applyGeneralNo) {
+        try {
+            return attendanceApplyService.getSavedGeneralApply(applyGeneralNo);
+        } catch (Exception e) {
+            log.error("저장된 일반근태 신청 조회 실패: applyGeneralNo={}", applyGeneralNo, e);
+            return null;
+        }
+    }
+
+    // 저장된 기타근태 신청 조회 API
+    @GetMapping("/etc/{applyEtcNo}")
+    @ResponseBody
+    public AttendanceApplyEtc getSavedEtcApply(@PathVariable String applyEtcNo) {
+        try {
+            return attendanceApplyService.getSavedEtcApply(applyEtcNo);
+        } catch (Exception e) {
+            log.error("저장된 기타근태 신청 조회 실패: applyEtcNo={}", applyEtcNo, e);
+            return null;
+        }
+    }
+
+    // 일반근태 신청 저장 API
     @PostMapping("/general")
     @ResponseBody
-    public String saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
-                                   @AuthenticationPrincipal CustomUserDetails user) {
+    public Map<String, Object> saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
+                                                @AuthenticationPrincipal CustomUserDetails user) {
+        Map<String, Object> response = new HashMap<>();
         try {
             apply.setApplicantCode(user.getUsername());
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
-            apply.setStatus("대기");
+            apply.setStatus("저장");
+
+            // 유효한 TIME_ITEM_CODE 조회 후 설정
+            String validTimeItemCode = attendanceApplyService.getValidTimeItemCode();
+            if (validTimeItemCode != null) {
+                apply.setTimeItemCode(validTimeItemCode);
+            } else {
+                // 기본값 설정
+                apply.setTimeItemCode("1010");
+            }
 
             // 신청 유효성 검증
             String validationResult = attendanceApplyService.validateGeneralApply(apply);
             if (!"valid".equals(validationResult)) {
-                return validationResult;
+                response.put("result", "error");
+                response.put("message", validationResult);
+                return response;
             }
 
             attendanceApplyService.saveGeneralApply(apply);
-            return "success";
+
+            // 저장된 데이터 조회 및 반환
+            AttendanceApplyGeneral savedApply = attendanceApplyService.getSavedGeneralApply(apply.getApplyGeneralNo());
+            response.put("result", "success");
+            response.put("message", "저장되었습니다.");
+            response.put("data", savedApply);
+
+            return response;
         } catch (Exception e) {
-            return "저장에 실패했습니다: " + e.getMessage();
+            log.error("일반근태 저장 실패", e);
+            response.put("result", "error");
+            response.put("message", "저장에 실패했습니다: " + e.getMessage());
+            return response;
         }
     }
 
-    // 기타근태 신청 저장 API - 수정: 저장 로직 개선
+    // 기타근태 신청 저장 API
     @PostMapping("/etc")
     @ResponseBody
-    public String saveEtcApply(@RequestBody AttendanceApplyEtc apply,
-                               @AuthenticationPrincipal CustomUserDetails user) {
+    public Map<String, Object> saveEtcApply(@RequestBody AttendanceApplyEtc apply,
+                                            @AuthenticationPrincipal CustomUserDetails user) {
+        Map<String, Object> response = new HashMap<>();
         try {
             apply.setApplicantCode(user.getUsername());
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
-            apply.setStatus("대기");
+            apply.setStatus("저장");
 
             // 신청 유효성 검증
             String validationResult = attendanceApplyService.validateEtcApply(apply);
             if (!"valid".equals(validationResult)) {
-                return validationResult;
+                response.put("result", "error");
+                response.put("message", validationResult);
+                return response;
             }
 
             attendanceApplyService.saveEtcApply(apply);
-            return "success";
+
+            // 저장된 데이터 조회 및 반환
+            AttendanceApplyEtc savedApply = attendanceApplyService.getSavedEtcApply(apply.getApplyEtcNo());
+            response.put("result", "success");
+            response.put("message", "저장되었습니다.");
+            response.put("data", savedApply);
+
+            return response;
         } catch (Exception e) {
-            return "저장에 실패했습니다: " + e.getMessage();
+            log.error("기타근태 저장 실패", e);
+            response.put("result", "error");
+            response.put("message", "저장에 실패했습니다: " + e.getMessage());
+            return response;
         }
     }
 
-    // 일반근태 신청 상신 API - 수정: applyNo -> applyGeneralNo
+    // 일반근태 신청 상신 API
     @PostMapping("/submit/general")
     @ResponseBody
     public String submitGeneralApply(@RequestParam String applyGeneralNo,
@@ -115,11 +280,12 @@ public class AttendanceApplyController {
             attendanceApplyService.submitGeneralApply(applyGeneralNo, user.getUsername());
             return "success";
         } catch (Exception e) {
+            log.error("일반근태 상신 실패", e);
             return "상신에 실패했습니다: " + e.getMessage();
         }
     }
 
-    // 기타근태 신청 상신 API - 수정: applyNo -> applyEtcNo
+    // 기타근태 신청 상신 API
     @PostMapping("/submit/etc")
     @ResponseBody
     public String submitEtcApply(@RequestParam String applyEtcNo,
@@ -128,11 +294,40 @@ public class AttendanceApplyController {
             attendanceApplyService.submitEtcApply(applyEtcNo, user.getUsername());
             return "success";
         } catch (Exception e) {
+            log.error("기타근태 상신 실패", e);
             return "상신에 실패했습니다: " + e.getMessage();
         }
     }
 
-    // 일반근태 신청 삭제 API - 수정: applyNo -> applyGeneralNo
+    // 일반근태 신청 상신취소 API
+    @PostMapping("/cancel/general")
+    @ResponseBody
+    public String cancelGeneralApply(@RequestParam String applyGeneralNo,
+                                     @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            attendanceApplyService.cancelGeneralApply(applyGeneralNo, user.getUsername());
+            return "success";
+        } catch (Exception e) {
+            log.error("일반근태 상신취소 실패", e);
+            return "상신취소에 실패했습니다: " + e.getMessage();
+        }
+    }
+
+    // 기타근태 신청 상신취소 API
+    @PostMapping("/cancel/etc")
+    @ResponseBody
+    public String cancelEtcApply(@RequestParam String applyEtcNo,
+                                 @AuthenticationPrincipal CustomUserDetails user) {
+        try {
+            attendanceApplyService.cancelEtcApply(applyEtcNo, user.getUsername());
+            return "success";
+        } catch (Exception e) {
+            log.error("기타근태 상신취소 실패", e);
+            return "상신취소에 실패했습니다: " + e.getMessage();
+        }
+    }
+
+    // 일반근태 신청 삭제 API
     @PostMapping("/delete/general")
     @ResponseBody
     public String deleteGeneralApply(@RequestParam String applyGeneralNo,
@@ -141,11 +336,12 @@ public class AttendanceApplyController {
             attendanceApplyService.deleteGeneralApply(applyGeneralNo, user.getUsername());
             return "success";
         } catch (Exception e) {
+            log.error("일반근태 삭제 실패", e);
             return "삭제에 실패했습니다: " + e.getMessage();
         }
     }
 
-    // 기타근태 신청 삭제 API - 수정: applyNo -> applyEtcNo
+    // 기타근태 신청 삭제 API
     @PostMapping("/delete/etc")
     @ResponseBody
     public String deleteEtcApply(@RequestParam String applyEtcNo,
@@ -154,6 +350,7 @@ public class AttendanceApplyController {
             attendanceApplyService.deleteEtcApply(applyEtcNo, user.getUsername());
             return "success";
         } catch (Exception e) {
+            log.error("기타근태 삭제 실패", e);
             return "삭제에 실패했습니다: " + e.getMessage();
         }
     }
