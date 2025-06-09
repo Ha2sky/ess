@@ -15,4 +15,6 @@ public class Department {
     private String workPatternCode; // 근태패턴코드
     private int empCount;           // 부서별 사원수
     private String leaderName;      // 부서장 이름
+
+    private String workPatternName; // 근태패턴명
 }

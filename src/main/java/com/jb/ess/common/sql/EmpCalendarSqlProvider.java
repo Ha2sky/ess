@@ -10,13 +10,14 @@ public class EmpCalendarSqlProvider {
         List<EmpCalendar> list = (List<EmpCalendar>) params.get("list");
 
         StringBuilder sb = new StringBuilder();
-        sb.append("INSERT INTO HRTWORKEMPCALENDAR (WORK_PATTERN_CODE, YYYYMMDD, SHIFT_CODE, EMP_CODE, DEPT_CODE, HOLIDAY_YN) VALUES ");
+        sb.append("INSERT INTO HRTWORKEMPCALENDAR (WORK_PATTERN_CODE, YYYYMMDD, SHIFT_CODE, SHIFT_CODE_ORIG, EMP_CODE, DEPT_CODE, HOLIDAY_YN) VALUES ");
 
         for (int i = 0; i < list.size(); i++) {
             sb.append("(")
                 .append("#{list[").append(i).append("].workPatternCode}, ")
                 .append("#{list[").append(i).append("].yyyymmdd}, ")
                 .append("#{list[").append(i).append("].shiftCode}, ")
+                .append("#{list[").append(i).append("].shiftCodeOrig}, ")
                 .append("#{list[").append(i).append("].empCode}, ")
                 .append("#{list[").append(i).append("].deptCode}, ")
                 .append("#{list[").append(i).append("].holidayYn})");

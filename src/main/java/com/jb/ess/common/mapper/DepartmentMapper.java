@@ -23,10 +23,12 @@ public interface DepartmentMapper {
                 d.DEPT_LEADER,
                 leader.EMP_NAME AS LEADER_NAME,
                 d.WORK_PATTERN_CODE,
-                COUNT(e.EMP_CODE) AS EMP_COUNT
+                COUNT(e.EMP_CODE) AS EMP_COUNT,
+                pattern.WORK_PATTERN_NAME
             FROM ORGDEPTMASTER d
             LEFT JOIN HRIMASTER e ON d.DEPT_CODE = e.DEPT_CODE
             LEFT JOIN HRIMASTER leader ON d.DEPT_LEADER = leader.EMP_CODE
+            LEFT JOIN HRTSHIFTPATTERN pattern ON d.WORK_PATTERN_CODE = pattern.WORK_PATTERN_CODE
             GROUP BY
                 d.DEPT_CODE,
                 d.DEPT_NAME,
@@ -37,7 +39,8 @@ public interface DepartmentMapper {
                 d.END_DATE,
                 d.DEPT_LEADER,
                 leader.EMP_NAME,
-                d.WORK_PATTERN_CODE
+                d.WORK_PATTERN_CODE,
+                pattern.WORK_PATTERN_NAME
             ORDER BY d.DEPT_CODE
     """)
     // 부서 리스트
@@ -55,7 +58,7 @@ public interface DepartmentMapper {
     @Update("""
         UPDATE ORGDEPTMASTER
         SET DEPT_CODE = #{dept.deptCode}, DEPT_NAME = #{dept.deptName}, PARENT_DEPT = #{dept.parentDept},
-            DEPT_LEADER = #{dept.deptLeader}, START_DATE = #{dept.startDate}, END_DATE = #{dept.endDate},
+            START_DATE = #{dept.startDate}, END_DATE = #{dept.endDate},
             USE_YN = #{dept.useYn}, DEPT_CATEGORY = #{dept.deptCategory}, WORK_PATTERN_CODE = #{dept.workPatternCode}
         WHERE DEPT_CODE = #{originalDeptCode}
     """)

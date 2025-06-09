@@ -93,16 +93,16 @@ public class PatternService {
             List<String> empCodes = employeeMapper.findEmpCodesByDeptCode(deptCode);
             for (String empCode : empCodes) {
                 for (LocalDate date : dates) {
+                    if (empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, date.format(FORMATTER)) != null) continue;
                     int dayOfWeek = date.getDayOfWeek().getValue();
                     String shiftCode = shiftCodeMap.get(dayOfWeek);
-                    String shiftCodeOrig = shiftCodeMap.get(dayOfWeek);
                     if (shiftCode != null) {
                         String holidayYn = (dayOfWeek == 6 || dayOfWeek == 7) ? "Y" : "N";
                         batchList.add(new EmpCalendar(
                             workPatternCode,
                             date.format(FORMATTER),
                             shiftCode,
-                            shiftCodeOrig,
+                            shiftCode,
                             empCode,
                             deptCode,
                             holidayYn
