@@ -85,7 +85,7 @@ public interface AttendanceApplyMapper {
 
     // 기존 일반근태 신청 조회
     @Select("""
-        SELECT TOP 1 APPLY_GENERAL_NO, STATUS 
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON
         FROM HRTATTAPLGENERAL 
         WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
         AND STATUS != '삭제'
@@ -95,7 +95,7 @@ public interface AttendanceApplyMapper {
 
     // 기존 기타근태 신청 조회
     @Select("""
-        SELECT TOP 1 APPLY_ETC_NO, STATUS 
+        SELECT TOP 1 APPLY_ETC_NO, STATUS, REASON
         FROM HRTATTAPLETC 
         WHERE EMP_CODE = #{empCode} 
         AND TARGET_START_DATE <= #{workDate} AND TARGET_END_DATE >= #{workDate}
@@ -184,11 +184,11 @@ public interface AttendanceApplyMapper {
     @Insert("""
         INSERT INTO HRTATTAPLGENERAL (
             APPLY_GENERAL_NO, EMP_CODE, TIME_ITEM_CODE, APPLY_DATE, 
-            TARGET_DATE, START_TIME, END_TIME, APPLY_TYPE, STATUS, 
+            TARGET_DATE, START_TIME, END_TIME, APPLY_TYPE, REASON, STATUS, 
             DEPT_CODE, APPLICANT_CODE
         ) VALUES (
             #{applyGeneralNo}, #{empCode}, #{timeItemCode}, #{applyDate},
-            #{targetDate}, #{startTime}, #{endTime}, #{applyType}, #{status},
+            #{targetDate}, #{startTime}, #{endTime}, #{applyType}, #{reason}, #{status},
             #{deptCode}, #{applicantCode}
         )
     """)

@@ -2,386 +2,668 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>부서원 근태 승인</title>
+  <title>부서원 일근태 승인</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    .table-container {
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+    }
+    .table-header {
+        background-color: #f3f4f6;
+        border-bottom: 1px solid #d1d5db;
+    }
+    .table-row:hover {
+        background-color: #f8fafc;
+    }
+    .table-row.selected {
+        background-color: #dbeafe !important;
+    }
+    .status-waiting {
+        background-color: #fef3c7;
+        color: #92400e;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+    .status-approved {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+    .status-rejected {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+    .detail-section {
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        background-color: #f9fafb;
+    }
+    .tab-content {
+        min-height: 400px;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 p-6">
+<body class="bg-white">
 
-<div class="max-w-full mx-auto bg-white rounded shadow">
+<div class="max-w-full mx-auto p-4">
   <!-- 헤더 -->
-  <div class="bg-green-600 text-white p-4 rounded-t">
-    <h1 class="text-2xl font-bold">부서원 근태 승인</h1>
-    <p class="text-sm">부서장만 접근 가능한 페이지입니다.</p>
+  <div class="mb-4">
+    <h1 class="text-xl font-bold text-gray-800">부서원 일근태 승인</h1>
+    <div class="text-xs text-gray-500 mt-1">
+      <span>🏠 근태 / 일 근태 승인 / 부서원 일근태 승인</span>
+    </div>
   </div>
 
-  <!-- 검색 조건 -->
-  <div class="bg-gray-50 p-4 border-b">
-    <form method="get" th:action="@{/user/approval/}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700">대상일자 (시작)</label>
-        <input type="date" name="startDate" th:value="${startDate}"
-               class="mt-1 block w-full border border-gray-300 rounded p-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700">대상일자 (종료)</label>
-        <input type="date" name="endDate" th:value="${endDate}"
-               class="mt-1 block w-full border border-gray-300 rounded p-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700">근태유형</label>
-        <select name="applyType" class="mt-1 block w-full border border-gray-300 rounded p-2">
-          <option value="">전체</option>
-          <option value="연장근로">연장근로</option>
-          <option value="휴일근로">휴일근로</option>
-          <option value="기타근태">기타근태</option>
-          <option value="조퇴외출반차">조퇴외출반차</option>
-        </select>
-      </div>
-      <div class="flex items-end">
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-          조회
-        </button>
-      </div>
-    </form>
+  <!-- 에러 메시지 -->
+  <div th:if="${errorMessage}" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+    <span th:text="${errorMessage}"></span>
   </div>
 
-  <!-- 탭 메뉴 -->
-  <div class="border-b border-gray-200">
-    <nav class="flex space-x-8">
-      <button id="pendingTab" class="tab-button active bg-red-500 text-white px-4 py-2 rounded-t">
-        결재할 문서 (<span id="pendingCount" th:text="${#lists.size(pendingGenerals) + #lists.size(pendingEtcs)}">0</span>)
-      </button>
-      <button id="approvedTab" class="tab-button bg-gray-300 text-gray-700 px-4 py-2 rounded-t">
-        승인된 문서 (<span th:text="${#lists.size(approvedGenerals)}">0</span>)
-      </button>
-      <button id="rejectedTab" class="tab-button bg-gray-300 text-gray-700 px-4 py-2 rounded-t">
-        반려된 문서 (<span th:text="${#lists.size(rejectedGenerals)}">0</span>)
-      </button>
-    </nav>
-  </div>
+  <div class="grid grid-cols-12 gap-4">
+    <!-- 좌측 영역 (검색 조건 + 문서 목록) -->
+    <div class="col-span-8">
+      <!-- 검색 조건 -->
+      <div class="bg-gray-50 p-3 border border-gray-300 rounded mb-4">
+        <!-- 검색 폼에 현재 활성 탭 정보 포함 -->
+        <form method="get" th:action="@{/user/approval/}" class="grid grid-cols-8 gap-3 items-end" id="searchForm">
+          <!-- 현재 활성 탭을 hidden 필드로 유지 -->
+          <input type="hidden" name="activeTab" id="activeTabInput" th:value="${activeTab}">
 
-  <div class="flex">
-    <!-- 좌측: 문서 목록 -->
-    <div class="w-1/2 p-4 border-r">
-      <!-- 결재할 문서 -->
-      <div id="pendingPanel" class="document-panel">
-        <h3 class="text-lg font-semibold mb-4 text-red-600">결재할 문서</h3>
-
-        <!-- 일반근태 신청 -->
-        <div class="mb-6">
-          <h4 class="font-medium mb-2">일반근태 신청</h4>
-          <div class="space-y-2">
-            <div th:each="apply : ${pendingGenerals}"
-                 class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-                 th:data-apply-general-no="${apply.applyGeneralNo}"
-                 th:data-apply-type="general">
-              <div class="flex justify-between">
-                <span class="font-medium" th:text="${apply.applicantName}"></span>
-                <span class="text-sm text-gray-500" th:text="${apply.applyType}"></span>
-              </div>
-              <div class="text-sm text-gray-600">
-                <span th:text="${apply.empName}"></span> -
-                <span th:text="${#temporals.format(#temporals.createDate(#strings.substring(apply.targetDate,0,4), #strings.substring(apply.targetDate,4,6), #strings.substring(apply.targetDate,6,8)), 'yyyy-MM-dd')}"></span>
-              </div>
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">대상일자</label>
+            <div class="flex space-x-1">
+              <input type="date" name="startDate" th:value="${startDate}"
+                     class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+              <span class="text-gray-500">~</span>
+              <input type="date" name="endDate" th:value="${endDate}"
+                     class="w-full text-xs border border-gray-300 rounded px-2 py-1">
             </div>
           </div>
-        </div>
-
-        <!-- 기타근태 신청 -->
-        <div>
-          <h4 class="font-medium mb-2">기타근태 신청</h4>
-          <div class="space-y-2">
-            <div th:each="apply : ${pendingEtcs}"
-                 class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-                 th:data-apply-etc-no="${apply.applyEtcNo}"
-                 th:data-apply-type="etc">
-              <div class="flex justify-between">
-                <span class="font-medium" th:text="${apply.applicantName}"></span>
-                <span class="text-sm text-gray-500">기타근태</span>
-              </div>
-              <div class="text-sm text-gray-600">
-                <span th:text="${apply.empName}"></span> -
-                <span th:text="${#temporals.format(#temporals.createDate(#strings.substring(apply.targetStartDate,0,4), #strings.substring(apply.targetStartDate,4,6), #strings.substring(apply.targetStartDate,6,8)), 'yyyy-MM-dd')}"></span>
-              </div>
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">사번</label>
+            <input type="text" name="empCode" th:value="${empCode}" placeholder="Search..."
+                   class="w-full text-xs border border-gray-300 rounded px-2 py-1">
           </div>
-        </div>
+          <!-- 근태유형 드롭다운 옵션 변경 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">근태유형</label>
+            <select name="applyType" class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+              <option value="">전체</option>
+              <option value="일반근태" th:selected="${applyType == '일반근태'}">일반근태</option>
+              <option value="기타근태" th:selected="${applyType == '기타근태'}">기타근태</option>
+            </select>
+          </div>
+          <div>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-1 rounded text-sm hover:bg-blue-600">
+              조회
+            </button>
+          </div>
+          <div class="col-span-3 text-right">
+            <button type="button" id="bulkApproveBtn" class="bg-green-500 text-white px-3 py-1 rounded text-xs mr-1">
+              일괄승인
+            </button>
+            <button type="button" id="bulkRejectBtn" class="bg-red-500 text-white px-3 py-1 rounded text-xs">
+              일괄반려
+            </button>
+          </div>
+        </form>
       </div>
 
-      <!-- 승인된 문서 -->
-      <div id="approvedPanel" class="document-panel hidden">
-        <h3 class="text-lg font-semibold mb-4 text-green-600">승인된 문서</h3>
-        <div class="space-y-2">
-          <div th:each="apply : ${approvedGenerals}"
-               class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-               th:data-apply-general-no="${apply.applyGeneralNo}"
-               th:data-apply-type="general">
-            <div class="flex justify-between">
-              <span class="font-medium" th:text="${apply.applicantName}"></span>
-              <span class="text-sm text-green-600">승인완료</span>
-            </div>
-            <div class="text-sm text-gray-600">
-              <span th:text="${apply.empName}"></span> -
-              <span th:text="${apply.applyType}"></span>
-            </div>
-          </div>
-        </div>
+      <!-- 탭 메뉴 -->
+      <div class="border-b border-gray-200 mb-4">
+        <nav class="flex space-x-1">
+          <button id="pendingTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+                  th:classappend="${activeTab == 'pending' ? 'text-white bg-red-500' : 'text-gray-500 bg-gray-200'}">
+            결재할 문서 (<span th:text="${#lists.size(pendingGenerals) + #lists.size(pendingEtcs)}">0</span>)
+          </button>
+          <button id="approvedTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+                  th:classappend="${activeTab == 'approved' ? 'text-white bg-blue-500' : 'text-gray-500 bg-gray-200'}">
+            승인된 문서 (<span th:text="${#lists.size(approvedGenerals) + #lists.size(approvedEtcs)}">0</span>)
+          </button>
+          <button id="rejectedTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+                  th:classappend="${activeTab == 'rejected' ? 'text-white bg-green-500' : 'text-gray-500 bg-gray-200'}">
+            반려된 문서 (<span th:text="${#lists.size(rejectedGenerals) + #lists.size(rejectedEtcs)}">0</span>)
+          </button>
+        </nav>
       </div>
 
-      <!-- 반려된 문서 -->
-      <div id="rejectedPanel" class="document-panel hidden">
-        <h3 class="text-lg font-semibold mb-4 text-red-600">반려된 문서</h3>
-        <div class="space-y-2">
-          <div th:each="apply : ${rejectedGenerals}"
-               class="document-item cursor-pointer p-3 border rounded hover:bg-blue-50"
-               th:data-apply-general-no="${apply.applyGeneralNo}"
-               th:data-apply-type="general">
-            <div class="flex justify-between">
-              <span class="font-medium" th:text="${apply.applicantName}"></span>
-              <span class="text-sm text-red-600">반려</span>
-            </div>
-            <div class="text-sm text-gray-600">
-              <span th:text="${apply.empName}"></span> -
-              <span th:text="${apply.applyType}"></span>
-            </div>
-          </div>
+      <!-- 문서 목록 테이블 -->
+      <div class="table-container tab-content">
+        <!-- 결재할 문서 -->
+        <div id="pendingPanel" class="document-panel" th:style="${activeTab == 'pending' ? 'display: block;' : 'display: none;'}">
+          <table class="w-full text-xs">
+            <thead class="table-header">
+            <tr>
+              <th class="px-2 py-2 text-center">
+                <input type="checkbox" id="selectAll" class="rounded">
+              </th>
+              <th class="px-2 py-2 text-center">결재번호</th>
+              <th class="px-2 py-2 text-center">신청자번</th>
+              <th class="px-2 py-2 text-center">상신자</th>
+              <th class="px-2 py-2 text-center">대상자부서</th>
+              <th class="px-2 py-2 text-center">신청근태</th>
+              <th class="px-2 py-2 text-center">대상자</th>
+              <th class="px-2 py-2 text-center">대상일</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- 일반근태 -->
+            <tr th:each="item : ${pendingGenerals}" class="table-row cursor-pointer"
+                th:data-type="general" th:data-no="${item.applyGeneralNo}">
+              <td class="px-2 py-2 text-center">
+                <input type="checkbox" class="document-checkbox rounded" th:value="${item.applyGeneralNo}" data-type="general">
+              </td>
+              <td class="px-2 py-2 text-center" th:text="${item.applyGeneralNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applyType}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetDate}"></td>
+            </tr>
+            <!-- 기타근태 -->
+            <tr th:each="item : ${pendingEtcs}" class="table-row cursor-pointer"
+                th:data-type="etc" th:data-no="${item.applyEtcNo}">
+              <td class="px-2 py-2 text-center">
+                <input type="checkbox" class="document-checkbox rounded" th:value="${item.applyEtcNo}" data-type="etc">
+              </td>
+              <td class="px-2 py-2 text-center" th:text="${item.applyEtcNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.shiftName != null ? item.shiftName : '기타근태'}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetStartDate}"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 승인된 문서 -->
+        <div id="approvedPanel" class="document-panel" th:style="${activeTab == 'approved' ? 'display: block;' : 'display: none;'}">
+          <table class="w-full text-xs">
+            <thead class="table-header">
+            <tr>
+              <th class="px-2 py-2 text-center">결재번호</th>
+              <th class="px-2 py-2 text-center">신청자번</th>
+              <th class="px-2 py-2 text-center">상신자</th>
+              <th class="px-2 py-2 text-center">대상자부서</th>
+              <th class="px-2 py-2 text-center">신청근태</th>
+              <th class="px-2 py-2 text-center">대상자</th>
+              <th class="px-2 py-2 text-center">대상일</th>
+              <th class="px-2 py-2 text-center">상태</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- 일반근태 승인 문서 -->
+            <tr th:each="item : ${approvedGenerals}" class="table-row cursor-pointer"
+                th:data-type="general" th:data-no="${item.applyGeneralNo}">
+              <td class="px-2 py-2 text-center" th:text="${item.applyGeneralNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applyType}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetDate}"></td>
+              <td class="px-2 py-2 text-center">
+                <span class="status-approved">승인완료</span>
+              </td>
+            </tr>
+            <!-- 기타근태 승인 문서 -->
+            <tr th:each="item : ${approvedEtcs}" class="table-row cursor-pointer"
+                th:data-type="etc" th:data-no="${item.applyEtcNo}">
+              <td class="px-2 py-2 text-center" th:text="${item.applyEtcNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.shiftName != null ? item.shiftName : '기타근태'}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetStartDate}"></td>
+              <td class="px-2 py-2 text-center">
+                <span class="status-approved">승인완료</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 반려된 문서 -->
+        <div id="rejectedPanel" class="document-panel" th:style="${activeTab == 'rejected' ? 'display: block;' : 'display: none;'}">
+          <table class="w-full text-xs">
+            <thead class="table-header">
+            <tr>
+              <th class="px-2 py-2 text-center">결재번호</th>
+              <th class="px-2 py-2 text-center">신청자번</th>
+              <th class="px-2 py-2 text-center">상신자</th>
+              <th class="px-2 py-2 text-center">대상자부서</th>
+              <th class="px-2 py-2 text-center">신청근태</th>
+              <th class="px-2 py-2 text-center">대상자</th>
+              <th class="px-2 py-2 text-center">대상일</th>
+              <th class="px-2 py-2 text-center">상태</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- 일반근태 반려 문서 -->
+            <tr th:each="item : ${rejectedGenerals}" class="table-row cursor-pointer"
+                th:data-type="general" th:data-no="${item.applyGeneralNo}">
+              <td class="px-2 py-2 text-center" th:text="${item.applyGeneralNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applyType}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetDate}"></td>
+              <td class="px-2 py-2 text-center">
+                <span class="status-rejected">반려</span>
+              </td>
+            </tr>
+            <!-- 기타근태 반려 문서 -->
+            <tr th:each="item : ${rejectedEtcs}" class="table-row cursor-pointer"
+                th:data-type="etc" th:data-no="${item.applyEtcNo}">
+              <td class="px-2 py-2 text-center" th:text="${item.applyEtcNo}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empCode}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.applicantName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.deptName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.shiftName != null ? item.shiftName : '기타근태'}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.empName}"></td>
+              <td class="px-2 py-2 text-center" th:text="${item.targetStartDate}"></td>
+              <td class="px-2 py-2 text-center">
+                <span class="status-rejected">반려</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <!-- 우측: 상세 정보 -->
-    <div class="w-1/2 p-4">
-      <div id="detailPanel">
-        <h3 class="text-lg font-semibold mb-4">근태 신청 상세</h3>
-        <div id="detailContent" class="space-y-4">
-          <p class="text-gray-500">좌측에서 문서를 선택하세요.</p>
+    <!-- 우측 영역 (상세 정보) -->
+    <div class="col-span-4">
+      <div class="detail-section p-4">
+        <h3 class="text-lg font-bold mb-4">신청 상세</h3>
+        <div id="detailContent" class="text-sm">
+          <p class="text-gray-500">문서를 선택하세요.</p>
         </div>
-        <!-- 승인/반려 버튼 -->
-        <div id="actionButtons" class="mt-6 flex space-x-2 hidden">
-          <button id="approveBtn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-            승인
-          </button>
-          <button id="rejectBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-            반려
-          </button>
-        </div>
+      </div>
+
+      <!-- 결재 처리 버튼 -->
+      <div class="mt-4 flex space-x-2">
+        <button id="approveBtn" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 disabled:bg-gray-400" disabled>
+          승인
+        </button>
+        <button id="rejectBtn" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 disabled:bg-gray-400" disabled>
+          반려
+        </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- 반려 사유 입력 모달 -->
-<div id="rejectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-  <div class="bg-white p-6 rounded-lg w-96">
-    <h3 class="text-lg font-semibold mb-4">반려 사유 입력</h3>
-    <textarea id="rejectReason" class="w-full h-24 border border-gray-300 rounded p-2"
-              placeholder="반려 사유를 입력하세요..."></textarea>
-    <div class="mt-4 flex justify-end space-x-2">
-      <button id="cancelRejectBtn" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">
-        취소
-      </button>
-      <button id="confirmRejectBtn" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-        반려
-      </button>
+<!-- 반려 사유 모달 -->
+<div id="rejectModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+  <div class="flex items-center justify-center min-h-screen">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+      <h3 class="text-lg font-bold mb-4">반려 사유</h3>
+      <textarea id="rejectReason" class="w-full h-24 border border-gray-300 rounded px-3 py-2 text-sm"
+                placeholder="반려 사유를 입력하세요..."></textarea>
+      <div class="mt-4 flex space-x-2">
+        <button id="confirmReject" class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">
+          반려
+        </button>
+        <button id="cancelReject" class="flex-1 bg-gray-500 text-white py-2 rounded hover:bg-gray-600">
+          취소
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
   $(document).ready(function() {
-      // 수정: applyNo 대신 분리된 변수 사용
-      let currentApplyGeneralNo = null;
-      let currentApplyEtcNo = null;
-      let currentApplyType = null;
+      let selectedRow = null;
+      let selectedType = null;
+      let selectedNo = null;
 
-      // 탭 전환
+      // 현재 활성 탭 정보를 서버에서 가져오기
+      let currentActiveTab = '[[${activeTab}]]' || 'pending';
+
+      // 탭 전환 함수 개선
+      function switchTab(tabName) {
+          $('.tab-button').removeClass('text-white bg-red-500 bg-blue-500 bg-green-500').addClass('text-gray-500 bg-gray-200');
+          $('.document-panel').hide();
+
+          currentActiveTab = tabName;
+          $('#activeTabInput').val(tabName); // hidden 필드 업데이트
+
+          if (tabName === 'pending') {
+              $('#pendingTab').removeClass('text-gray-500 bg-gray-200').addClass('text-white bg-red-500');
+              $('#pendingPanel').show();
+              $('#approveBtn, #rejectBtn').prop('disabled', false);
+          } else if (tabName === 'approved') {
+              $('#approvedTab').removeClass('text-gray-500 bg-gray-200').addClass('text-white bg-blue-500');
+              $('#approvedPanel').show();
+              $('#approveBtn, #rejectBtn').prop('disabled', true);
+          } else if (tabName === 'rejected') {
+              $('#rejectedTab').removeClass('text-gray-500 bg-gray-200').addClass('text-white bg-green-500');
+              $('#rejectedPanel').show();
+              $('#approveBtn, #rejectBtn').prop('disabled', true);
+          }
+
+          // 선택 초기화
+          selectedRow = null;
+          selectedType = null;
+          selectedNo = null;
+          $('#detailContent').html('<p class="text-gray-500">문서를 선택하세요.</p>');
+      }
+
+      // 탭 클릭 이벤트
       $('.tab-button').click(function() {
-          $('.tab-button').removeClass('active bg-red-500 bg-green-500 text-white').addClass('bg-gray-300 text-gray-700');
-          $('.document-panel').addClass('hidden');
-
-          if ($(this).attr('id') === 'pendingTab') {
-              $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-red-500 text-white');
-              $('#pendingPanel').removeClass('hidden');
-          } else if ($(this).attr('id') === 'approvedTab') {
-              $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-green-500 text-white');
-              $('#approvedPanel').removeClass('hidden');
-          } else {
-              $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-red-500 text-white');
-              $('#rejectedPanel').removeClass('hidden');
-          }
-
-          $('#detailContent').html('<p class="text-gray-500">좌측에서 문서를 선택하세요.</p>');
-          $('#actionButtons').addClass('hidden');
-      });
-
-      // 문서 선택 - 수정: applyGeneralNo, applyEtcNo 분리 처리
-      $(document).on('click', '.document-item', function() {
-          $('.document-item').removeClass('bg-blue-100');
-          $(this).addClass('bg-blue-100');
-
-          // 수정: 신청 유형에 따라 다른 번호 설정
-          currentApplyType = $(this).data('apply-type');
-          if (currentApplyType === 'general') {
-              currentApplyGeneralNo = $(this).data('apply-general-no');
-              currentApplyEtcNo = null;
-          } else {
-              currentApplyEtcNo = $(this).data('apply-etc-no');
-              currentApplyGeneralNo = null;
-          }
-
-          loadDocumentDetail(currentApplyType === 'general' ? currentApplyGeneralNo : currentApplyEtcNo, currentApplyType);
-
-          // 결재할 문서에서만 버튼 표시
-          if ($('#pendingTab').hasClass('active')) {
-              $('#actionButtons').removeClass('hidden');
-          } else {
-              $('#actionButtons').addClass('hidden');
+          const tabId = this.id;
+          if (tabId === 'pendingTab') {
+              switchTab('pending');
+          } else if (tabId === 'approvedTab') {
+              switchTab('approved');
+          } else if (tabId === 'rejectedTab') {
+              switchTab('rejected');
           }
       });
 
-      // 승인 처리 - 수정: 신청 유형에 따라 다른 URL 호출
-      $('#approveBtn').click(function() {
-          if (!currentApplyGeneralNo && !currentApplyEtcNo) {
-              alert('선택된 문서가 없습니다.');
-              return;
+      // 페이지 로드 시 현재 활성 탭으로 설정
+      switchTab(currentActiveTab);
+
+      // 행 클릭 이벤트
+      $(document).on('click', '.table-row', function() {
+          selectedRow = $(this);
+          selectedType = $(this).data('type');
+          selectedNo = $(this).data('no');
+
+          $('.table-row').removeClass('selected');
+          $(this).addClass('selected');
+
+          loadDetail(selectedType, selectedNo);
+
+          // 결재할 문서 탭에서만 버튼 활성화
+          if (currentActiveTab === 'pending') {
+              $('#approveBtn, #rejectBtn').prop('disabled', false);
           }
+      });
 
-          if (confirm('승인하시겠습니까?')) {
-              let url, data;
+      // 상세 정보 로드
+      function loadDetail(type, no) {
+          $.get('/user/approval/detail/' + type + '/' + no)
+              .done(function(data) {
+                  if (data.error) {
+                      $('#detailContent').html('<p class="text-red-500">' + data.error + '</p>');
+                      return;
+                  }
 
-              if (currentApplyType === 'general') {
-                  url = '/user/approval/approve/general';
-                  data = { applyGeneralNo: currentApplyGeneralNo };
-              } else {
-                  url = '/user/approval/approve/etc';
-                  data = { applyEtcNo: currentApplyEtcNo };
-              }
-
-              $.ajax({
-                  url: url,
-                  method: 'POST',
-                  data: data,
-                  success: function(result) {
-                      if (result === 'success') {
-                          alert('승인되었습니다.');
-                          location.reload();
-                      } else {
-                          alert(result);
+                  let html = '';
+                  if (data.applyInfo) {
+                      html += '<div class="mb-4">';
+                      html += '<h4 class="font-bold mb-2">신청 정보</h4>';
+                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div><span class="font-medium">신청번호:</span> ' + (data.applyInfo.APPLY_GENERAL_NO || data.applyInfo.APPLY_ETC_NO) + '</div>';
+                      html += '<div><span class="font-medium">신청일자:</span> ' + data.applyInfo.APPLY_DATE + '</div>';
+                      if (data.applyInfo.TARGET_DATE) {
+                          html += '<div><span class="font-medium">근무일:</span> ' + data.applyInfo.TARGET_DATE + '</div>';
                       }
-                  },
-                  error: function() {
-                      alert('승인 처리에 실패했습니다.');
+                      if (data.applyInfo.WORK_TIME_RANGE) {
+                          html += '<div><span class="font-medium">시간:</span> ' + data.applyInfo.WORK_TIME_RANGE + '</div>';
+                      }
+                      if (data.applyInfo.REASON) {
+                          html += '<div><span class="font-medium">사유:</span> ' + data.applyInfo.REASON + '</div>';
+                      }
+                      html += '</div></div>';
                   }
+
+                  if (data.applicantInfo) {
+                      html += '<div class="mb-4">';
+                      html += '<h4 class="font-bold mb-2">상신자 정보</h4>';
+                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div><span class="font-medium">사번:</span> ' + data.applicantInfo.EMP_CODE + '</div>';
+                      html += '<div><span class="font-medium">성명:</span> ' + data.applicantInfo.EMP_NAME + '</div>';
+                      html += '<div><span class="font-medium">부서:</span> ' + data.applicantInfo.DEPT_NAME + '</div>';
+                      html += '<div><span class="font-medium">직책:</span> ' + data.applicantInfo.POSITION_NAME + '</div>';
+                      html += '</div></div>';
+                  }
+
+                  if (data.targetInfo) {
+                      html += '<div class="mb-4">';
+                      html += '<h4 class="font-bold mb-2">대상자 정보</h4>';
+                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div><span class="font-medium">사번:</span> ' + data.targetInfo.EMP_CODE + '</div>';
+                      html += '<div><span class="font-medium">성명:</span> ' + data.targetInfo.EMP_NAME + '</div>';
+                      html += '<div><span class="font-medium">부서:</span> ' + data.targetInfo.DEPT_NAME + '</div>';
+                      html += '<div><span class="font-medium">직책:</span> ' + data.targetInfo.POSITION_NAME + '</div>';
+                      html += '</div></div>';
+                  }
+
+                  if (data.approvalHistory && data.approvalHistory.length > 0) {
+                      html += '<div class="mb-4">';
+                      html += '<h4 class="font-bold mb-2">결재자 정보</h4>';
+                      html += '<div class="text-xs">';
+                      html += '<table class="w-full border border-gray-300">';
+                      html += '<thead class="bg-gray-100">';
+                      html += '<tr>';
+                      html += '<th class="border border-gray-300 px-1 py-1">순번</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">구분</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">부서</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">직책</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">이름</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">사번</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">결과</th>';
+                      html += '<th class="border border-gray-300 px-1 py-1">결재완료일</th>';
+                      html += '</tr>';
+                      html += '</thead>';
+                      html += '<tbody>';
+                      data.approvalHistory.forEach(function(history) {
+                          html += '<tr>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.ORDER_NUM + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.CATEGORY + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.DEPT_NAME + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.POSITION_NAME + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVER_NAME + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVER_CODE + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVAL_STATUS + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.APPROVAL_DATE || '-') + '</td>';
+                          html += '</tr>';
+                      });
+                      html += '</tbody>';
+                      html += '</table>';
+                      html += '</div></div>';
+                  }
+
+                  $('#detailContent').html(html);
+              })
+              .fail(function() {
+                  $('#detailContent').html('<p class="text-red-500">상세 정보 로드 실패</p>');
               });
-          }
-      });
+      }
 
-      // 반려 처리 - 수정: 신청 유형에 따라 다른 URL 호출
-      $('#rejectBtn').click(function() {
-          if (!currentApplyGeneralNo && !currentApplyEtcNo) {
-              alert('선택된 문서가 없습니다.');
-              return;
-          }
+      // 승인 처리 후 현재 탭 유지하면서 페이지 새로고침
+      $('#approveBtn').click(function() {
+          if (!selectedType || !selectedNo) return;
 
-          $('#rejectModal').removeClass('hidden');
-      });
-
-      $('#confirmRejectBtn').click(function() {
-          const rejectReason = $('#rejectReason').val().trim();
-          if (!rejectReason) {
-              alert('반려 사유를 입력해주세요.');
-              return;
-          }
-
-          let url, data;
-
-          if (currentApplyType === 'general') {
-              url = '/user/approval/reject/general';
-              data = {
-                  applyGeneralNo: currentApplyGeneralNo,
-                  rejectReason: rejectReason
-              };
-          } else {
-              url = '/user/approval/reject/etc';
-              data = {
-                  applyEtcNo: currentApplyEtcNo,
-                  rejectReason: rejectReason
-              };
-          }
-
-          $.ajax({
-              url: url,
-              method: 'POST',
-              data: data,
-              success: function(result) {
-                  if (result === 'success') {
-                      alert('반려되었습니다.');
-                      $('#rejectModal').addClass('hidden');
-                      $('#rejectReason').val('');
-                      location.reload();
-                  } else {
-                      alert(result);
-                  }
-              },
-              error: function() {
-                  alert('반려 처리에 실패했습니다.');
+          $.post('/user/approval/approve/' + selectedType, {
+              [selectedType === 'general' ? 'applyGeneralNo' : 'applyEtcNo']: selectedNo
+          })
+          .done(function(response) {
+              if (response === 'success') {
+                  alert('승인되었습니다.');
+                  // 승인 후 승인된 문서 탭으로 이동하면서 새로고침
+                  window.location.href = '/user/approval/?activeTab=approved&startDate=' +
+                                       $('input[name="startDate"]').val().replace(/-/g, '') +
+                                       '&endDate=' + $('input[name="endDate"]').val().replace(/-/g, '') +
+                                       '&empCode=' + $('input[name="empCode"]').val() +
+                                       '&applyType=' + $('select[name="applyType"]').val();
+              } else {
+                  alert(response);
               }
+          })
+          .fail(function() {
+              alert('승인 처리 중 오류가 발생했습니다.');
           });
       });
 
-      $('#cancelRejectBtn').click(function() {
+      // 반려 처리
+      $('#rejectBtn').click(function() {
+          if (!selectedType || !selectedNo) return;
+          $('#rejectModal').removeClass('hidden');
+      });
+
+      $('#confirmReject').click(function() {
+          const reason = $('#rejectReason').val().trim();
+          if (!reason) {
+              alert('반려 사유를 입력하세요.');
+              return;
+          }
+
+          $.post('/user/approval/reject/' + selectedType, {
+              [selectedType === 'general' ? 'applyGeneralNo' : 'applyEtcNo']: selectedNo,
+              rejectReason: reason
+          })
+          .done(function(response) {
+              if (response === 'success') {
+                  alert('반려되었습니다.');
+                  // 반려 후 반려된 문서 탭으로 이동하면서 새로고침
+                  window.location.href = '/user/approval/?activeTab=rejected&startDate=' +
+                                       $('input[name="startDate"]').val().replace(/-/g, '') +
+                                       '&endDate=' + $('input[name="endDate"]').val().replace(/-/g, '') +
+                                       '&empCode=' + $('input[name="empCode"]').val() +
+                                       '&applyType=' + $('select[name="applyType"]').val();
+              } else {
+                  alert(response);
+              }
+          })
+          .fail(function() {
+              alert('반려 처리 중 오류가 발생했습니다.');
+          });
+
           $('#rejectModal').addClass('hidden');
           $('#rejectReason').val('');
       });
 
-      // 문서 상세 정보 로드 - 수정: 신청 유형에 따라 다른 URL 호출
-      function loadDocumentDetail(applyNo, applyType) {
-          $('#detailContent').html(`
-              <div class="space-y-4">
-                  <div class="bg-gray-50 p-4 rounded">
-                      <h4 class="font-medium mb-2">신청 정보</h4>
-                      <p>신청번호: ${applyNo}</p>
-                      <p>신청유형: ${applyType}</p>
-                  </div>
-                  <div class="bg-gray-50 p-4 rounded">
-                      <h4 class="font-medium mb-2">결재 정보</h4>
-                      <div id="approvalHistory">로딩 중...</div>
-                  </div>
-              </div>
-          `);
+      $('#cancelReject').click(function() {
+          $('#rejectModal').addClass('hidden');
+          $('#rejectReason').val('');
+      });
 
-          // 결재 이력 로드 - 수정: 신청 유형에 따라 다른 URL 호출
-          const historyUrl = applyType === 'general'
-              ? `/user/approval/history/general/${applyNo}`
-              : `/user/approval/history/etc/${applyNo}`;
+      // 전체 선택/해제
+      $('#selectAll').change(function() {
+          $('.document-checkbox:visible').prop('checked', this.checked);
+      });
 
-          $.ajax({
-              url: historyUrl,
-              method: 'GET',
-              success: function(histories) {
-                  let historyHtml = '';
-                  histories.forEach(function(history) {
-                      historyHtml += `
-                          <div class="border-l-4 border-blue-500 pl-4 mb-2">
-                              <p class="font-medium">${history.approverCode}</p>
-                              <p class="text-sm text-gray-600">
-                                  ${history.approvalStatus || '대기중'}
-                                  ${history.approvalDate ? '- ' + history.approvalDate : ''}
-                              </p>
-                              ${history.rejectReason ? `<p class="text-sm text-red-600">반려사유: ${history.rejectReason}</p>` : ''}
-                          </div>
-                      `;
-                  });
-                  $('#approvalHistory').html(historyHtml || '결재 이력이 없습니다.');
-              }
+      // 일괄 승인
+      $('#bulkApproveBtn').click(function() {
+          const checkedItems = $('.document-checkbox:checked:visible');
+          if (checkedItems.length === 0) {
+              alert('승인할 문서를 선택하세요.');
+              return;
+          }
+
+          if (!confirm('선택한 ' + checkedItems.length + '건을 승인하시겠습니까?')) {
+              return;
+          }
+
+          let completed = 0;
+          let errors = [];
+
+          checkedItems.each(function() {
+              const type = $(this).data('type');
+              const no = $(this).val();
+
+              $.post('/user/approval/approve/' + type, {
+                  [type === 'general' ? 'applyGeneralNo' : 'applyEtcNo']: no
+              })
+              .done(function(response) {
+                  if (response !== 'success') {
+                      errors.push(no + ': ' + response);
+                  }
+              })
+              .fail(function() {
+                  errors.push(no + ': 처리 실패');
+              })
+              .always(function() {
+                  completed++;
+                  if (completed === checkedItems.length) {
+                      if (errors.length > 0) {
+                          alert('일부 문서 처리 실패:\n' + errors.join('\n'));
+                      } else {
+                          alert('모든 문서가 승인되었습니다.');
+                      }
+                      // 승인된 문서 탭으로 이동
+                      window.location.href = '/user/approval/?activeTab=approved&startDate=' +
+                                           $('input[name="startDate"]').val().replace(/-/g, '') +
+                                           '&endDate=' + $('input[name="endDate"]').val().replace(/-/g, '') +
+                                           '&empCode=' + $('input[name="empCode"]').val() +
+                                           '&applyType=' + $('select[name="applyType"]').val();
+                  }
+              });
           });
-      }
+      });
 
-      // 페이지 로드시 첫 번째 문서 자동 선택
-      if ($('.document-item').length > 0) {
-          $('.document-item').first().click();
-      }
+      // 일괄 반려
+      $('#bulkRejectBtn').click(function() {
+          const checkedItems = $('.document-checkbox:checked:visible');
+          if (checkedItems.length === 0) {
+              alert('반려할 문서를 선택하세요.');
+              return;
+          }
+
+          const reason = prompt('반려 사유를 입력하세요:');
+          if (!reason || !reason.trim()) {
+              return;
+          }
+
+          if (!confirm('선택한 ' + checkedItems.length + '건을 반려하시겠습니까?')) {
+              return;
+          }
+
+          let completed = 0;
+          let errors = [];
+
+          checkedItems.each(function() {
+              const type = $(this).data('type');
+              const no = $(this).val();
+
+              $.post('/user/approval/reject/' + type, {
+                  [type === 'general' ? 'applyGeneralNo' : 'applyEtcNo']: no,
+                  rejectReason: reason.trim()
+              })
+              .done(function(response) {
+                  if (response !== 'success') {
+                      errors.push(no + ': ' + response);
+                  }
+              })
+              .fail(function() {
+                  errors.push(no + ': 처리 실패');
+              })
+              .always(function() {
+                  completed++;
+                  if (completed === checkedItems.length) {
+                      if (errors.length > 0) {
+                          alert('일부 문서 처리 실패:\n' + errors.join('\n'));
+                      } else {
+                          alert('모든 문서가 반려되었습니다.');
+                      }
+                      // 반려된 문서 탭으로 이동
+                      window.location.href = '/user/approval/?activeTab=rejected&startDate=' +
+                                           $('input[name="startDate"]').val().replace(/-/g, '') +
+                                           '&endDate=' + $('input[name="endDate"]').val().replace(/-/g, '') +
+                                           '&empCode=' + $('input[name="empCode"]').val() +
+                                           '&applyType=' + $('select[name="applyType"]').val();
+                  }
+              });
+          });
+      });
   });
 </script>
 

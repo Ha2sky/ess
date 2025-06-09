@@ -100,6 +100,7 @@
           <th class="border border-gray-300 px-4 py-2">시작시간</th>
           <th class="border border-gray-300 px-4 py-2">종료시간</th>
           <th class="border border-gray-300 px-4 py-2">예상근로시간</th>
+          <th class="border border-gray-300 px-4 py-2">사유</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
           <th class="border border-gray-300 px-4 py-2">상신자</th>
         </tr>
@@ -180,6 +181,7 @@
           <th class="border border-gray-300 px-4 py-2">종료일</th>
           <th class="border border-gray-300 px-4 py-2">연차잔여</th>
           <th class="border border-gray-300 px-4 py-2">신청시각</th>
+          <th class="border border-gray-300 px-4 py-2">사유</th>
           <th class="border border-gray-300 px-4 py-2">상태</th>
           <th class="border border-gray-300 px-4 py-2">상신자</th>
         </tr>
@@ -281,7 +283,7 @@
           // 테이블 데이터 셀 숨기기/보이기
           $('#generalEmployeeTable .expected-hours').closest('td').toggleClass('hidden', isLeaveType);
 
-          // 테이블 헤더 숨기기/보이기 (11번째 컬럼)
+          // 테이블 헤더 숨기기/보이기
           $('#generalEmployeeTable thead th:eq(10)').toggleClass('hidden', isLeaveType);
       });
 
@@ -435,6 +437,9 @@
                               <span class="expected-hours">0.00</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
+                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력">
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
                               <span class="status-field">${status}</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
@@ -509,6 +514,9 @@
                                   <option value="1일이전신청">1일이전신청</option>
                                   <option value="당일신청">당일신청</option>
                               </select>
+                          </td>
+                          <td class="border border-gray-300 px-4 py-2">
+                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력">
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <span class="status-field">${status}</span>
@@ -635,6 +643,7 @@
                       if (data.endTime) {
                           row.find('.end-time').val(formatTimeDisplay(data.endTime));
                       }
+                      row.find('.reason-field').val(data.reason || '');
                       row.find('.status-field').text(data.status || '대기');
 
                       // 복원 후 예상근로시간 재계산
@@ -662,6 +671,7 @@
                           row.find('.end-date').val(formatDateDisplay(data.targetEndDate));
                       }
                       row.find('.apply-time').val(data.applyDateTime || '1일이전신청');
+                      row.find('.reason-field').val(data.reason || '');
                       row.find('.status-field').text(data.status || '대기');
                   }
               })
@@ -752,6 +762,7 @@
               const workSelect = row.find('.work-select').val();
               const startTime = row.find('.start-time').val().replace(':', '');
               const endTime = row.find('.end-time').val().replace(':', '');
+              const reason = row.find('.reason-field').val();
 
               const applyType = $('#generalApplyType').val();
               if (applyType !== '조퇴외출반차') {
@@ -768,7 +779,8 @@
                   targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
                   startTime: startTime,
                   endTime: endTime,
-                  applyType: workSelect
+                  applyType: workSelect,
+                  reason: reason
               };
 
               $.ajax({
@@ -809,6 +821,7 @@
               const startDate = row.find('.start-date').val().replace(/-/g, '');
               const endDate = row.find('.end-date').val().replace(/-/g, '');
               const applyDateTime = row.find('.apply-time').val();
+              const reason = row.find('.reason-field').val();
 
               if (!shiftCode || !startDate || !endDate) {
                   alert('필수 항목을 모두 입력해주세요.');
@@ -833,7 +846,7 @@
                   targetStartDate: startDate,
                   targetEndDate: endDate,
                   applyDateTime: applyDateTime,
-                  reason: '근태변경'
+                  reason: reason
               };
 
               $.ajax({

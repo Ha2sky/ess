@@ -14,4 +14,8 @@ public class AttendanceApplyEtc {
     private String status;          // 신청상태
     private String deptCode;        // 부서코드
     private String applicantCode;   // 신청자 사원 코드
+    private String empName;
+    private String deptName;
+    private String applicantName;
+    private String shiftName;
 }
