@@ -18,8 +18,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmpAttService {
@@ -94,12 +97,20 @@ public class EmpAttService {
 
                 // 결근이 아닐때
                 if (shift != null && !Objects.equals(shift.getShiftCode(), "00")) {
+                    List<Pair<String, String>> leavePeriods = new ArrayList<>();
+                    List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, ymd, "승인완료");
+                    for (String timeItemName : timeItemNames) {
+                        AttendanceApplyGeneral attendanceApplyGeneral = attendanceApplyMapper.findStartTimeAndEndTime(empCode, ymd, "승인완료", timeItemName);
+                        leavePeriods.add(Pair.of(attendanceApplyGeneral.getStartTime(), attendanceApplyGeneral.getEndTime()));
+                    }
                     workHours = workHours.plus(WorkHoursCalculator.getRealWorkTime(
                             attRecord.getCheckInTime(),
                             attRecord.getCheckOutTime(),
                             shift,
-                            date));
+                            date,
+                            leavePeriods));
                 }
+
             // 실적이 없고 미래일 경우: EmpCalendar에서 SHIFT_CODE로 예측
             } else if (!date.isBefore(LocalDate.now())) {
                 String shiftCode = empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd);
@@ -127,24 +138,14 @@ public class EmpAttService {
         for (Employee emp : empList) {
             String empCode = emp.getEmpCode();
 
-            // 1. 주간 근무시간 및 잔여시간 계산
-            String weeklyHours = getWorkHoursForWeek(empCode, weekStart, weekEnd);
-            emp.setWorkHours(weeklyHours);
-            try {
-                double remain = 52.00 - Double.parseDouble(weeklyHours);
-                emp.setRemainWorkHours(String.format("%05.2f", remain));
-            } catch (NumberFormatException e) {
-                emp.setRemainWorkHours("00.00");
-            }
-
-            // 2. 출퇴근 정보 조회
+            // 1. 출퇴근 정보 조회
             AttendanceRecord att = attRecordMapper.getAttRecordByEmpCode(empCode, workYmd);
             String checkInStr = att != null && att.getCheckInTime() != null ? att.getCheckInTime() : "-";
             String checkOutStr = att != null && att.getCheckOutTime() != null ? att.getCheckOutTime() : "-";
             emp.setCheckInTime(checkInStr);
             emp.setCheckOutTime(checkOutStr);
 
-            // 3. 근무 계획/실적 조회
+            // 2. 근무 계획/실적 조회
             EmpCalendar cal = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workYmd);
             emp.setShiftCodeOrig(cal != null ? cal.getShiftCodeOrig() : null);
 
@@ -202,23 +203,31 @@ public class EmpAttService {
                         // 출근 기록 존재 && 지각
                         if (checkInDateTime != null && checkInDateTime.isAfter(workOnDateTime)) {
                             emp.setTimeItemCode("3050");
-                            emp.setTimeItemName("지각");
+                            emp.setTimeItemNames(List.of("지각"));
                         }
                         emp.setShiftCode(cal.getShiftCode());
                     }
                 }
             }
 
-            // 4. 근무코드명 매핑
+            // 3. 근무코드명 매핑
             emp.setShiftOrigName(shiftMasterMapper.findShiftNameByShiftCode(emp.getShiftCodeOrig()));
             emp.setShiftName(shiftMasterMapper.findShiftNameByShiftCode(emp.getShiftCode()));
 
-            // 5. 가근태 조회
-            String timeItemName = attendanceApplyMapper.findApprovedTimeItemCode(empCode, workYmd, "승인완료");
-            if (Objects.equals(timeItemName, "조퇴") || Objects.equals(timeItemName, "외출") ||
-                Objects.equals(timeItemName, "전반차") || Objects.equals(timeItemName, "후반차")) {
+            // 4. 가근태 조회
+            List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, workYmd, "승인완료");
+            if (!timeItemNames.isEmpty()) {
+                emp.setTimeItemNames(timeItemNames); // 예: "조퇴, 외출"
+            }
 
-                emp.setTimeItemName(timeItemName);
+            // 5. 주간 근무시간 및 잔여시간 계산
+            String weeklyHours = getWorkHoursForWeek(empCode, weekStart, weekEnd);
+            emp.setWorkHours(weeklyHours);
+            try {
+                double remain = 52.00 - Double.parseDouble(weeklyHours);
+                emp.setRemainWorkHours(String.format("%05.2f", remain));
+            } catch (NumberFormatException e) {
+                emp.setRemainWorkHours("00.00");
             }
         }
 

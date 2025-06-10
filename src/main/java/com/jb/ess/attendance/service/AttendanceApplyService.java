@@ -15,8 +15,10 @@ import com.jb.ess.common.mapper.AttRecordMapper;
 import com.jb.ess.common.mapper.EmpCalendarMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.util.WorkHoursCalculator;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -235,11 +237,18 @@ public class AttendanceApplyService {
 
                         if (attRecord != null && attRecord.getCheckInTime() != null) {
                             // apply.txt: "출근 시각이 존재하면 계획 그대로의 값"
+                            List<Pair<String, String>> leavePeriods = new ArrayList<>();
+                            List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, workDate, "승인완료");
+                            for (String timeItemName : timeItemNames) {
+                                AttendanceApplyGeneral attendanceApplyGeneral = attendanceApplyMapper.findStartTimeAndEndTime(empCode, workDate, "승인완료", timeItemName);
+                                leavePeriods.add(Pair.of(attendanceApplyGeneral.getStartTime(), attendanceApplyGeneral.getEndTime()));
+                            }
                             dailyHours = WorkHoursCalculator.getRealWorkTime(
                                     attRecord.getCheckInTime(),
                                     attRecord.getCheckOutTime(),
                                     shift,
-                                    targetDate
+                                    targetDate,
+                                    leavePeriods
                             );
                             log.debug("실적 기반 시간: date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
                         } else {

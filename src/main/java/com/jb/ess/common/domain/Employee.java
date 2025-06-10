@@ -2,6 +2,7 @@ package com.jb.ess.common.domain;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -46,7 +47,7 @@ public class Employee implements Serializable {
 
     private String shiftOrigName;   // 계획근태명
     private String shiftName;       // 실적근태명
-    private String timeItemName;    // 가근태명
+    private List<String> timeItemNames; // 가근태명
 
     private String applyGeneralNo;      // 일반근태 신청번호
     private String generalApplyStatus;  // 일반근태 신청상태

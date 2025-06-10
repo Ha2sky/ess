@@ -302,8 +302,24 @@ public interface AttendanceApplyMapper {
         WHERE EMP_CODE = #{empCode}
         AND TARGET_DATE = #{workYmd}
         AND STATUS = #{status}
+        AND APPLY_TYPE IN ('조퇴', '외출', '전반차', '후반차')
     """)
-    String findApprovedTimeItemCode(@Param("empCode") String empCode,
-                                    @Param("workYmd") String workYmd,
-                                    @Param("status") String status);
+    // 승인된 가근태 찾기
+    List<String> findApprovedTimeItemCode(@Param("empCode") String empCode,
+                                          @Param("workYmd") String workYmd,
+                                          @Param("status") String status);
+
+    @Select("""
+        SELECT START_TIME, END_TIME
+        FROM HRTATTAPLGENERAL
+        WHERE EMP_CODE = #{empCode}
+        AND TARGET_DATE = #{workYmd}
+        AND STATUS = #{status}
+        AND APPLY_TYPE = #{applyType}
+    """)
+    // 승인된 가근태 시작시간, 종료시간 찾기
+    AttendanceApplyGeneral findStartTimeAndEndTime(@Param("empCode") String empCode,
+                                                   @Param("targetDate") String targetDate,
+                                                   @Param("status") String status,
+                                                   @Param("applyType") String applyType);
 }
