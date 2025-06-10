@@ -26,7 +26,7 @@ public interface AttendanceApplyMapper {
     // 하위부서 조회
     @Select("""
         SELECT DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER, DEPT_CATEGORY
-        FROM ORGDEPTMASTER 
+        FROM ORGDEPTMASTER
         WHERE PARENT_DEPT = #{parentDeptCode} OR DEPT_CODE = #{parentDeptCode}
         ORDER BY DEPT_CODE
     """)
@@ -295,4 +295,15 @@ public interface AttendanceApplyMapper {
     // 기타근태 신청 삭제
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
+
+    @Select("""
+        SELECT APPLY_TYPE
+        FROM HRTATTAPLGENERAL
+        WHERE EMP_CODE = #{empCode}
+        AND TARGET_DATE = #{workYmd}
+        AND STATUS = #{status}
+    """)
+    String findApprovedTimeItemCode(@Param("empCode") String empCode,
+                                    @Param("workYmd") String workYmd,
+                                    @Param("status") String status);
 }

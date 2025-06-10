@@ -2,6 +2,7 @@ package com.jb.ess.attendance.service;
 
 import com.jb.ess.common.domain.*;
 import com.jb.ess.common.mapper.AttRecordMapper;
+import com.jb.ess.common.mapper.AttendanceApplyMapper;
 import com.jb.ess.common.mapper.EmpAttendanceMapper;
 import com.jb.ess.common.mapper.DepartmentMapper;
 import com.jb.ess.common.mapper.EmpCalendarMapper;
@@ -28,10 +29,11 @@ public class EmpAttService {
     private final EmpCalendarMapper empCalendarMapper;
     private final ShiftMasterMapper shiftMasterMapper;
     private final AttRecordMapper attRecordMapper;
+    private final AttendanceApplyMapper attendanceApplyMapper;
 
     /* 사원 정보 및 실적 리스트 */
     public List<Employee> empAttendanceList(String deptCode, String workDate, String planType) {
-        if (Objects.equals(planType, "")) {
+        if (!(planType == null || planType.isEmpty())) {
             return empAttendanceMapper.getEmpAttendanceByDeptCodeAndWorkDateAndPlanType(deptCode, workDate, planType);
         } else {
             return empAttendanceMapper.getEmpAttendanceByDeptCodeAndWorkDate(deptCode, workDate);
@@ -40,7 +42,7 @@ public class EmpAttService {
 
     /* 사원 정보 및 실적 */
     public List<Employee> empAttendance(String empCode, String workDate, String planType) {
-        if (Objects.equals(planType, "")) {
+        if (!(planType == null || planType.isEmpty())) {
             return empAttendanceMapper.getEmpAttendanceByEmpCodeAndWorkDateAndPlanType(empCode, workDate, planType);
         } else {
             return empAttendanceMapper.getEmpAttendanceByEmpCodeAndWorkDate(empCode, workDate);
@@ -137,8 +139,8 @@ public class EmpAttService {
 
             // 2. 출퇴근 정보 조회
             AttendanceRecord att = attRecordMapper.getAttRecordByEmpCode(empCode, workYmd);
-            String checkInStr = att != null ? att.getCheckInTime() : "-";
-            String checkOutStr = att != null ? att.getCheckOutTime() : "-";
+            String checkInStr = att != null && att.getCheckInTime() != null ? att.getCheckInTime() : "-";
+            String checkOutStr = att != null && att.getCheckOutTime() != null ? att.getCheckOutTime() : "-";
             emp.setCheckInTime(checkInStr);
             emp.setCheckOutTime(checkOutStr);
 
@@ -153,12 +155,9 @@ public class EmpAttService {
             } else {
                 // 실근무일인 경우
                 String workOn = shiftMasterMapper.findWorkOnHourByShiftCode(cal.getShiftCode());
-                String workOff = shiftMasterMapper.findWorkOffHourByShiftCode(cal.getShiftCode());
 
                 LocalTime parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
-                LocalTime parsedWorkOffTime = LocalTime.parse(workOff, timeFormatter);
                 LocalDateTime workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
-                LocalDateTime workOffDateTime = LocalDateTime.of(workLocalDate, parsedWorkOffTime);
 
                 // 출퇴근 시간 파싱
                 LocalDateTime checkInDateTime = null;
@@ -191,8 +190,8 @@ public class EmpAttService {
                 } else {
                     // 출퇴근 기록 없음
                     if (checkInDateTime == null && checkOutDateTime == null) {
-                        if (nowDateTime.isAfter(workOffDateTime)) {
-                            // 퇴근 지났는데 기록 없으면 결근 처리
+                        if (nowDateTime.isAfter(workOnDateTime)) {
+                            // 출근 지났는데 기록 없으면 결근 처리
                             emp.setShiftCode("00");
                             empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, "00");
                             if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd);
@@ -200,7 +199,11 @@ public class EmpAttService {
                             emp.setShiftCode(null);
                         }
                     } else {
-                        // 출근 기록 존재
+                        // 출근 기록 존재 && 지각
+                        if (checkInDateTime != null && checkInDateTime.isAfter(workOnDateTime)) {
+                            emp.setTimeItemCode("3050");
+                            emp.setTimeItemName("지각");
+                        }
                         emp.setShiftCode(cal.getShiftCode());
                     }
                 }
@@ -209,6 +212,14 @@ public class EmpAttService {
             // 4. 근무코드명 매핑
             emp.setShiftOrigName(shiftMasterMapper.findShiftNameByShiftCode(emp.getShiftCodeOrig()));
             emp.setShiftName(shiftMasterMapper.findShiftNameByShiftCode(emp.getShiftCode()));
+
+            // 5. 가근태 조회
+            String timeItemName = attendanceApplyMapper.findApprovedTimeItemCode(empCode, workYmd, "승인완료");
+            if (Objects.equals(timeItemName, "조퇴") || Objects.equals(timeItemName, "외출") ||
+                Objects.equals(timeItemName, "전반차") || Objects.equals(timeItemName, "후반차")) {
+
+                emp.setTimeItemName(timeItemName);
+            }
         }
 
         return empList;

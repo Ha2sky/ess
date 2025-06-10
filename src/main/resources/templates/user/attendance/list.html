@@ -102,7 +102,8 @@
       <td class="border px-2 py-1"
           th:text="(${emp.shiftOrigName} ?: '-') + '/' + (${emp.shiftName} ?: '-')">
       </td>
-      <td class="border px-2 py-1">(임시)</td>
+      <td class="border px-2 py-1"
+          th:text="(${emp.timeItemName} ?: '-')"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>
       <td class="border px-2 py-1">0.00 (임시)</td>

@@ -42,12 +42,14 @@ public class Employee implements Serializable {
     private String shiftCode;       // 근태코드
     private String shiftCodeOrig;   // 근태코드 변경전
     private String holidayYn;       // 휴일여부
+    private String timeItemCode;    // 가근태코드(TIME_ITEM_CODE)
 
     private String shiftOrigName;   // 계획근태명
     private String shiftName;       // 실적근태명
+    private String timeItemName;    // 가근태명
 
-    private String applyGeneralNo;    // 일반근태 신청번호
-    private String generalApplyStatus; // 일반근태 신청상태
-    private String applyEtcNo;        // 기타근태 신청번호
-    private String etcApplyStatus;    // 기타근태 신청상태
+    private String applyGeneralNo;      // 일반근태 신청번호
+    private String generalApplyStatus;  // 일반근태 신청상태
+    private String applyEtcNo;          // 기타근태 신청번호
+    private String etcApplyStatus;      // 기타근태 신청상태
 }

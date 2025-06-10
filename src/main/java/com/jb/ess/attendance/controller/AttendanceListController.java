@@ -84,6 +84,7 @@ public class AttendanceListController {
         model.addAttribute("empCode", empCode);
         model.addAttribute("deptCode", deptCode);
         model.addAttribute("employees", empList);
+        model.addAttribute("planType", planType);
         // 계획/실적
         model.addAttribute("shiftList", empCalendarMapper.getShiftCodeByDeptCodeAndWorkDate(deptCode, workDateStr));
         // 로그인한 사원 부서 + 하위부서 목록을 세션에서 꺼내거나 최초 생성
