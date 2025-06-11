@@ -69,7 +69,7 @@ public interface ApprovalMapper {
                                                      @Param("endDate") String endDate,
                                                      @Param("empCode") String empCode);
 
-    // 승인된 일반근태 문서 조회
+    // 수정: 승인된 일반근태 문서 조회 - 부서장 자동승인 문서도 포함
     @Select("""
         <script>
         SELECT g.APPLY_GENERAL_NO, g.EMP_CODE, g.TIME_ITEM_CODE, g.APPLY_DATE, 
@@ -80,11 +80,23 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER h ON g.EMP_CODE = h.EMP_CODE
         LEFT JOIN HRIMASTER applicant ON g.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON g.DEPT_CODE = d.DEPT_CODE
-        LEFT JOIN HRTAPRHIST hist ON g.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
         WHERE g.STATUS = '승인완료'
-          AND hist.APPROVER_CODE = #{approverCode}
-          AND hist.APPROVAL_STATUS = '승인'
           AND g.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
+          AND (
+            -- 일반 결재 승인 문서
+            EXISTS (
+              SELECT 1 FROM HRTAPRHIST hist 
+              WHERE g.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
+                AND hist.APPROVER_CODE = #{approverCode}
+                AND hist.APPROVAL_STATUS = '승인'
+            )
+            OR
+            -- 부서장 자동승인 문서 (결재이력이 없는 경우)
+            (g.APPLICANT_CODE = #{approverCode} AND NOT EXISTS (
+              SELECT 1 FROM HRTAPRHIST hist2 
+              WHERE g.APPLY_GENERAL_NO = hist2.APPLY_GENERAL_NO
+            ))
+          )
           <if test="applyType != null and applyType != ''">
             AND g.APPLY_TYPE = #{applyType}
           </if>
@@ -100,7 +112,7 @@ public interface ApprovalMapper {
                                                               @Param("applyType") String applyType,
                                                               @Param("empCode") String empCode);
 
-    // 승인된 기타근태 문서 조회
+    // 수정: 승인된 기타근태 문서 조회 - 부서장 자동승인 문서도 포함
     @Select("""
         <script>
         SELECT e.APPLY_ETC_NO, e.EMP_CODE, e.SHIFT_CODE, e.APPLY_DATE,
@@ -113,11 +125,23 @@ public interface ApprovalMapper {
         LEFT JOIN HRIMASTER applicant ON e.APPLICANT_CODE = applicant.EMP_CODE
         LEFT JOIN ORGDEPTMASTER d ON e.DEPT_CODE = d.DEPT_CODE
         LEFT JOIN HRTSHIFTMASTER s ON e.SHIFT_CODE = s.SHIFT_CODE
-        LEFT JOIN HRTAPRHIST hist ON e.APPLY_ETC_NO = hist.APPLY_ETC_NO
         WHERE e.STATUS = '승인완료'
-          AND hist.APPROVER_CODE = #{approverCode}
-          AND hist.APPROVAL_STATUS = '승인'
           AND e.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
+          AND (
+            -- 일반 결재 승인 문서
+            EXISTS (
+              SELECT 1 FROM HRTAPRHIST hist 
+              WHERE e.APPLY_ETC_NO = hist.APPLY_ETC_NO
+                AND hist.APPROVER_CODE = #{approverCode}
+                AND hist.APPROVAL_STATUS = '승인'
+            )
+            OR
+            -- 부서장 자동승인 문서 (결재이력이 없는 경우)
+            (e.APPLICANT_CODE = #{approverCode} AND NOT EXISTS (
+              SELECT 1 FROM HRTAPRHIST hist2 
+              WHERE e.APPLY_ETC_NO = hist2.APPLY_ETC_NO
+            ))
+          )
           <if test="empCode != null and empCode != ''">
             AND e.EMP_CODE = #{empCode}
           </if>

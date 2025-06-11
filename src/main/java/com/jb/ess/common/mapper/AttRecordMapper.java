@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import java.util.Map;
 
 @Mapper
 public interface AttRecordMapper {
@@ -25,4 +26,14 @@ public interface AttRecordMapper {
     """)
     void insertAttRecord(@Param("empCode") String empCode,
                          @Param("workDate") String workDate);
+
+    // 수정: 근태기 정보 조회를 위한 메서드 추가
+    @Select("""
+        SELECT CHECK_IN_TIME, CHECK_OUT_TIME, WORK_DATE
+        FROM HRTATTRECORD
+        WHERE EMP_CODE = #{empCode}
+        AND WORK_DATE = #{workDate}
+    """)
+    Map<String, Object> getAttendanceRecordInfo(@Param("empCode") String empCode,
+                                                @Param("workDate") String workDate);
 }

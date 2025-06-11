@@ -43,8 +43,18 @@ public interface DepartmentMapper {
                 pattern.WORK_PATTERN_NAME
             ORDER BY d.DEPT_CODE
     """)
-    // 부서 리스트
+        // 부서 리스트
     List<Department> findAll();
+
+    // 수정: 전체 부서 구조 조회를 위한 메서드 추가 (하위부서 재귀 검색용)
+    @Select("""
+        SELECT DEPT_CODE, DEPT_NAME, DEPT_CATEGORY, PARENT_DEPT, USE_YN, 
+               START_DATE, END_DATE, DEPT_LEADER, WORK_PATTERN_CODE
+        FROM ORGDEPTMASTER
+        WHERE USE_YN = 'Y'
+        ORDER BY DEPT_CODE
+    """)
+    List<Department> findAllDepartments();
 
     @Insert("""
         INSERT INTO ORGDEPTMASTER (DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER,
@@ -52,7 +62,7 @@ public interface DepartmentMapper {
         VALUES (#{deptCode}, #{deptName}, #{parentDept}, #{deptLeader},
                 #{deptCategory}, #{startDate}, #{endDate}, #{useYn}, #{workPatternCode})
     """)
-    // 부서 생성
+        // 부서 생성
     void insertDepartment(Department department);
 
     @Update("""
@@ -62,7 +72,7 @@ public interface DepartmentMapper {
             USE_YN = #{dept.useYn}, DEPT_CATEGORY = #{dept.deptCategory}, WORK_PATTERN_CODE = #{dept.workPatternCode}
         WHERE DEPT_CODE = #{originalDeptCode}
     """)
-    // 부서 수정
+        // 부서 수정
     void updateDepartment(@Param("dept") Department department,
                           @Param("originalDeptCode") String originalDeptCode);
 
@@ -71,22 +81,22 @@ public interface DepartmentMapper {
         FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
-    // 부서 코드로 부서 찾기
+        // 부서 코드로 부서 찾기
     Department findByDeptCode(String deptCode);
 
     @Select("SELECT COUNT(*) FROM ORGDEPTMASTER WHERE DEPT_CODE = #{deptCode}")
-    // 부서에 소속된 인원수
+        // 부서에 소속된 인원수
     int countByDeptCode(String deptCode);
 
     @Delete("""
         DELETE FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
-    // 부서 삭제
+        // 부서 삭제
     void deleteDepartment(String deptCode);
 
     @Update("UPDATE ORGDEPTMASTER SET DEPT_LEADER = #{empCode} WHERE DEPT_CODE = #{deptCode}")
-    // 부서장 변경
+        // 부서장 변경
     void updateDeptLeader(@Param("deptCode") String deptCode, @Param("empCode") String empCode);
 
     // 현재 부서장의 사번 조회
@@ -102,7 +112,7 @@ public interface DepartmentMapper {
         FROM ORGDEPTMASTER
         WHERE WORK_PATTERN_CODE = #{workPatternCode}
     """)
-    // workPatternCode를 사용중인 부서코드 리스트
+        // workPatternCode를 사용중인 부서코드 리스트
     List<String> findDeptCodesByWorkPatternCode(@Param("workPatternCode") String workPatternCode);
 
     @Select("""
@@ -110,6 +120,6 @@ public interface DepartmentMapper {
         FROM ORGDEPTMASTER
         WHERE DEPT_CODE = #{deptCode}
     """)
-    /* deptCode가 사용중인 workPatternCode 반환 */
+        /* deptCode가 사용중인 workPatternCode 반환 */
     String findWorkPatternCodeByDeptCode(String deptCode);
 }

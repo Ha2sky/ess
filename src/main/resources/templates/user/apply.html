@@ -47,6 +47,13 @@
             <option value="조퇴외출반차">조퇴/외출/반차</option>
           </select>
         </div>
+        <!-- 수정: 신청근무 드롭다운 추가 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700">신청근무</label>
+          <select id="generalWorkTypeFilter" class="mt-1 block w-full border border-gray-300 rounded p-2">
+            <option value="">전체</option>
+          </select>
+        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700">근무일</label>
           <input type="date" id="generalWorkDate" class="mt-1 block w-full border border-gray-300 rounded p-2"
@@ -62,10 +69,10 @@
                     th:if="${dept.deptCode != currentEmp.deptCode}"
                     th:value="${dept.deptCode}"
                     th:text="${dept.deptName}"
-                    ></option>
+            ></option>
           </select>
         </div>
-        <div class="flex items-end space-x-2 col-span-3">
+        <div class="flex items-end space-x-2 col-span-2">
           <button id="searchGeneralBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
             조회
           </button>
@@ -116,6 +123,7 @@
   <!-- 기타근태 신청 탭 -->
   <div id="etcPanel" class="tab-panel p-6 hidden">
     <h2 class="text-xl font-semibold mb-4">기타근태 신청 (근태 변경)</h2>
+
     <!-- 검색 조건 -->
     <div class="bg-gray-50 p-4 rounded mb-6">
       <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -211,6 +219,8 @@
       };
 
       let shiftMasters = [];
+      // 수정: 기타근태 조회 중복 방지를 위한 플래그
+      let isEtcSearching = false;
 
       // 신청근무 옵션 정의
       const workTypeOptions = {
@@ -290,10 +300,16 @@
       $('#cancelGeneralBtn').click(cancelGeneralApply);
       $('#cancelEtcBtn').click(cancelEtcApply);
 
-      // 근태신청종류 변경 시 신청근무 옵션 업데이트
+      // 수정: 근태신청종류 변경 시 테이블 초기화 및 신청근무 옵션 업데이트
       $('#generalApplyType').change(function() {
           const selectedType = $(this).val();
+
+          // 수정: 근태신청종류 변경 시 테이블 초기화
+          $('#generalEmployeeBody').empty();
+
           updateWorkTypeOptions(selectedType);
+          // 수정: 신청근무 필터 옵션도 업데이트
+          updateWorkTypeFilter(selectedType);
 
           const isLeaveType = selectedType === '조퇴외출반차';
 
@@ -302,6 +318,16 @@
 
           // 테이블 헤더 숨기기/보이기
           $('#generalEmployeeTable thead th:eq(10)').toggleClass('hidden', isLeaveType);
+
+          // 수정: 근태신청종류 변경 후 자동으로 다시 조회
+          setTimeout(function() {
+              searchGeneralEmployees();
+          }, 100);
+      });
+
+      // 수정: 신청근무 필터 변경 시 테이블 필터링
+      $('#generalWorkTypeFilter').change(function() {
+          filterGeneralEmployeesByWorkType();
       });
 
       // 근태 마스터 로드 함수
@@ -335,10 +361,46 @@
           });
       }
 
-      // 일반근태 사원 조회
+      // 수정: 신청근무 필터 업데이트 함수
+      function updateWorkTypeFilter(applyType) {
+          const options = workTypeOptions[applyType] || [];
+          const filterSelect = $('#generalWorkTypeFilter');
+          const currentValue = filterSelect.val();
+
+          filterSelect.empty();
+          filterSelect.append('<option value="">전체</option>');
+
+          options.forEach(function(option) {
+              filterSelect.append(`<option value="${option.value}">${option.text}</option>`);
+          });
+
+          // 이전 선택값이 새 옵션에 있으면 유지
+          if (options.some(opt => opt.value === currentValue)) {
+              filterSelect.val(currentValue);
+          }
+      }
+
+      // 수정: 신청근무 필터링 함수
+      function filterGeneralEmployeesByWorkType() {
+          const filterValue = $('#generalWorkTypeFilter').val();
+
+          $('#generalEmployeeTable tbody tr').each(function() {
+              const workSelect = $(this).find('.work-select');
+              const workValue = workSelect.val();
+
+              if (!filterValue || workValue === filterValue) {
+                  $(this).show();
+              } else {
+                  $(this).hide();
+              }
+          });
+      }
+
+      // 수정: 일반근태 사원 조회 - 근태신청종류별 필터링 추가
       function searchGeneralEmployees() {
           const deptCode = $('#generalDeptSelect').val();
           const workDate = $('#generalWorkDate').val();
+          const applyTypeCategory = $('#generalApplyType').val(); // 수정: 근태신청종류 추가
 
           if (!deptCode) {
               console.error('부서코드가 선택되지 않았습니다.');
@@ -354,11 +416,14 @@
 
           const formattedWorkDate = workDate.replace(/-/g, '');
 
-          console.log('사원 조회 요청:', { deptCode, workDate: formattedWorkDate });
+          console.log('사원 조회 요청:', { deptCode, workDate: formattedWorkDate, applyTypeCategory });
 
+          // 수정: 근태신청종류별 필터링 파라미터 추가
           $.get('/user/apply/employees', {
               deptCode: deptCode,
-              workDate: formattedWorkDate
+              workDate: formattedWorkDate,
+              sortBy: 'position,empCode,empName',
+              applyTypeCategory: applyTypeCategory // 수정: 근태신청종류별 필터링
           })
           .done(function(employees) {
               console.log('사원 조회 성공:', employees);
@@ -373,26 +438,38 @@
 
       // 기타근태 사원 조회
       function searchEtcEmployees() {
+          // 수정: 중복 조회 방지
+          if (isEtcSearching) {
+              console.log('이미 조회 중입니다.');
+              return;
+          }
+
+          isEtcSearching = true;
+
           const deptCode = $('#etcDeptSelect').val();
           const workDate = $('#etcWorkDate').val();
           const workPlan = $('#etcWorkPlan').val();
 
           if (!deptCode) {
               alert('부서를 선택해주세요.');
+              isEtcSearching = false;
               return;
           }
 
           if (!workDate) {
               alert('근무일을 선택해주세요.');
+              isEtcSearching = false;
               return;
           }
 
           const formattedWorkDate = workDate.replace(/-/g, '');
 
+          // 수정: 정렬 파라미터 추가 (직위, 사번, 이름 순)
           $.get('/user/apply/employees', {
               deptCode: deptCode,
               workDate: formattedWorkDate,
-              workPlan: workPlan
+              workPlan: workPlan,
+              sortBy: 'position,empCode,empName'
           })
           .done(function(employees) {
               displayEtcEmployees(employees);
@@ -400,6 +477,10 @@
           .fail(function(xhr, status, error) {
               console.error('사원 조회 실패:', { xhr, status, error });
               alert('사원 조회에 실패했습니다: ' + (xhr.responseText || error));
+          })
+          .always(function() {
+              // 수정: 조회 완료 후 플래그 해제
+              isEtcSearching = false;
           });
       }
 
@@ -421,15 +502,26 @@
                       workSelectHtml += `<option value="${option.value}">${option.text}</option>`;
                   });
 
-                  // 실제 신청번호와 상태 사용
+                  // 수정: 현재 근태신청종류에 해당하는 신청 상태만 표시
                   const applyNo = emp.applyGeneralNo || '';
                   const status = emp.generalApplyStatus || '대기';
 
                   // 실적
                   let recordDisplay = workInfo.record.shiftName || '-';
 
+                  // 수정: 미래 날짜의 경우 결근 체크 로직 개선
+                  const workDate = $('#generalWorkDate').val().replace(/-/g, '');
+                  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                  const isFutureDate = workDate > today;
+
+                  let isAbsent = false;
+                  if (!isFutureDate) {
+                      // 과거/현재 날짜만 결근 체크
+                      isAbsent = workInfo.record.shiftCode === '00' || workInfo.record.shiftName === '결근';
+                  }
+
                   const row = `
-                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}">
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="checkbox" class="emp-checkbox">
                           </td>
@@ -438,23 +530,23 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2">${recordDisplay}</td>
+                          <td class="border border-gray-300 px-4 py-2 ${isAbsent ? 'text-red-500 font-bold' : ''}">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <select class="work-select w-full border rounded px-2 py-1">
+                              <select class="work-select w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                                   ${workSelectHtml}
                               </select>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="time" class="start-time w-full border rounded px-2 py-1">
+                              <input type="time" class="start-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="time" class="end-time w-full border rounded px-2 py-1">
+                              <input type="time" class="end-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2 ${isLeaveType ? 'hidden' : ''}">
                               <span class="expected-hours">0.00</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력">
+                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <span class="status-field">${status}</span>
@@ -466,15 +558,20 @@
                   `;
                   tbody.append(row);
 
-                  // 기존 신청 데이터가 있으면 복원
+                  // 수정: 현재 근태신청종류와 매치되는 신청 데이터만 복원
                   if (applyNo) {
-                      loadSavedGeneralData(applyNo, tbody.find('tr:last'));
+                      loadSavedGeneralData(applyNo, tbody.find('tr:last'), applyType);
                   }
 
                   // 시간 변경 시 예상근로시간 자동 계산 이벤트 핸들러
                   const currentRow = tbody.find('tr:last');
                   currentRow.find('.start-time, .end-time').on('change', function() {
                       calculateExpectedHours(currentRow, emp.empCode);
+                  });
+
+                  // 수정: 신청근무 변경 시 시간 제한 검증
+                  currentRow.find('.work-select').on('change', function() {
+                      validateWorkTimeRestrictions(currentRow);
                   });
 
                   // 초기 예상근로시간 계산
@@ -484,6 +581,43 @@
                   updateButtonStates();
               });
           });
+      }
+
+      // 수정: 근무시간 제한 검증 함수
+      function validateWorkTimeRestrictions(row) {
+          const workType = row.find('.work-select').val();
+          const startTimeInput = row.find('.start-time');
+          const endTimeInput = row.find('.end-time');
+
+          // 조출연장의 경우 07:30 이전만 허용
+          if (workType === '조출연장') {
+              startTimeInput.attr('max', '07:30');
+              endTimeInput.attr('max', '07:30');
+
+              // 현재 시간이 07:30 이후면 초기화
+              if (startTimeInput.val() && startTimeInput.val() > '07:30') {
+                  startTimeInput.val('');
+              }
+              if (endTimeInput.val() && endTimeInput.val() > '07:30') {
+                  endTimeInput.val('');
+              }
+          } else if (workType === '연장') {
+              // 일반 연장의 경우 16:20 이후만 허용
+              startTimeInput.attr('min', '16:20');
+
+              // 현재 시간이 16:20 이전이면 초기화
+              if (startTimeInput.val() && startTimeInput.val() < '16:20') {
+                  startTimeInput.val('');
+              }
+
+              // max 제한 해제
+              startTimeInput.removeAttr('max');
+              endTimeInput.removeAttr('max');
+          } else {
+              // 기타 근무의 경우 제한 해제
+              startTimeInput.removeAttr('min max');
+              endTimeInput.removeAttr('min max');
+          }
       }
 
       // 기타근태 사원 목록 표시
@@ -501,8 +635,19 @@
                   // 실적
                   let recordDisplay = workInfo.record.shiftName || '-';
 
+                  // 수정: 미래 날짜의 경우 결근 체크 로직 개선
+                  const workDate = $('#etcWorkDate').val().replace(/-/g, '');
+                  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                  const isFutureDate = workDate > today;
+
+                  let isAbsent = false;
+                  if (!isFutureDate) {
+                      // 과거/현재 날짜만 결근 체크
+                      isAbsent = workInfo.record.shiftCode === '00' || workInfo.record.shiftName === '결근';
+                  }
+
                   const row = `
-                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}">
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}">
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="checkbox" class="emp-checkbox">
                           </td>
@@ -511,29 +656,29 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2">${recordDisplay}</td>
+                          <td class="border border-gray-300 px-4 py-2 ${isAbsent ? 'text-red-500 font-bold' : ''}">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <select class="shift-select w-full border rounded px-2 py-1">
+                              <select class="shift-select w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                                   <option value="">선택</option>
                               </select>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="date" class="start-date w-full border rounded px-2 py-1">
+                              <input type="date" class="start-date w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="date" class="end-date w-full border rounded px-2 py-1">
+                              <input type="date" class="end-date w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <span class="annual-balance">${parseFloat(currentAnnual.balanceDay).toFixed(2)}</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <select class="apply-time w-full border rounded px-2 py-1">
+                              <select class="apply-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                                   <option value="1일이전신청">1일이전신청</option>
                                   <option value="당일신청">당일신청</option>
                               </select>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력">
+                              <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <span class="status-field">${status}</span>
@@ -545,17 +690,28 @@
                   `;
                   tbody.append(row);
 
-                  // 근태 마스터 옵션
+                  // 근태 마스터 옵션 (수정: 휴일/휴무일 제외)
                   const shiftSelect = tbody.find('tr:last .shift-select');
                   shiftMasters.forEach(function(shift) {
-                      shiftSelect.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
+                      // 휴일, 휴무일 제외
+                      if (shift.shiftCode !== '12' && shift.shiftCode !== '13') {
+                          shiftSelect.append(`<option value="${shift.shiftCode}">${shift.shiftName}</option>`);
+                      }
                   });
 
-                  // 연차잔여 업데이트
-                  loadAnnualBalance(emp.empCode, function(annual) {
-                      const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
-                      tbody.find('tr:last .annual-balance').text(balanceDay);
+                  // 수정: 날짜 변경 시 휴일/휴무일 검증
+                  const currentRow = tbody.find('tr:last');
+                  currentRow.find('.start-date, .end-date').on('change', function() {
+                      validateEtcDateRange(currentRow);
                   });
+
+                  // 연차잔여 업데이트 (수정: 중복 조회 방지)
+                  if (!isEtcSearching) {
+                      loadAnnualBalance(emp.empCode, function(annual) {
+                          const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
+                          tbody.find('tr:last .annual-balance').text(balanceDay);
+                      });
+                  }
 
                   // 기존 신청 데이터가 있으면 복원
                   if (applyNo) {
@@ -565,6 +721,29 @@
                   // 상태별 버튼 활성화/비활성화
                   updateButtonStates();
               });
+          });
+      }
+
+      // 수정: 기타근태 날짜 범위 검증 함수
+      function validateEtcDateRange(row) {
+          const startDate = row.find('.start-date').val();
+          const endDate = row.find('.end-date').val();
+
+          if (!startDate || !endDate) return;
+
+          // 휴일/휴무일 체크를 위한 API 호출
+          $.get('/user/apply/validateDateRange', {
+              startDate: startDate.replace(/-/g, ''),
+              endDate: endDate.replace(/-/g, '')
+          })
+          .done(function(result) {
+              if (!result.valid) {
+                  alert('신청 기간에 휴일/휴무일이 포함되어 있습니다. 날짜를 다시 선택해주세요.');
+                  row.find('.start-date, .end-date').val('');
+              }
+          })
+          .fail(function() {
+              console.warn('날짜 범위 검증 API 호출 실패');
           });
       }
 
@@ -603,18 +782,29 @@
 
           const diffMs = end - start;
           const diffHours = diffMs / (1000 * 60 * 60);
-          const hours = Math.floor(diffHours);
-          const minutes = Math.round((diffHours - hours) * 60);
+
+          // 수정: 휴일근무의 경우 휴게시간 차감
+          let dailyHours = diffHours;
+          if ($('#generalApplyType').val() === '휴일근로') {
+              // 1시간 휴게시간 차감 (4시간 이상 근무 시)
+              if (diffHours >= 4) {
+                  dailyHours = diffHours - 1;
+              }
+          }
+
+          const hours = Math.floor(dailyHours);
+          const minutes = Math.round((dailyHours - hours) * 60);
 
           // 30분 단위로 조정
           const adjustedMinutes = Math.round(minutes / 30) * 30;
-          const dailyHours = hours + (adjustedMinutes / 60);
+          const finalHours = hours + (adjustedMinutes / 60);
 
           // 주간 총 근로시간 계산
-          calculateWeeklyExpectedHours(empCode, dailyHours, function(weeklyHours, isValid) {
+          calculateWeeklyExpectedHours(empCode, finalHours, function(weeklyHours, isValid) {
               const expectedHoursSpan = row.find('.expected-hours');
               expectedHoursSpan.text(weeklyHours.toFixed(2));
 
+              // 수정: 부서장의 경우 52시간 초과 검증 무시하지 않음
               if (!isValid) {
                   expectedHoursSpan.addClass('text-red-500 font-bold');
                   expectedHoursSpan.attr('title', `주 52시간 초과 (현재: ${weeklyHours.toFixed(2)}시간)`);
@@ -647,31 +837,53 @@
               });
       }
 
-      // 저장된 일반근태 데이터 복원 함수
-      function loadSavedGeneralData(applyNo, row) {
+      // 수정: 저장된 일반근태 데이터 복원 함수 - 근태신청종류 매치 확인 강화
+      function loadSavedGeneralData(applyNo, row, currentApplyType) {
           $.get(`/user/apply/general/${applyNo}`)
               .done(function(data) {
                   if (data) {
-                      // 저장된 데이터로 폼 필드 복원
-                      row.find('.work-select').val(data.applyType || '');
-                      if (data.startTime) {
-                          row.find('.start-time').val(formatTimeDisplay(data.startTime));
-                      }
-                      if (data.endTime) {
-                          row.find('.end-time').val(formatTimeDisplay(data.endTime));
-                      }
-                      row.find('.reason-field').val(data.reason || '');
-                      row.find('.status-field').text(data.status || '대기');
+                      // 수정: 저장된 신청의 근태신청종류 확인
+                      const savedApplyType = data.applyType;
+                      const savedApplyCategory = getApplyCategoryFromType(savedApplyType);
 
-                      // 복원 후 예상근로시간 재계산
-                      if (data.startTime && data.endTime) {
-                          calculateExpectedHours(row, row.data('emp-code'));
+                      // 수정: 현재 선택된 근태신청종류와 매치되는 경우만 복원
+                      if (savedApplyCategory === currentApplyType) {
+                          // 저장된 데이터로 폼 필드 복원
+                          row.find('.work-select').val(data.applyType || '');
+                          if (data.startTime) {
+                              row.find('.start-time').val(formatTimeDisplay(data.startTime));
+                          }
+                          if (data.endTime) {
+                              row.find('.end-time').val(formatTimeDisplay(data.endTime));
+                          }
+                          row.find('.reason-field').val(data.reason || '');
+                          row.find('.status-field').text(data.status || '대기');
+
+                          // 복원 후 예상근로시간 재계산
+                          if (data.startTime && data.endTime) {
+                              calculateExpectedHours(row, row.data('emp-code'));
+                          }
+                      } else {
+                          // 수정: 다른 종류의 신청은 기본 상태로 표시
+                          row.find('.status-field').text('대기');
                       }
                   }
               })
               .fail(function() {
                   console.log('저장된 일반근태 데이터 없음: ' + applyNo);
               });
+      }
+
+      // 수정: 근태신청종류 매핑 함수 추가
+      function getApplyCategoryFromType(applyType) {
+          if (['조출연장', '연장'].includes(applyType)) {
+              return '연장근로';
+          } else if (['휴일근무'].includes(applyType)) {
+              return '휴일근로';
+          } else if (['조퇴', '외근', '외출', '전반차', '후반차'].includes(applyType)) {
+              return '조퇴외출반차';
+          }
+          return '';
       }
 
       // 저장된 기타근태 데이터 복원 함수
@@ -722,20 +934,32 @@
           }
 
           let hasWaiting = false, hasSaved = false, hasSubmitted = false;
+          // 수정: 결근 사원 체크
+          let hasAbsent = false;
 
           selectedRows.each(function() {
               const status = $(this).find('.status-field').text();
+              const isAbsent = $(this).data('is-absent') === true;
+
               if (status === '대기') hasWaiting = true;
               else if (status === '저장') hasSaved = true;
               else if (status === '상신') hasSubmitted = true;
+
+              if (isAbsent) hasAbsent = true;
           });
 
-          // 대기 상태: 저장만 가능
-          // 저장 상태: 삭제, 상신 가능
-          // 상신 상태: 상신취소만 가능
-          $('#saveGeneralBtn, #saveEtcBtn').prop('disabled', !hasWaiting);
+          // 수정: 결근 사원이 선택된 경우 저장/상신 비활성화
+          if (hasAbsent) {
+              $('#saveGeneralBtn, #saveEtcBtn, #submitGeneralBtn, #submitEtcBtn').prop('disabled', true);
+          } else {
+              // 대기 상태: 저장만 가능
+              // 저장 상태: 삭제, 상신 가능
+              // 상신 상태: 상신취소만 가능
+              $('#saveGeneralBtn, #saveEtcBtn').prop('disabled', !hasWaiting);
+              $('#submitGeneralBtn, #submitEtcBtn').prop('disabled', !hasSaved);
+          }
+
           $('#deleteGeneralBtn, #deleteEtcBtn').prop('disabled', !hasSaved);
-          $('#submitGeneralBtn, #submitEtcBtn').prop('disabled', !hasSaved);
           $('#cancelGeneralBtn, #cancelEtcBtn').prop('disabled', !hasSubmitted);
       }
 
@@ -770,6 +994,16 @@
 
           if (selectedRows.length === 0) {
               alert('저장할 사원을 선택해주세요.');
+              return;
+          }
+
+          // 수정: 결근 사원 체크
+          const absentRows = selectedRows.filter(function() {
+              return $(this).data('is-absent') === true;
+          });
+
+          if (absentRows.length > 0) {
+              alert('결근 사원은 근태 신청을 할 수 없습니다.');
               return;
           }
 
@@ -828,6 +1062,16 @@
 
           if (selectedRows.length === 0) {
               alert('저장할 사원을 선택해주세요.');
+              return;
+          }
+
+          // 수정: 결근 사원 체크
+          const absentRows = selectedRows.filter(function() {
+              return $(this).data('is-absent') === true;
+          });
+
+          if (absentRows.length > 0) {
+              alert('결근 사원은 근태 신청을 할 수 없습니다.');
               return;
           }
 
@@ -990,6 +1234,27 @@
               return;
           }
 
+          // 수정: 결근 사원 체크
+          const absentRows = selectedRows.filter(function() {
+              return $(this).data('is-absent') === true;
+          });
+
+          if (absentRows.length > 0) {
+              alert('결근 사원은 근태 신청을 할 수 없습니다.');
+              return;
+          }
+
+          // 수정: 부서장의 경우에도 52시간 초과 검증
+          const invalidRows = selectedRows.filter(function() {
+              const expectedHoursSpan = $(this).find('.expected-hours');
+              return expectedHoursSpan.hasClass('text-red-500');
+          });
+
+          if (invalidRows.length > 0) {
+              alert('주 52시간을 초과하는 사원이 있습니다. 상신할 수 없습니다.');
+              return;
+          }
+
           selectedRows.each(function() {
               const row = $(this);
               const applyNo = row.data('apply-no');
@@ -1032,6 +1297,16 @@
               return;
           }
 
+          // 수정: 결근 사원 체크
+          const absentRows = selectedRows.filter(function() {
+              return $(this).data('is-absent') === true;
+          });
+
+          if (absentRows.length > 0) {
+              alert('결근 사원은 근태 신청을 할 수 없습니다.');
+              return;
+          }
+
           selectedRows.each(function() {
               const row = $(this);
               const applyNo = row.data('apply-no');
@@ -1053,6 +1328,7 @@
                           const finalStatus = currentUser.isHeader === 'Y' ? '승인완료' : '상신';
                           row.find('.status-field').text(finalStatus);
 
+                          // 수정: 승인완료 시 연차 차감 (연차/전반차/후반차)
                           if (finalStatus === '승인완료') {
                               const shiftCode = row.find('.shift-select').val();
                               const selectedShift = shiftMasters.find(shift => shift.shiftCode === shiftCode);

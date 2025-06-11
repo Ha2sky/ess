@@ -412,14 +412,25 @@
                       html += '<div class="grid grid-cols-2 gap-2 text-xs">';
                       html += '<div><span class="font-medium">신청번호:</span> ' + (data.applyInfo.APPLY_GENERAL_NO || data.applyInfo.APPLY_ETC_NO) + '</div>';
                       html += '<div><span class="font-medium">신청일자:</span> ' + data.applyInfo.APPLY_DATE + '</div>';
+
+                      // 수정: 기타근태의 경우 신청대상일 추가
                       if (data.applyInfo.TARGET_DATE) {
                           html += '<div><span class="font-medium">근무일:</span> ' + data.applyInfo.TARGET_DATE + '</div>';
+                      } else if (data.applyInfo.TARGET_START_DATE) {
+                          html += '<div><span class="font-medium">신청대상일:</span> ' + data.applyInfo.TARGET_START_DATE;
+                          if (data.applyInfo.TARGET_END_DATE && data.applyInfo.TARGET_END_DATE !== data.applyInfo.TARGET_START_DATE) {
+                              html += ' ~ ' + data.applyInfo.TARGET_END_DATE;
+                          }
+                          html += '</div>';
                       }
+
                       if (data.applyInfo.WORK_TIME_RANGE) {
                           html += '<div><span class="font-medium">시간:</span> ' + data.applyInfo.WORK_TIME_RANGE + '</div>';
                       }
+
+                      // 수정: 실제 사유 표시 (일반근태/기타근태 모두)
                       if (data.applyInfo.REASON) {
-                          html += '<div><span class="font-medium">사유:</span> ' + data.applyInfo.REASON + '</div>';
+                          html += '<div class="col-span-2"><span class="font-medium">사유:</span> ' + data.applyInfo.REASON + '</div>';
                       }
                       html += '</div></div>';
                   }
@@ -446,6 +457,32 @@
                       html += '</div></div>';
                   }
 
+                  // 수정: 근태기 정보 추가 (대상자 정보와 결재자 정보 사이)
+                  if (data.attendanceInfo) {
+                      html += '<div class="mb-4">';
+                      html += '<h4 class="font-bold mb-2">근태기 정보</h4>';
+                      html += '<div class="text-xs">';
+                      html += '<table class="w-full border border-gray-300">';
+                      html += '<thead class="bg-gray-100">';
+                      html += '<tr>';
+                      html += '<th class="border border-gray-300 px-2 py-1">날짜</th>';
+                      html += '<th class="border border-gray-300 px-2 py-1">출근시간</th>';
+                      html += '<th class="border border-gray-300 px-2 py-1">퇴근시간</th>';
+                      html += '</tr>';
+                      html += '</thead>';
+                      html += '<tbody>';
+                      data.attendanceInfo.forEach(function(attendance) {
+                          html += '<tr>';
+                          html += '<td class="border border-gray-300 px-2 py-1 text-center">' + attendance.WORK_DATE + '</td>';
+                          html += '<td class="border border-gray-300 px-2 py-1 text-center">' + (attendance.CHECK_IN_TIME || '-') + '</td>';
+                          html += '<td class="border border-gray-300 px-2 py-1 text-center">' + (attendance.CHECK_OUT_TIME || '-') + '</td>';
+                          html += '</tr>';
+                      });
+                      html += '</tbody>';
+                      html += '</table>';
+                      html += '</div></div>';
+                  }
+
                   if (data.approvalHistory && data.approvalHistory.length > 0) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">결재자 정보</h4>';
@@ -466,13 +503,14 @@
                       html += '<tbody>';
                       data.approvalHistory.forEach(function(history) {
                           html += '<tr>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.ORDER_NUM + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.CATEGORY + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.DEPT_NAME + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.POSITION_NAME + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVER_NAME + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVER_CODE + '</td>';
-                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + history.APPROVAL_STATUS + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.ORDER_NUM || '1') + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.CATEGORY || '부서장') + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.DEPT_NAME || '-') + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.POSITION_NAME || '-') + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.APPROVER_NAME || '-') + '</td>';
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.APPROVER_CODE || '-') + '</td>';
+                          // 수정: 결과 부분 undefined 문제 해결
+                          html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.APPROVAL_STATUS || '대기') + '</td>';
                           html += '<td class="border border-gray-300 px-1 py-1 text-center">' + (history.APPROVAL_DATE || '-') + '</td>';
                           html += '</tr>';
                       });

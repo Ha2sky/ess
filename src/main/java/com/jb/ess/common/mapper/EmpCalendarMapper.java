@@ -28,7 +28,7 @@ public interface EmpCalendarMapper {
         WHERE WORK_PATTERN_CODE = #{workPatternCode}
         AND YYYYMMDD LIKE CONCAT(#{dateStr}, '%')
     """)
-    /* 월 단위 삭제 (예: 202505, 202506 형태) */
+        /* 월 단위 삭제 (예: 202505, 202506 형태) */
     void deleteEmpCalendarForUpdate(@Param("workPatternCode") String workPatternCode,
                                     @Param("dateStr") String dateStr);
 
@@ -37,7 +37,7 @@ public interface EmpCalendarMapper {
         FROM HRTWORKEMPCALENDAR
         WHERE WORK_PATTERN_CODE = #{workPatternCode}
     """)
-    /* workPatternCode 데이터 모두 삭제 */
+        /* workPatternCode 데이터 모두 삭제 */
     void deleteEmpCalendar(String workPatternCode);
 
     @Delete("""
@@ -108,4 +108,13 @@ public interface EmpCalendarMapper {
     """)
     List<String> getShiftCodeByDeptCodeAndWorkDate(@Param("deptCode") String deptCode,
                                                    @Param("workDate") String workDate);
+
+    // 수정: 기타근태 날짜 범위 검증을 위한 휴일 정보 조회 메서드 추가
+    @Select("""
+        SELECT SHIFT_CODE, HOLIDAY_YN
+        FROM HRTWORKEMPCALENDAR
+        WHERE YYYYMMDD = #{date}
+        GROUP BY SHIFT_CODE, HOLIDAY_YN
+    """)
+    List<EmpCalendar> getHolidayInfoByDate(@Param("date") String date);
 }
