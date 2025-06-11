@@ -61,7 +61,8 @@
             <option th:each="dept : ${availableDepartments}"
                     th:if="${dept.deptCode != currentEmp.deptCode}"
                     th:value="${dept.deptCode}"
-                    th:text="${dept.deptName}"></option>
+                    th:text="${dept.deptName}"
+                    ></option>
           </select>
         </div>
         <div class="flex items-end space-x-2 col-span-3">
@@ -230,18 +231,34 @@
       };
 
       // 탭 전환 기능
-      $('.tab-button').click(function() {
-          $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
-          $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
+    $('.tab-button').click(function() {
+      $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
+      $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
 
-          $('.tab-panel').addClass('hidden');
+      $('.tab-panel').addClass('hidden');
 
-          if (this.id === 'generalTab') {
-              $('#generalPanel').removeClass('hidden');
-          } else {
-              $('#etcPanel').removeClass('hidden');
-          }
-      });
+      if (this.id === 'generalTab') {
+        $('#generalPanel').removeClass('hidden');
+      } else {
+        $('#etcPanel').removeClass('hidden');
+      }
+    });
+
+    // URL 쿼리 파라미터에서 'tab' 값 읽기
+    function getQueryParam(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    // 페이지 로드 시 탭 활성화 처리
+    const activeTab = getQueryParam('tab');
+    if (activeTab === 'etc') {
+      // 기타근태신청 탭 활성화
+      $('#etcTab').click();
+    } else {
+      // 기본값은 일반근태 신청 탭 활성화
+      $('#generalTab').click();
+    }
 
       // 근태 마스터 로드
       loadShiftMasters();
@@ -1137,6 +1154,25 @@
               });
           });
       }
+  });
+</script>
+
+<script>
+  // URL에서 특정 쿼리 파라미터 값을 읽는 함수 (한 줄 버전)
+  const getQueryParam = param => new URLSearchParams(window.location.search).get(param);
+
+  function selectOptionByValue(selectId, value) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const option = Array.from(select.options).find(opt => opt.value === value);
+    if (option) option.selected = true;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const deptCode = getQueryParam("deptCode");
+    if (!deptCode) return;
+
+    ["generalDeptSelect", "etcDeptSelect"].forEach(id => selectOptionByValue(id, deptCode));
   });
 </script>
 

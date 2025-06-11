@@ -16,53 +16,66 @@ public class WorkHoursCalculator {
     /* 총 근무시간 계산 */
     public static Duration getTotalWorkTime(ShiftMaster shift) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
-        LocalDate today = LocalDate.now(); // 기준
+        LocalDate today = LocalDate.now(); // 기준 날짜
 
-        // 출근/퇴근 시간 처리
+        // 출근/퇴근 시간 설정
         LocalTime workOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
         LocalTime workOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
         LocalDateTime onTime = LocalDateTime.of(today, workOn);
         LocalDateTime offTime = LocalDateTime.of(today, workOff);
-        if (Objects.equals(shift.getWorkOffDayType(), "N1")) {
-            offTime = offTime.plusDays(1); // 익일 퇴근
+
+        if ("N1".equals(shift.getWorkOffDayType())) {
+            offTime = offTime.plusDays(1); // 익일 퇴근 처리
         }
+
         Duration total = Duration.between(onTime, offTime);
 
-        // 휴게1 처리
-        Duration break1 = Duration.ZERO;
-        if (!shift.getBreak1StartHhmm().isEmpty() && !shift.getBreak1EndHhmm().isEmpty()
-            && shift.getBreak1StartHhmm().compareTo(shift.getWorkOnHhmm()) > 0) {
-                LocalTime break1Start = LocalTime.parse(shift.getBreak1StartHhmm(), formatter);
-                LocalTime break1End = LocalTime.parse(shift.getBreak1EndHhmm(), formatter);
-                LocalDateTime b1Start = LocalDateTime.of(today, break1Start);
-                LocalDateTime b1End = LocalDateTime.of(today, break1End);
-                if (!Objects.equals(shift.getBreak1StartDayType(), shift.getBreak1EndDayType())) {
-                    b1End = b1End.plusDays(1); // 익일 종료
-                }
-                break1 = Duration.between(b1Start, b1End);
-            }
+        // 휴게시간 계산
+        Duration break1 = calculateBreakDuration(shift.getBreak1StartHhmm(), shift.getBreak1EndHhmm(),
+            shift.getBreak1StartDayType(), shift.getBreak1EndDayType(),
+            onTime, offTime, formatter, today);
 
-        // 휴게2 처리
-        Duration break2 = Duration.ZERO;
-        if (!shift.getBreak2StartHhmm().isEmpty() && !shift.getBreak2EndHhmm().isEmpty()
-            && shift.getBreak2StartHhmm().compareTo(shift.getWorkOffHhmm()) < 0) {
-            LocalTime break2Start = LocalTime.parse(shift.getBreak2StartHhmm(), formatter);
-            LocalTime break2End = LocalTime.parse(shift.getBreak2EndHhmm(), formatter);
-            LocalDateTime b2Start = LocalDateTime.of(today, break2Start);
-            LocalDateTime b2End = LocalDateTime.of(today, break2End);
-            if (!Objects.equals(shift.getBreak2StartDayType(), shift.getBreak2EndDayType())) {
-                b2End = b2End.plusDays(1); // 익일 종료
-            }
-            break2 = Duration.between(b2Start, b2End);
-        }
+        Duration break2 = calculateBreakDuration(shift.getBreak2StartHhmm(), shift.getBreak2EndHhmm(),
+            shift.getBreak2StartDayType(), shift.getBreak2EndDayType(),
+            onTime, offTime, formatter, today);
 
         return total.minus(break1).minus(break2);
     }
 
+    private static Duration calculateBreakDuration(String startHhmm, String endHhmm,
+                                                   String startDayType, String endDayType,
+                                                   LocalDateTime onTime, LocalDateTime offTime,
+                                                   DateTimeFormatter formatter, LocalDate baseDate) {
+        if (startHhmm == null || endHhmm == null || startHhmm.isEmpty() || endHhmm.isEmpty()) {
+            return Duration.ZERO;
+        }
+
+        LocalTime startTime = LocalTime.parse(startHhmm, formatter);
+        LocalTime endTime = LocalTime.parse(endHhmm, formatter);
+
+        LocalDateTime breakStart = LocalDateTime.of(baseDate, startTime);
+        LocalDateTime breakEnd = LocalDateTime.of(baseDate, endTime);
+
+        if (!Objects.equals(startDayType, endDayType)) {
+            breakEnd = breakEnd.plusDays(1); // 익일 종료
+        }
+
+        // 휴게시간이 근무시간 구간과 겹치는 경우만 계산
+        if (breakEnd.isBefore(onTime) || breakStart.isAfter(offTime)) {
+            return Duration.ZERO;
+        }
+
+        // 겹치는 실제 휴게 구간 계산
+        LocalDateTime effectiveStart = breakStart.isBefore(onTime) ? onTime : breakStart;
+        LocalDateTime effectiveEnd = breakEnd.isAfter(offTime) ? offTime : breakEnd;
+
+        return Duration.between(effectiveStart, effectiveEnd);
+    }
+
     /* 실적 근무 시간 계산 */
     public static Duration getRealWorkTime(String checkIn, String checkOut,
-        ShiftMaster shift, LocalDate workDate,
-        List<Pair<String, String>> leavePeriods) {
+                                           ShiftMaster shift, LocalDate workDate,
+                                           List<Pair<String, String>> leavePeriods) {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
 
@@ -98,7 +111,6 @@ public class WorkHoursCalculator {
             totalWorked = totalWorked.minus(overlap);
         }
 
-        System.out.println("[DEBUG] " + workDate + " Adjusted Work: " + totalWorked);
         return totalWorked.isNegative() ? Duration.ZERO : totalWorked;
     }
 
@@ -106,7 +118,7 @@ public class WorkHoursCalculator {
 
     // 휴게시간 차감
     private static Duration subtractBreakTime(Duration original, ShiftMaster shift,
-        LocalDate date, LocalDateTime inTime, LocalDateTime outTime) {
+                                              LocalDate date, LocalDateTime inTime, LocalDateTime outTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
         Duration result = original;
 

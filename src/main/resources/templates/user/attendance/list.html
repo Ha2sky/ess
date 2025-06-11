@@ -10,25 +10,21 @@
 <!-- 제목 및 필터 -->
 <form method="get" th:action="@{/user/attendance/list}" class="mb-4 flex flex-wrap justify-between items-end">
   <div class="flex items-center gap-4 flex-wrap">
-    <!-- 숨겨진 필드 (월요일, 일요일) 추가 -->
     <input type="hidden" name="weekStart" id="weekStart">
     <input type="hidden" name="weekEnd" id="weekEnd">
 
-    <!-- 근무일 -->
     <div>
       <label class="block text-sm font-medium text-gray-700">근무일</label>
       <input type="date" name="workDate" id="workDate" class="border rounded px-2 py-1"
              th:value="${workDate}">
     </div>
 
-    <!-- 사번 -->
     <div>
       <label class="block text-sm font-medium text-gray-700">사번</label>
       <input type="text" name="empCode" class="border rounded px-2 py-1"
              th:value="${empCode}" placeholder="Search...">
     </div>
 
-    <!-- 근무계획 -->
     <div>
       <label class="block text-sm font-medium text-gray-700">근무계획</label>
       <select name="planType" class="border rounded px-2 py-1">
@@ -41,7 +37,6 @@
       </select>
     </div>
 
-    <!-- 부서 -->
     <div>
       <label for="deptCode" class="block text-sm font-medium text-gray-700">부서</label>
       <select name="deptCode" id="deptCode" class="border rounded px-2 py-1">
@@ -53,14 +48,19 @@
       </select>
     </div>
 
-    <!-- 조회 버튼 -->
     <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">조회</button>
   </div>
 
   <!-- 근태신청 버튼 -->
   <div class="flex gap-2 mt-2 md:mt-0">
-    <button type="button" class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700">일반근태 신청</button>
-    <button type="button" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">기타근태 신청</button>
+    <button type="button" onclick="submitAttendance('general')"
+            class="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700 text-center">
+      일반근태 신청
+    </button>
+    <button type="button" onclick="submitAttendance('etc')"
+            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-center">
+      기타근태 신청
+    </button>
   </div>
 </form>
 
@@ -93,7 +93,7 @@
         th:classappend="${stat.index % 2 == 0} ? 'bg-white' : 'bg-gray-100'"
         class="hover:bg-blue-100 transition text-center">
       <td class="border px-2 py-1">
-        <input type="radio" name="empCode" th:value="${emp.empCode}">
+        <input type="radio" name="selectedEmpCode" th:value="${emp.empCode}">
       </td>
       <td class="border px-2 py-1" th:text="${emp.empCode}"></td>
       <td class="border px-2 py-1" th:text="${emp.empName}"></td>
@@ -106,26 +106,17 @@
           th:text="${emp.timeItemNames != null && !#lists.isEmpty(emp.timeItemNames) ? #strings.listJoin(emp.timeItemNames, ', ') : '-'}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>
-      <td class="border px-2 py-1">0.00 (임시)</td>
-      <td class="border px-2 py-1">0.00 (임시)</td>
-      <td class="border px-2 py-1">52.00</td>
+      <td class="border px-2 py-1" th:text="${emp.overTime2}"></td>
+      <td class="border px-2 py-1" th:text="${emp.overTime}"></td>
+      <td class="border px-2 py-1 bg-red-200">52.00</td>
       <td class="border px-2 py-1" th:text="${emp.workHours}"></td>
       <td class="border px-2 py-1" th:text="${emp.remainWorkHours}"></td>
     </tr>
-    <!-- 나머지 데이터 반복 -->
     </tbody>
   </table>
 </div>
-</body>
-</html>
 
-<script>
-  document.querySelector('input[name="workDate"]').addEventListener('change', function () {
-    updateWeekHiddenFields(this.value); // 날짜 업데이트 먼저
-    setTimeout(() => this.form.submit(), 0); // 값 반영 직후 form 제출
-  });
-</script>
-
+<!-- 날짜 처리 스크립트 -->
 <script>
   function formatDate(date) {
     return date.toISOString().slice(0, 10);
@@ -149,7 +140,6 @@
 
   const workDateInput = document.getElementById("workDate");
 
-  // 값이 없으면 오늘 날짜로 설정
   if (!workDateInput.value) {
     workDateInput.value = new Date().toISOString().slice(0, 10);
   }
@@ -158,16 +148,49 @@
 
   workDateInput.addEventListener("change", function () {
     updateWeekHiddenFields(this.value);
+    setTimeout(() => this.form.submit(), 0);
   });
 </script>
 
+<!-- 시간 포맷팅 -->
 <script>
   document.querySelectorAll(".time-value").forEach(el => {
     const raw = el.dataset.time;
     if (/^\d{6}$/.test(raw)) {
       el.textContent = raw.slice(0, 2) + ":" + raw.slice(2, 4) + ":" + raw.slice(4, 6);
     } else {
-      el.textContent = raw; // 그대로 출력
+      el.textContent = raw;
     }
   });
 </script>
+
+<!-- 근태신청 제출 처리 -->
+<script th:inline="javascript">
+  const loginEmpCode = /*[[${user}]]*/ 'dummy';
+  const isManager = /*[[${isHeader}]]*/ false;
+</script>
+
+<script>
+  function submitAttendance(tab) {
+    const selected = document.querySelector('input[name="selectedEmpCode"]:checked');
+    const deptCode = document.getElementById('deptCode').value;
+
+    if (!selected) {
+      alert('사원을 한 명 선택해주세요.');
+      return;
+    }
+
+    const user = selected.value;
+
+    if (!isManager && user !== loginEmpCode) {
+      alert('다른 사원의 신청은 부서장만 가능합니다.');
+      return;
+    }
+
+    const url = `/user/apply/?tab=${tab}&empCode=${user}&deptCode=${deptCode}`;
+    window.location.href = url;
+  }
+</script>
+
+</body>
+</html>

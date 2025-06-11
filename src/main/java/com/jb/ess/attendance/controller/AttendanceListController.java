@@ -5,6 +5,7 @@ import com.jb.ess.common.domain.Department;
 import com.jb.ess.common.domain.Employee;
 import com.jb.ess.common.mapper.DepartmentMapper;
 import com.jb.ess.common.mapper.EmpCalendarMapper;
+import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.security.CustomUserDetails;
 import com.jb.ess.pattern.service.PatternService;
@@ -17,6 +18,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 import jakarta.servlet.http.HttpSession;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -35,6 +37,7 @@ public class AttendanceListController {
     private final DepartmentMapper departmentMapper;
     private final EmpCalendarMapper empCalendarMapper;
     private final ShiftMasterMapper shiftMasterMapper;
+    private final EmployeeMapper employeeMapper;
 
     @GetMapping("/list")
     public String attendanceList(@AuthenticationPrincipal CustomUserDetails user,
@@ -87,16 +90,18 @@ public class AttendanceListController {
         model.addAttribute("planType", planType);
         // 계획/실적
         model.addAttribute("shiftList", empCalendarMapper.getShiftCodeByDeptCodeAndWorkDate(deptCode, workDateStr));
-        // 로그인한 사원 부서 + 하위부서 목록을 세션에서 꺼내거나 최초 생성
-        @SuppressWarnings("unchecked")
-        List<Department> departments = (List<Department>) session.getAttribute("departments");
-        if (departments == null) {
-            String loginDeptCode = empAttService.empDepartmentInfo(user.getUsername()).getDeptCode();
-            departments = empAttService.childDepartmentList(loginDeptCode);
-            session.setAttribute("departments", departments);
-        }
+
+        // 부서 목록 - 매 요청시 최신화 (세션 캐싱 제거)
+        String loginDeptCode = empAttService.empDepartmentInfo(user.getUsername()).getDeptCode();
+        List<Department> departments = empAttService.childDepartmentList(loginDeptCode);
+        session.setAttribute("departments", departments);
 
         model.addAttribute("departments", departments);
+
+        model.addAttribute("user", user.getUsername());
+        if (Objects.equals(employeeMapper.findIsHeader(user.getUsername()).getIsHeader(), "Y")) {
+            model.addAttribute("isHeader", true);
+        } else model.addAttribute("isHeader", false);
 
         return "user/attendance/list";
     }
