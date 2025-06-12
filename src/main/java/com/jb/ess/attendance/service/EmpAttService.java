@@ -260,7 +260,9 @@ public class EmpAttService {
                 shift.setWorkOnHhmm(overtime2.getStartTime());
                 shift.setWorkOffHhmm(overtime2.getEndTime());
                 Duration workTime = WorkHoursCalculator.getTotalWorkTime(shift);
-                emp.setOverTime(String.format("%05.2f", workTime.toMinutes() / 60.0));
+                emp.setOverTime2(String.format("%05.2f", workTime.toMinutes() / 60.0));
+                emp.setShiftCode("14-1");
+                emp.setShiftName("휴일근무");
             } else emp.setOverTime2("-");
             // 7. 주간 근무시간 및 잔여시간 계산
             Duration weeklyHours = getWorkHoursForWeek(empCode, weekStart, weekEnd);
