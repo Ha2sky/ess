@@ -12,7 +12,7 @@
     <h1 class="text-2xl font-bold text-gray-800 mb-6">근태 신청 이력</h1>
 
     <!-- 검색 -->
-    <form th:action="@{/user/history}" method="get"
+    <form th:action="@{/user/history/list}" method="get"
           class="bg-gray-50 p-4 rounded-lg mb-6 flex flex-wrap gap-4 items-end">
 
       <!-- 대상일자 -->
@@ -27,14 +27,30 @@
         </div>
       </div>
 
+      <!-- 근태유형 -->
+      <div class="min-w-[160px]">
+        <label class="block text-xs font-semibold text-gray-700 mb-1">근태유형</label>
+        <select name="shiftType" class="w-full border rounded-lg px-2 h-[42px]">
+          <option value="">전체</option>
+          <option value="연장근로">연장근로</option>
+          <option value="휴일근로">휴일근로</option>
+          <option value="기타근태">기타근태</option>
+          <option value="조퇴외출반차">조퇴/외출/반차</option>
+        </select>
+      </div>
+
       <!-- 상태 -->
       <div class="w-20">
         <label class="block text-xs font-semibold text-gray-700 mb-1">상태</label>
         <select name="status" class="w-full border rounded-lg px-2 h-[42px]">
           <option value="">전체</option>
-          <option th:each="status : ${statusOptions}" th:value="${status}" th:text="${status}"></option>
+          <option value="저장">저장</option>
+          <option value="승인중">승인중</option>
+          <option value="승인완료">승인완료</option>
+          <option value="반려">반려</option>
         </select>
       </div>
+
 
       <!-- 조회 버튼 -->
       <div class="w-16">
@@ -59,20 +75,27 @@
         </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
-        <tr th:each="item : ${history}" class="hover:bg-gray-50 cursor-pointer"
-            th:onclick="|showDetails('${item.applyDate}', '${item.targetDate}', '${item.deptName}', '${item.empCode}', '${item.empName}', '${item.shiftName}', '${item.status}')|">
+        <tr th:each="item : ${attList}" class="hover:bg-gray-50 cursor-pointer">
+            <!--th:onclick="|showDetails('${item.applyDate}', '${item.targetDate}', '${item.deptName}', '${item.empCode}', '${item.empName}', '${item.shiftName}', '${item.status}')|">-->
           <td class="px-4 py-2 text-center"
-              th:text="${#dates.format(#dates.parse(item.applyDate, 'yyyyMMdd'), 'yyyy-MM-dd')}"></td>
+              th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(item.applyDate)}|"></td>
           <td class="px-4 py-2 text-center"
-              th:text="${#dates.format(#dates.parse(item.targetDate, 'yyyyMMdd'), 'yyyy-MM-dd')}"></td>
+              th:text="${item.targetEndDate == null} ?
+      ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetDate)} :
+      ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetDate)} + ' ~ ' + ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetEndDate)}">
+          </td>
+
+
           <td class="px-4 py-2 text-center" th:text="${item.deptName}"></td>
           <td class="px-4 py-2 text-center" th:text="${item.empCode} + '/' + ${item.empName}"></td>
-          <td class="px-4 py-2 text-center" th:text="${item.shiftName}"></td>
-          <td class="px-4 py-2 text-center">
-            <span th:class="${item.status == '승인'} ? 'bg-green-100 text-green-800' :
-                             ${item.status == '반려'} ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'"
-                  class="px-2 py-1 rounded-full" th:text="${item.status}"></span>
+          <td class="px-4 py-2 text-center" th:text="${item.applyType}"></td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+              th:classappend="
+            ${item.status} == '승인' ? 'bg-green-100 text-green-800' :
+            (${item.status} == '반려' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800')">
+            [[${item.status}]]
           </td>
+
         </tr>
         </tbody>
       </table>
@@ -199,5 +222,42 @@
     return yyyymmdd.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
   }
 </script>
+
+<!-- startDate, endDate, 상태, 근태유형 디폴트 값 -->
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    const startDateInput = form.querySelector('input[name="startDate"]');
+    const endDateInput = form.querySelector('input[name="endDate"]');
+    const shiftTypeSelect = form.querySelector('select[name="shiftType"]');
+    const statusSelect = form.querySelector('select[name="status"]');
+
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    const formatLocalDate = (date) => {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    // 기본값 설정: 날짜
+    if (!startDateInput.value) startDateInput.value = formatLocalDate(firstDay);
+    if (!endDateInput.value) endDateInput.value = formatLocalDate(lastDay);
+
+    // 기본값 설정: 셀렉트 박스 (필요시 조정)
+    if (!shiftTypeSelect.value) shiftTypeSelect.value = ''; // '전체'
+    if (!statusSelect.value) statusSelect.value = ''; // '전체'
+
+    // form 자동 제출 (최초 접속 시만)
+    // 히스토리 API 사용하여 새로고침 시 자동 제출 방지 (이미 쿼리파라미터가 있으면 실행 안 함)
+    if (!location.search) {
+      form.submit();
+    }
+  });
+</script>
+
 </body>
 </html>

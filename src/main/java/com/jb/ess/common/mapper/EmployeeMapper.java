@@ -10,12 +10,7 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface EmployeeMapper {
     @Select("""
-        SELECT
-            EMP_CODE AS empCode,
-            PASSWORD AS password,
-            EMP_NAME AS empName,
-            EMP_STATE AS empState,
-            DEPT_CODE AS deptCode
+        SELECT *
         FROM HRIMASTER
         WHERE EMP_CODE = #{empCode}
     """)
