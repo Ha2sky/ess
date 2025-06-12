@@ -14,24 +14,28 @@ public class HistoryService {
     private final AttendanceApplyMapper attendanceApplyMapper;
 
     public List<AttHistory> setAttList(LocalDate startDate, LocalDate endDate,
-                                       String workType, String status, String empCode) {
-        if (workType == null || workType.isEmpty()) {
+                                       String applyType, String status, String empCode) {
+
+        if (applyType == null || applyType.isEmpty()) {
             return attendanceApplyMapper.getAllAttList(DateUtil.reverseFormatDate(startDate),
                                                        DateUtil.reverseFormatDate(endDate),
                                                        status, empCode);
+        } else if (applyType.equals("연장근로")) {
+            return attendanceApplyMapper.getAttList(DateUtil.reverseFormatDate(startDate),
+                                                    DateUtil.reverseFormatDate(endDate),
+                                                    "연장", status, empCode);
+        } else if (applyType.equals("휴일근로")) {
+            return attendanceApplyMapper.getAttList(DateUtil.reverseFormatDate(startDate),
+                                                    DateUtil.reverseFormatDate(endDate),
+                                                    "휴일근무", status, empCode);
+        } else if (applyType.equals("조퇴외출반차")) {
+            return attendanceApplyMapper.getAttList2(DateUtil.reverseFormatDate(startDate),
+                                                    DateUtil.reverseFormatDate(endDate),
+                                                    status, empCode);
+        } else {
+            return attendanceApplyMapper.getAttListEtc(DateUtil.reverseFormatDate(startDate),
+                                                       DateUtil.reverseFormatDate(endDate),
+                                                       status, empCode);
         }
-        else if (workType.equals("연장근로")) {
-
-        }
-        else if (workType.equals("휴일근로")) {
-
-        }
-        else if (workType.equals("기타근태")) {
-
-        }
-        else if (workType.equals("조퇴외출반차")) {
-
-        }
-        return null;
     }
 }

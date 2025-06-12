@@ -26,16 +26,16 @@ public class HistoryController {
         @AuthenticationPrincipal CustomUserDetails user,
         @RequestParam(value = "startDate", required = false) LocalDate startDate,
         @RequestParam(value = "endDate", required = false) LocalDate endDate,
-        @RequestParam(value = "workType", required = false) String workType,
+        @RequestParam(value = "applyType", required = false) String applyType,
         @RequestParam(value = "status", required = false) String status,
         Model model) {
 
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
-        model.addAttribute("workType", workType);
+        model.addAttribute("applyType", applyType);
         model.addAttribute("status", status);
 
-       List<AttHistory> attList = historyService.setAttList(startDate, endDate, workType, status, user.getUsername());
+       List<AttHistory> attList = historyService.setAttList(startDate, endDate, applyType, status, user.getUsername());
 
        model.addAttribute("attList", attList);
         return "user/history";
