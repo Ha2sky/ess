@@ -376,7 +376,7 @@ public interface AttendanceApplyMapper {
         SELECT START_TIME, END_TIME
         FROM HRTATTAPLGENERAL
         WHERE EMP_CODE = #{empCode}
-        AND TARGET_DATE = #{workYmd}
+        AND TARGET_DATE = #{targetDate}
         AND STATUS = #{status}
         AND APPLY_TYPE = #{applyType}
     """)
