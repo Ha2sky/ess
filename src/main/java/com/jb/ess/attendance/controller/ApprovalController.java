@@ -64,7 +64,7 @@ public class ApprovalController {
             String approverCode = user.getUsername();
             log.debug("결재 문서 조회: 결재자={}, 기간={} ~ {}, 활성탭={}", approverCode, startDate, endDate, activeTab);
 
-            // 기타근태 승인/반려 문서 조회
+            // 결재 문서 조회 (수정: 부서장 자동승인 문서도 포함)
             List<AttendanceApplyGeneral> pendingGenerals = approvalService.getPendingGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
             List<AttendanceApplyEtc> pendingEtcs = approvalService.getPendingEtcApprovals(approverCode, startDate, endDate, empCode);
             List<AttendanceApplyGeneral> approvedGenerals = approvalService.getApprovedGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
@@ -89,7 +89,6 @@ public class ApprovalController {
             model.addAttribute("currentUser", currentUser);
 
             return "user/approval";
-
         } catch (Exception e) {
             log.error("근태승인 페이지 로딩 실패", e);
             model.addAttribute("errorMessage", "페이지 로딩 중 오류가 발생했습니다: " + e.getMessage());
@@ -98,18 +97,34 @@ public class ApprovalController {
     }
 
     /**
-     * 신청 상세 정보 조회 API
+     * 수정: 신청 상세 정보 조회 API - 근태기 정보, 실제 사유, undefined 문제 해결
      */
     @GetMapping("/detail/{type}/{applyNo}")
     @ResponseBody
     public Map<String, Object> getApplyDetail(@PathVariable String type, @PathVariable String applyNo) {
         try {
             log.debug("상세 정보 조회: type={}, applyNo={}", type, applyNo);
+            Map<String, Object> result;
+
             if ("general".equals(type)) {
-                return approvalService.getGeneralApplyDetail(applyNo);
+                result = approvalService.getGeneralApplyDetail(applyNo);
             } else {
-                return approvalService.getEtcApplyDetail(applyNo);
+                result = approvalService.getEtcApplyDetail(applyNo);
             }
+
+            // 수정: 근태기 정보 추가
+            if (result != null && !result.containsKey("error")) {
+                try {
+                    List<Map<String, Object>> attendanceInfo = approvalService.getAttendanceInfo(type, applyNo);
+                    result.put("attendanceInfo", attendanceInfo);
+                    log.debug("근태기 정보 추가됨: {}", attendanceInfo.size());
+                } catch (Exception e) {
+                    log.warn("근태기 정보 조회 실패, 계속 진행: {}", e.getMessage());
+                    result.put("attendanceInfo", List.of());
+                }
+            }
+
+            return result;
         } catch (Exception e) {
             log.error("상세 정보 조회 실패: type={}, applyNo={}", type, applyNo, e);
             return Map.of("error", "상세 정보 조회에 실패했습니다.");
@@ -117,7 +132,7 @@ public class ApprovalController {
     }
 
     /**
-     * 일반근태 승인 처리
+     * 수정: 일반근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
      */
     @PostMapping("/approve/general")
     @ResponseBody
@@ -132,6 +147,7 @@ public class ApprovalController {
                 return "error: 부서장만 승인 가능합니다.";
             }
 
+            // 수정: 승인 처리 시 연차 차감 및 실적 업데이트 포함
             approvalService.approveGeneralApply(applyGeneralNo, user.getUsername());
             log.info("일반근태 승인 완료: 신청번호={}", applyGeneralNo);
             return "success";
@@ -142,7 +158,7 @@ public class ApprovalController {
     }
 
     /**
-     * 기타근태 승인 처리
+     * 수정: 기타근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
      */
     @PostMapping("/approve/etc")
     @ResponseBody
@@ -157,6 +173,7 @@ public class ApprovalController {
                 return "error: 부서장만 승인 가능합니다.";
             }
 
+            // 수정: 승인 처리 시 연차 차감 및 실적 업데이트 포함
             approvalService.approveEtcApply(applyEtcNo, user.getUsername());
             log.info("기타근태 승인 완료: 신청번호={}", applyEtcNo);
             return "success";

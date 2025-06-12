@@ -84,9 +84,34 @@ public interface AttendanceApplyMapper {
     """)
     String getExpectedWorkHours(String shiftCode);
 
-    // 기존 일반근태 신청 조회
+    // 수정: 기존 일반근태 신청 조회 - 근태신청종류별 필터링 (메소드명 변경)
     @Select("""
-        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON
+        <script>
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
+        AND STATUS != '삭제'
+        <if test="applyTypeCategory != null and applyTypeCategory != ''">
+            <if test="applyTypeCategory == '연장근로'">
+                AND APPLY_TYPE IN ('연장', '조출연장')
+            </if>
+            <if test="applyTypeCategory == '휴일근로'">
+                AND APPLY_TYPE = '휴일근무'
+            </if>
+            <if test="applyTypeCategory == '조퇴외출반차'">
+                AND APPLY_TYPE IN ('조퇴', '외근', '외출', '전반차', '후반차')
+            </if>
+        </if>
+        ORDER BY APPLY_DATE DESC
+        </script>
+    """)
+    AttendanceApplyGeneral findGeneralApplyByEmpAndDateWithCategory(@Param("empCode") String empCode,
+                                                                    @Param("workDate") String workDate,
+                                                                    @Param("applyTypeCategory") String applyTypeCategory);
+
+    // 기존 일반근태 신청 조회 (전체)
+    @Select("""
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE
         FROM HRTATTAPLGENERAL 
         WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
         AND STATUS != '삭제'
@@ -119,7 +144,7 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
-    // 부서별 사원 조회 (근무계획 포함) - 부서장용
+    // 수정: 부서별 사원 조회 (근무계획 포함) - 부서장용 (정렬 수정: 직위 높은 순 → 사번 낮은 순)
     @Select("""
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
                wc.SHIFT_CODE as workPlan,
@@ -133,13 +158,39 @@ public interface AttendanceApplyMapper {
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.DEPT_CODE = #{deptCode}
         AND h.EMP_STATE = 'WORK'
-        ORDER BY h.EMP_CODE
+        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
     """)
     List<Employee> findEmployeesByDept(@Param("deptCode") String deptCode,
                                        @Param("workDate") String workDate,
                                        @Param("workPlan") String workPlan);
 
-    // 현재 사원 정보 조회 (근무계획 포함) - 일반 사원용
+    // 수정: 부서별 사원 조회 (정렬 조건 개선) - 부서장용 (직위 높은 순 → 사번 낮은 순)
+    @Select("""
+        <script>
+        SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
+               wc.SHIFT_CODE as workPlan,
+               sm.SHIFT_NAME as workPlanName
+        FROM HRIMASTER h
+        LEFT JOIN HRTGRADEINFO p ON h.POSITION_CODE = p.POSITION_CODE
+        LEFT JOIN HRTDUTYINFO d ON h.DUTY_CODE = d.DUTY_CODE
+        LEFT JOIN ORGDEPTMASTER dept ON h.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRTWORKEMPCALENDAR wc ON h.EMP_CODE = wc.EMP_CODE 
+               AND wc.YYYYMMDD = #{workDate}
+        LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
+        WHERE h.DEPT_CODE = #{deptCode}
+        AND h.EMP_STATE = 'WORK'
+        <if test="workPlan != null and workPlan != ''">
+            AND sm.SHIFT_NAME = #{workPlan}
+        </if>
+        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
+        </script>
+    """)
+    List<Employee> findEmployeesByDeptWithSort(@Param("deptCode") String deptCode,
+                                               @Param("workDate") String workDate,
+                                               @Param("workPlan") String workPlan,
+                                               @Param("sortBy") String sortBy);
+
+    // 수정: 현재 사원 정보 조회 (근무계획 포함) - 일반 사원용 (정렬 추가)
     @Select("""
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
                wc.SHIFT_CODE as workPlan,
@@ -152,6 +203,7 @@ public interface AttendanceApplyMapper {
                AND wc.YYYYMMDD = #{workDate}
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.EMP_CODE = #{empCode}
+        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
     """)
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
@@ -297,6 +349,16 @@ public interface AttendanceApplyMapper {
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
 
+    // 수정: 기타근태 승인완료 시 실적 업데이트
+    @Update("""
+        UPDATE HRTATTRECORD 
+        SET SHIFT_CODE = #{shiftCode}
+        WHERE EMP_CODE = #{empCode} AND WORK_DATE = #{workDate}
+    """)
+    void updateAttendanceRecordByEtcApply(@Param("empCode") String empCode,
+                                          @Param("workDate") String workDate,
+                                          @Param("shiftCode") String shiftCode);
+
     @Select("""
         SELECT APPLY_TYPE
         FROM HRTATTAPLGENERAL
@@ -305,7 +367,7 @@ public interface AttendanceApplyMapper {
         AND STATUS = #{status}
         AND APPLY_TYPE IN (N'조퇴', N'외출', N'전반차', N'후반차')
     """)
-    // 승인된 가근태 찾기
+        // 승인된 가근태 찾기
     List<String> findApprovedTimeItemCode(@Param("empCode") String empCode,
                                           @Param("workYmd") String workYmd,
                                           @Param("status") String status);
@@ -318,7 +380,7 @@ public interface AttendanceApplyMapper {
         AND STATUS = #{status}
         AND APPLY_TYPE = #{applyType}
     """)
-    // 승인된 가근태 시작시간, 종료시간 찾기
+        // 승인된 가근태 시작시간, 종료시간 찾기
     AttendanceApplyGeneral findStartTimeAndEndTime(@Param("empCode") String empCode,
                                                    @Param("targetDate") String targetDate,
                                                    @Param("status") String status,
@@ -332,9 +394,9 @@ public interface AttendanceApplyMapper {
         AND APPLY_TYPE IN (N'연장', N'조출연장')
         AND TARGET_DATE = #{workYmd}
     """)
-    // 승인된 연장, 조출연장
+        // 승인된 연장, 조출연장
     AttendanceApplyGeneral findApprovedOverTime(@Param("empCode") String empCode,
-                                                 @Param("workYmd") String workYmd);
+                                                @Param("workYmd") String workYmd);
 
     @Select("""
         SELECT *
@@ -344,9 +406,9 @@ public interface AttendanceApplyMapper {
         AND APPLY_TYPE = N'휴일근무'
         AND TARGET_DATE = #{workYmd}
     """)
-    // 승인된 휴일근무
+        // 승인된 휴일근무
     AttendanceApplyGeneral findApprovedOverTime2(@Param("empCode") String empCode,
-                                                  @Param("workYmd") String workYmd);
+                                                 @Param("workYmd") String workYmd);
 
     @Select("""
         SELECT *
