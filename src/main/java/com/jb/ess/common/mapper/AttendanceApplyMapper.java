@@ -158,7 +158,7 @@ public interface AttendanceApplyMapper {
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.DEPT_CODE = #{deptCode}
         AND h.EMP_STATE = 'WORK'
-        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
+        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
     """)
     List<Employee> findEmployeesByDept(@Param("deptCode") String deptCode,
                                        @Param("workDate") String workDate,
@@ -182,7 +182,7 @@ public interface AttendanceApplyMapper {
         <if test="workPlan != null and workPlan != ''">
             AND sm.SHIFT_NAME = #{workPlan}
         </if>
-        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
+        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
         </script>
     """)
     List<Employee> findEmployeesByDeptWithSort(@Param("deptCode") String deptCode,
@@ -203,7 +203,7 @@ public interface AttendanceApplyMapper {
                AND wc.YYYYMMDD = #{workDate}
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.EMP_CODE = #{empCode}
-        ORDER BY ISNULL(p.POSITION_CODE, 999) ASC, h.EMP_CODE ASC
+        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
     """)
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
