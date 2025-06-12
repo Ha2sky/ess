@@ -63,33 +63,33 @@
 
     <!-- 이력 테이블 -->
     <div class="overflow-x-auto rounded-lg border mb-6">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
         <thead class="bg-gray-600 text-white">
         <tr>
-          <th class="px-4 py-3">신청일</th>
-          <th class="px-4 py-3">대상일</th>
-          <th class="px-4 py-3">부서</th>
-          <th class="px-4 py-3">대상자</th>
-          <th class="px-4 py-3">신청근태</th>
-          <th class="px-4 py-3">상태</th>
+          <th class="border px-4 py-3">신청일</th>
+          <th class="border px-4 py-3">대상일</th>
+          <th class="border px-4 py-3">부서</th>
+          <th class="border px-4 py-3">대상자</th>
+          <th class="border px-4 py-3">신청근태</th>
+          <th class="border px-4 py-3">상태</th>
         </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
         <tr th:each="item : ${attList}" class="hover:bg-gray-50 cursor-pointer">
             <!--th:onclick="|showDetails('${item.applyDate}', '${item.targetDate}', '${item.deptName}', '${item.empCode}', '${item.empName}', '${item.shiftName}', '${item.status}')|">-->
-          <td class="px-4 py-2 text-center"
+          <td class="border px-4 py-2 text-center"
               th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(item.applyDate)}|"></td>
-          <td class="px-4 py-2 text-center"
+          <td class="border px-4 py-2 text-center"
               th:text="${item.targetEndDate == null} ?
       ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetDate)} :
       ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetDate)} + ' ~ ' + ${T(com.jb.ess.common.util.DateUtil).formatDate(item.targetEndDate)}">
           </td>
 
 
-          <td class="px-4 py-2 text-center" th:text="${item.deptName}"></td>
-          <td class="px-4 py-2 text-center" th:text="${item.empCode} + '/' + ${item.empName}"></td>
-          <td class="px-4 py-2 text-center" th:text="${item.applyType}"></td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+          <td class="border px-4 py-2 text-center" th:text="${item.deptName}"></td>
+          <td class="border px-4 py-2 text-center" th:text="${item.empCode} + '/' + ${item.empName}"></td>
+          <td class="border px-4 py-2 text-center" th:text="${item.applyType}"></td>
+          <td class="border px-4 py-2 text-center"
               th:classappend="
             ${item.status} == '승인' ? 'bg-green-100 text-green-800' :
             (${item.status} == '반려' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800')">
@@ -109,16 +109,16 @@
     <!-- 신청 정보 -->
     <div class="border rounded-lg p-4 mb-4">
       <div class="grid grid-cols-2 gap-4 mb-2">
-        <div><strong>대상자</strong>: <span id="empInfo">-</span></div>
+        <div><strong>신청자</strong>: <span id="appEmpCode">-</span></div>
+        <div><strong>부서명</strong>: <span id="appDeptCode">-</span></div>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-2">
+        <div><strong>대상자</strong>: <span id="targetEmpCode">-</span></div>
+        <div><strong>부서명</strong>: <span id="targetDeptCode">-</span></div>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-2">
         <div><strong>신청일</strong>: <span id="applyDate">-</span></div>
-      </div>
-      <div class="grid grid-cols-2 gap-4 mb-2">
-        <div><strong>부서</strong>: <span id="deptName">-</span></div>
-        <div><strong>신청구분</strong>: <span id="shiftName">-</span></div>
-      </div>
-      <div class="grid grid-cols-2 gap-4 mb-2">
-        <div><strong>적용기간</strong>: <span id="targetDate">-</span></div>
-        <div><strong>처리상태</strong>: <span id="status">-</span></div>
+        <div><strong>계획근무</strong>: <span id="applyType">-</span></div>
       </div>
     </div>
 
