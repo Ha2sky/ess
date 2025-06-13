@@ -563,7 +563,7 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 일반근태 승인 처리 - 올바른 실적 업데이트 로직 적용
+     * 일반근태 승인 처리
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
@@ -590,18 +590,14 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
 
-            // 수정: 올바른 실적 업데이트 로직
             String applyType = apply.getApplyType();
             if ("휴일근무".equals(applyType)) {
-                // 휴일근무만 실적을 변경
                 attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
                 log.debug("휴일근무 승인 완료: 실적 변경 (14-1)");
             } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
-                // 수정: 전반차/후반차는 연차 차감만 하고 실적은 변경하지 않음
                 deductAnnualLeave(apply.getEmpCode(), new BigDecimal("0.5"));
                 log.debug("전반차/후반차 승인 완료: 연차 차감만 실행 (실적 변경 없음)");
             }
-            // 연장, 조출연장, 조퇴, 외근, 외출은 실적 변경하지 않음 (시간만 조정)
 
             log.info("일반근태 승인 처리 완료: applyGeneralNo={}", applyGeneralNo);
         } catch (Exception e) {
@@ -611,7 +607,7 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 기타근태 승인 처리 - 연차도 실적 변경하지 않음 (동적 계산)
+     * 기타근태 승인 처리
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
@@ -638,17 +634,12 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
-            // 수정: 연차도 실적 변경하지 않고 동적 계산으로 처리
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
-                    // 수정: 연차 차감만 하고 실적은 동적 계산으로 처리 (계획 보존)
                     deductAnnualLeave(apply.getEmpCode(), BigDecimal.ONE);
-                    // 이 줄 삭제! 계획을 바꾸는 원인
-                    // attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetStartDate(), "06");
                     log.debug("연차 승인 완료: 연차 차감만 실행 (실적은 동적 계산으로 처리)");
                 } else {
-                    // 연차가 아닌 기타근태는 실적 변경하지 않음
                     log.debug("기타근태 승인 완료: 실적 변경 없음 (shiftName={})", shiftName);
                 }
             }

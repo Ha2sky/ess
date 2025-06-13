@@ -76,14 +76,13 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 부서별 사원 조회 API - 근태신청종류별 필터링 추가 및 정렬 강화
+    // 부서별 사원 조회 API
     @GetMapping("/employees")
     @ResponseBody
     public List<Employee> getEmployeesByDept(@RequestParam String deptCode,
                                              @RequestParam String workDate,
                                              @RequestParam(required = false) String workPlan,
                                              @RequestParam(required = false) String sortBy,
-                                             // 수정: 근태신청종류 카테고리 파라미터 추가
                                              @RequestParam(required = false) String applyTypeCategory,
                                              @AuthenticationPrincipal CustomUserDetails user) {
 
@@ -113,12 +112,11 @@ public class AttendanceApplyController {
             log.debug("사원 조회 요청: empCode={}, deptCode={}, workDate={}, sortBy={}, applyTypeCategory={}",
                     empCode, deptCode, workDate, sortBy, applyTypeCategory);
 
-            // 수정: 기본 정렬을 직위순으로 강화 설정
             String finalSortBy = (sortBy != null && !sortBy.trim().isEmpty()) ? sortBy : "position,empCode,empName";
 
             // 부서장인 경우 부서원 전체, 일반 사원인 경우 본인만 조회
             if ("Y".equals(currentEmp.getIsHeader())) {
-                // 수정: 근태신청종류별 필터링 적용
+                // 근태신청종류별 필터링
                 if (applyTypeCategory != null && !applyTypeCategory.trim().isEmpty()) {
                     // 근태신청종류가 지정된 경우 필터링된 조회
                     return attendanceApplyService.getEmployeesByDeptWithApplyType(deptCode, workDate, workPlan, finalSortBy, applyTypeCategory);
@@ -127,7 +125,7 @@ public class AttendanceApplyController {
                     return attendanceApplyService.getEmployeesByDept(deptCode, workDate, workPlan, finalSortBy);
                 }
             } else {
-                // 수정: 일반 사원도 근태신청종류별 필터링 적용
+                // 근태신청종류별 필터링 적용
                 if (applyTypeCategory != null && !applyTypeCategory.trim().isEmpty()) {
                     // 근태신청종류가 지정된 경우 필터링된 조회
                     return attendanceApplyService.getCurrentEmployeeListWithApplyType(empCode, workDate, applyTypeCategory);
@@ -145,7 +143,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 기타근태 날짜 범위 검증 API 추가
+    // 기타근태 날짜 범위 검증 API 추가
     @GetMapping("/validateDateRange")
     @ResponseBody
     public Map<String, Object> validateDateRange(@RequestParam String startDate, @RequestParam String endDate) {
@@ -181,7 +179,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 근무계획/실적/예상근로시간 조회 API - empCalendar 활용 강화
+    // 근무계획/실적/예상근로시간 조회 API
     @GetMapping("/workInfo/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
@@ -246,7 +244,7 @@ public class AttendanceApplyController {
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
             apply.setStatus("저장");
 
-            // 수정: 결근 사원 체크
+            // 결근 사원 체크
             boolean isAbsent = attendanceApplyService.isEmployeeAbsent(apply.getEmpCode(), apply.getTargetDate());
             if (isAbsent) {
                 response.put("result", "error");
@@ -273,7 +271,7 @@ public class AttendanceApplyController {
 
             attendanceApplyService.saveGeneralApply(apply);
 
-            // 수정: 휴일근로 신청 후 실적 업데이트 처리
+            // 휴일근로 신청 후 실적 업데이트 처리
             if ("휴일근무".equals(apply.getApplyType())) {
                 attendanceApplyService.updateWorkRecordForHolidayWork(apply.getEmpCode(), apply.getTargetDate());
             }
@@ -304,7 +302,7 @@ public class AttendanceApplyController {
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
             apply.setStatus("저장");
 
-            // 수정: 결근 사원 체크
+            // 결근 사원 체크
             boolean isAbsent = attendanceApplyService.isEmployeeAbsent(apply.getEmpCode(), apply.getTargetStartDate());
             if (isAbsent) {
                 response.put("result", "error");
@@ -322,7 +320,7 @@ public class AttendanceApplyController {
 
             attendanceApplyService.saveEtcApply(apply);
 
-            // 수정: 연차/반차 신청 후 실적 업데이트 처리
+            // 연차/반차 신청 후 실적 업데이트
             if (apply.getShiftCode() != null) {
                 attendanceApplyService.updateWorkRecordForAnnualLeave(apply.getEmpCode(), apply.getTargetStartDate(), apply.getShiftCode());
             }
@@ -346,11 +344,9 @@ public class AttendanceApplyController {
     @PostMapping("/submit/general")
     @ResponseBody
     public String submitGeneralApply(@RequestParam String applyGeneralNo,
-                                     // 수정: 부서장 여부 파라미터 추가
                                      @RequestParam(required = false) String isHeader,
                                      @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            // 수정: 결근 사원 체크
             AttendanceApplyGeneral apply = attendanceApplyService.getSavedGeneralApply(applyGeneralNo);
             if (apply != null) {
                 boolean isAbsent = attendanceApplyService.isEmployeeAbsent(apply.getEmpCode(), apply.getTargetDate());
@@ -359,7 +355,6 @@ public class AttendanceApplyController {
                 }
             }
 
-            // 수정: 부서장 자동승인 처리 개선
             attendanceApplyService.submitGeneralApply(applyGeneralNo, user.getUsername(), isHeader);
             return "success";
         } catch (Exception e) {
@@ -372,11 +367,9 @@ public class AttendanceApplyController {
     @PostMapping("/submit/etc")
     @ResponseBody
     public String submitEtcApply(@RequestParam String applyEtcNo,
-                                 // 수정: 부서장 여부 파라미터 추가
                                  @RequestParam(required = false) String isHeader,
                                  @AuthenticationPrincipal CustomUserDetails user) {
         try {
-            // 수정: 결근 사원 체크
             AttendanceApplyEtc apply = attendanceApplyService.getSavedEtcApply(applyEtcNo);
             if (apply != null) {
                 boolean isAbsent = attendanceApplyService.isEmployeeAbsent(apply.getEmpCode(), apply.getTargetStartDate());
@@ -385,7 +378,6 @@ public class AttendanceApplyController {
                 }
             }
 
-            // 수정: 부서장 자동승인 처리 개선
             attendanceApplyService.submitEtcApply(applyEtcNo, user.getUsername(), isHeader);
             return "success";
         } catch (Exception e) {

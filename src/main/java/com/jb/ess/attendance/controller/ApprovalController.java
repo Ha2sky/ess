@@ -57,7 +57,6 @@ public class ApprovalController {
 
             if (startDate == null || endDate == null) {
                 LocalDate today = LocalDate.now();
-                // 수정: 이번달 1일부터 말일까지로 설정
                 LocalDate firstDay = today.withDayOfMonth(1);
                 LocalDate lastDay = today.withDayOfMonth(today.lengthOfMonth());
 
@@ -70,7 +69,7 @@ public class ApprovalController {
             String approverCode = user.getUsername();
             log.debug("결재 문서 조회: 결재자={}, 기간={} ~ {}, 활성탭={}", approverCode, startDate, endDate, activeTab);
 
-            // 결재 문서 조회 (수정: 부서장 자동승인 문서도 포함)
+            // 결재 문서 조회
             List<AttendanceApplyGeneral> pendingGenerals = approvalService.getPendingGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
             List<AttendanceApplyEtc> pendingEtcs = approvalService.getPendingEtcApprovals(approverCode, startDate, endDate, empCode);
             List<AttendanceApplyGeneral> approvedGenerals = approvalService.getApprovedGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
@@ -103,7 +102,7 @@ public class ApprovalController {
     }
 
     /**
-     * 수정: 신청 상세 정보 조회 API - 근태기 정보, 실제 사유, undefined 문제 해결
+     * 신청 상세 정보 조회 API
      */
     @GetMapping("/detail/{type}/{applyNo}")
     @ResponseBody
@@ -118,7 +117,7 @@ public class ApprovalController {
                 result = approvalService.getEtcApplyDetail(applyNo);
             }
 
-            // 수정: 근태기 정보 추가
+            // 근태기 정보
             if (result != null && !result.containsKey("error")) {
                 try {
                     List<Map<String, Object>> attendanceInfo = approvalService.getAttendanceInfo(type, applyNo);
@@ -138,7 +137,7 @@ public class ApprovalController {
     }
 
     /**
-     * 수정: 일반근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
+     * 일반근태 승인 처리
      */
     @PostMapping("/approve/general")
     @ResponseBody
@@ -153,7 +152,7 @@ public class ApprovalController {
                 return "error: 부서장만 승인 가능합니다.";
             }
 
-            // 수정: 승인 처리 시 연차 차감 및 실적 업데이트 포함
+            // 승인 처리 시 연차 차감 및 실적 업데이트
             approvalService.approveGeneralApply(applyGeneralNo, user.getUsername());
             log.info("일반근태 승인 완료: 신청번호={}", applyGeneralNo);
             return "success";
@@ -164,7 +163,7 @@ public class ApprovalController {
     }
 
     /**
-     * 수정: 기타근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
+     * 기타근태 승인 처리
      */
     @PostMapping("/approve/etc")
     @ResponseBody
@@ -179,7 +178,7 @@ public class ApprovalController {
                 return "error: 부서장만 승인 가능합니다.";
             }
 
-            // 수정: 승인 처리 시 연차 차감 및 실적 업데이트 포함
+            // 승인 처리 시 연차 차감 및 실적 업데이트
             approvalService.approveEtcApply(applyEtcNo, user.getUsername());
             log.info("기타근태 승인 완료: 신청번호={}", applyEtcNo);
             return "success";
