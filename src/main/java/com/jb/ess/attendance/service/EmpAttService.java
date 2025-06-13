@@ -9,6 +9,7 @@ import com.jb.ess.common.mapper.EmpCalendarMapper;
 import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.util.DateUtil;
+import com.jb.ess.common.util.DurationParseUtil;
 import com.jb.ess.common.util.WorkHoursCalculator;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -78,14 +79,15 @@ public class EmpAttService {
 
 
     /* 주단위 근무시간 계산 */
-    public Duration getWorkHoursForWeek(String empCode, LocalDate weekStart, LocalDate weekEnd) {
+    public Duration getWorkHoursForWeek(String empCode, LocalDate weekStart, LocalDate weekEnd, Employee emp) {
         Duration workHours = Duration.ZERO;
 
         for (LocalDate date = weekStart; !date.isAfter(weekEnd); date = date.plusDays(1)) {
             String ymd = DateUtil.reverseFormatDate(date);
-            AttendanceApplyGeneral overtime = attendanceApplyMapper.findApprovedOverTime(empCode, ymd);
+            List<AttendanceApplyGeneral> overtimes = attendanceApplyMapper.findApprovedOverTimes(empCode, ymd);
             AttendanceApplyGeneral overtime2 = attendanceApplyMapper.findApprovedOverTime2(empCode, ymd);
-            // 공휴일 스킵
+
+            // 공휴일 && 휴일근무X 스킵
             if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd)) && overtime2 == null)
                 continue;
 
@@ -100,6 +102,7 @@ public class EmpAttService {
                 // 결근이 아닐때
                 if (shift != null && !Objects.equals(shift.getShiftCode(), "00")) {
                     List<Pair<String, String>> leavePeriods = new ArrayList<>();
+                    // 외출, 조퇴, 전반차, 후반차
                     List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, ymd, "승인완료");
                     for (String timeItemName : timeItemNames) {
                         AttendanceApplyGeneral attendanceApplyGeneral = attendanceApplyMapper.findStartTimeAndEndTime(empCode, ymd, "승인완료", timeItemName);
@@ -125,20 +128,34 @@ public class EmpAttService {
                 }
             }
 
-            if (overtime != null) {
+            /* 연장근무 */
+            Duration overtimeHours = Duration.ZERO;
+            for (AttendanceApplyGeneral overtime : overtimes) {
                 shift = shiftMasterMapper.findShiftByCode(empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd));
                 shift.setWorkOnHhmm(overtime.getStartTime());
                 shift.setWorkOffHhmm(overtime.getEndTime());
-                workHours = workHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
+                overtimeHours = DurationParseUtil.parseHourStringToDuration(emp.getOverTime()).plus(WorkHoursCalculator.getTotalWorkTime(shift));
+                emp.setOverTime(String.format("%.2f", overtimeHours.toMinutes() / 60.0));
             }
 
+            /* 휴일근무 */
+            Duration overtime2Hours = Duration.ZERO;
             if (overtime2 != null) {
-                shift = shiftMasterMapper.findShiftByCode(empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd));
+                shift = shiftMasterMapper.findShiftByCode("14-1");
                 shift.setWorkOnHhmm(overtime2.getStartTime());
                 shift.setWorkOffHhmm(overtime2.getEndTime());
-                workHours = workHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
+                shift.setWorkOnDayType("N0");
+                shift.setWorkOffDayType("N0");
+                overtime2Hours = DurationParseUtil.parseHourStringToDuration(emp.getOverTime2()).plus(WorkHoursCalculator.getTotalWorkTime(shift));
+                emp.setOverTime2(String.format("%.2f", overtime2Hours.toMinutes() / 60.0));
             }
+
+            workHours = workHours.plus(overtimeHours);
+            workHours = workHours.plus(overtime2Hours);
         }
+
+        if (emp.getOverTime() == null) emp.setOverTime("-");
+        if (emp.getOverTime2() == null) emp.setOverTime2("-");
 
         return workHours;
     }
@@ -236,38 +253,13 @@ public class EmpAttService {
             emp.setShiftName(shiftMasterMapper.findShiftNameByShiftCode(emp.getShiftCode()));
 
             // 4. 가근태 조회
-            List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, workYmd, "승인완료");
+            List<String> timeItemNames = attendanceApplyMapper.findApprovedNotOvertime(empCode, workYmd, "승인완료");
             if (!timeItemNames.isEmpty()) {
-                emp.setTimeItemNames(timeItemNames); // 예: "조퇴, 외출"
+                emp.setTimeItemNames(timeItemNames); // 연장, 조출연장, 기타근태를 제외한 모든근태
             }
 
-            // 5. 연장근무 조회
-            AttendanceApplyGeneral overtime = attendanceApplyMapper.findApprovedOverTime(empCode, workYmd);
-            Duration totalOverTime = Duration.ZERO;
-            if (overtime != null) {
-                ShiftMaster shift = shiftMasterMapper.findShiftByCode(emp.getShiftCode());
-                shift.setWorkOnHhmm(overtime.getStartTime());
-                shift.setWorkOffHhmm(overtime.getEndTime());
-                Duration workTime = WorkHoursCalculator.getTotalWorkTime(shift);
-                emp.setOverTime(String.format("%05.2f", workTime.toMinutes() / 60.0));
-            } else emp.setOverTime("-");
-
-            // 6. 휴일근무 조회
-            AttendanceApplyGeneral overtime2 = attendanceApplyMapper.findApprovedOverTime2(empCode, workYmd);
-            Duration totalOverTime2 = Duration.ZERO;
-            if (overtime2 != null) {
-                ShiftMaster shift = shiftMasterMapper.findShiftByCode(emp.getShiftCode());
-                shift.setWorkOnHhmm(overtime2.getStartTime());
-                shift.setWorkOffHhmm(overtime2.getEndTime());
-                Duration workTime = WorkHoursCalculator.getTotalWorkTime(shift);
-                emp.setOverTime2(String.format("%05.2f", workTime.toMinutes() / 60.0));
-                emp.setShiftCode("14-1");
-                emp.setShiftName("휴일근무");
-            } else emp.setOverTime2("-");
-            // 7. 주간 근무시간 및 잔여시간 계산
-            Duration weeklyHours = getWorkHoursForWeek(empCode, weekStart, weekEnd);
-            weeklyHours = weeklyHours.plus(totalOverTime);
-            weeklyHours = weeklyHours.plus(totalOverTime2);
+            // 5. 주간 근무시간 및 잔여시간 계산
+            Duration weeklyHours = getWorkHoursForWeek(empCode, weekStart, weekEnd, emp);
             String formattedHours = String.format("%.2f", weeklyHours.toMinutes() / 60.0);
             emp.setWorkHours(formattedHours);
             try {

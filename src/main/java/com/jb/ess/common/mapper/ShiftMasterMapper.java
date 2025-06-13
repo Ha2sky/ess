@@ -30,13 +30,6 @@ public interface ShiftMasterMapper {
     String findWorkOnHourByShiftCode(String shiftCode);
 
     @Select("""
-        SELECT WORK_OFF_HHMM
-        FROM HRTSHIFTMASTER
-        WHERE SHIFT_CODE = #{shiftCode}
-    """)
-    String findWorkOffHourByShiftCode(String shiftCode);
-
-    @Select("""
         SELECT SHIFT_NAME
         FROM HRTSHIFTMASTER
         WHERE SHIFT_CODE = #{shiftCode}

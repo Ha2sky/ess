@@ -365,12 +365,25 @@ public interface AttendanceApplyMapper {
         WHERE EMP_CODE = #{empCode}
         AND TARGET_DATE = #{workYmd}
         AND STATUS = #{status}
-        AND APPLY_TYPE IN (N'조퇴', N'외출', N'전반차', N'후반차')
+        AND APPLY_TYPE IN (N'외출', N'조퇴', N'전반차', N'후반차')
     """)
         // 승인된 가근태 찾기
     List<String> findApprovedTimeItemCode(@Param("empCode") String empCode,
                                           @Param("workYmd") String workYmd,
                                           @Param("status") String status);
+
+    @Select("""
+        SELECT APPLY_TYPE
+        FROM HRTATTAPLGENERAL
+        WHERE EMP_CODE = #{empCode}
+        AND TARGET_DATE = #{workYmd}
+        AND STATUS = #{status}
+        AND APPLY_TYPE NOT IN (N'연장', N'조출연장')
+    """)
+        // 승인된 가근태 찾기
+    List<String> findApprovedNotOvertime(@Param("empCode") String empCode,
+                                         @Param("workYmd") String workYmd,
+                                         @Param("status") String status);
 
     @Select("""
         SELECT START_TIME, END_TIME
@@ -395,8 +408,8 @@ public interface AttendanceApplyMapper {
         AND TARGET_DATE = #{workYmd}
     """)
         // 승인된 연장, 조출연장
-    AttendanceApplyGeneral findApprovedOverTime(@Param("empCode") String empCode,
-                                                @Param("workYmd") String workYmd);
+    List<AttendanceApplyGeneral> findApprovedOverTimes(@Param("empCode") String empCode,
+                                                      @Param("workYmd") String workYmd);
 
     @Select("""
         SELECT *
@@ -409,33 +422,6 @@ public interface AttendanceApplyMapper {
         // 승인된 휴일근무
     AttendanceApplyGeneral findApprovedOverTime2(@Param("empCode") String empCode,
                                                  @Param("workYmd") String workYmd);
-
-    @Select("""
-        SELECT *
-        FROM HRTATTAPLGENERAL
-        WHERE EMP_CODE = #{empCode}
-        AND STATUS = N'승인완료'
-        AND APPLY_TYPE IN (N'연장', N'조출연장')
-        AND TARGET_DATE = #{workYmd}
-    """)
-        // 승인된 연장, 조출연장
-    List<AttendanceApplyGeneral> findApprovedOverTimes(@Param("empCode") String empCode,
-                                                       @Param("startYmd") String startYmd,
-                                                       @Param("endYmd") String endYmd);
-
-    @Select("""
-        SELECT *
-        FROM HRTATTAPLGENERAL
-        WHERE EMP_CODE = #{empCode}
-        AND STATUS = N'승인완료'
-        AND APPLY_TYPE = N'휴일근무'
-        AND TARGET_DATE BETWEEN #{startYmd} AND #{endYmd}
-    """)
-        // 승인된 휴일근무
-    List<AttendanceApplyGeneral> findApprovedOverTimes2(@Param("empCode") String empCode,
-                                                        @Param("startYmd") String startYmd,
-                                                        @Param("endYmd") String endYmd);
-
 
     @Select("""
         SELECT
