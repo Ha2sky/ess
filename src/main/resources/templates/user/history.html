@@ -83,7 +83,18 @@
              data-target-emp-name=${item.targetEmpName},
              data-target-dept-name=${item.targetDeptName},
              data-apply-date=${item.applyDate},
-             data-shift-name=${item.shiftName}"
+             data-shift-name=${item.shiftName},
+             data-target-date=${item.targetDate},
+             data-target-end-date=${item.targetEndDate},
+             data-reason=${item.reason},
+             data-apply-date-time=${item.applyDateTime},
+             data-start-time=${item.startTime},
+             data-end-time=${item.endTime},
+             data-overtime=${item.overtime},
+             data-holiday=${item.holiday},
+             data-apply-type=${item.applyType},
+             data-check-in-time=${item.checkInTime},
+             data-check-out-Time=${item.checkOutTime}"
             onclick="showDetails(this.dataset)">
 
         <td class="border px-4 py-2 text-center"
@@ -133,12 +144,37 @@
 
     <!-- 신청정보(변경) -->
     <div class="border border-gray-300 rounded-lg p-4 mb-4 bg-gray-50">
-      <h3 class="text-sm font-semibold text-gray-700 mb-2">신청정보 [변경]</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <div><strong>기간</strong>: <span id="changePeriod">-</span></div>
-        <div><strong>신청구분</strong>: <span id="changeType">-</span></div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">
+        신청정보
+        <span id="applyTypeInfo"></span>
+      </h3>
+      <!-- 연장근로 전용 -->
+      <div id="overtimeApplyInfo" class="grid grid-cols-2 gap-4 hidden">
+        <div><strong>근무일</strong>: <span id="overtimeWorkDate">-</span></div>
+        <div><strong>사유</strong>: <span id="overtimeReason">-</span></div>
+        <div><strong>연장근무시간</strong>: <span id="overtime">-</span></div>
       </div>
-      <div class="mt-2"><strong>사유</strong>: <span id="reason">-</span></div>
+
+      <!-- 휴일근로 전용 -->
+      <div id="holidayApplyInfo" class="grid grid-cols-2 gap-4 hidden">
+        <div><strong>근무일</strong>: <span id="holidayWorkDate">-</span></div>
+        <div><strong>사유</strong>: <span id="holidayReason">-</span></div>
+        <div><strong>휴일근무시간</strong>: <span id="holidayTime">-</span></div>
+      </div>
+
+      <!-- 조퇴/외출/반차 전용 -->
+      <div id="earlyLeaveApplyInfo" class="grid grid-cols-2 gap-4 hidden">
+        <div><strong>대상일</strong>: <span id="earlyLeaveDate">-</span></div>
+        <div><strong>사유</strong>: <span id="earlyLeaveReason">-</span></div>
+        <div><strong>시간</strong>: <span id="earlyLeaveTime">-</span></div>
+      </div>
+
+      <!-- 기타근태 전용 -->
+      <div id="etcApplyInfo" class="grid grid-cols-2 gap-4 hidden">
+        <div><strong>대상일</strong>: <span id="etcDate">-</span></div>
+        <div><strong>사유</strong>: <span id="etcReason">-</span></div>
+        <div><strong>시간</strong>: <span id="etcTime">-</span></div>
+      </div>
     </div>
 
     <!-- 근무 정보 -->
@@ -198,17 +234,45 @@
     document.getElementById('applyDate').innerText = formatDate(data.applyDate);
     document.getElementById('applyType').innerText = data.shiftName || '-';
 
-    /*
-    // 신청정보(변경) — 예시로 임시 값, 실제 detail2 등에 맞게 변경 필요
-    document.getElementById('changePeriod').innerText = detail2.changePeriod || '-';
-    document.getElementById('changeType').innerText = detail2.changeType || '-';
-    document.getElementById('reason').innerText = detail2.reason || '-';
+    // 신청정보[변경] 영역 동적 처리
+    const applyType = data.applyType;
+
+    // 모든 조건부 영역 숨김
+    document.getElementById("overtimeApplyInfo").classList.add("hidden");
+    document.getElementById("earlyLeaveApplyInfo").classList.add("hidden");
+    document.getElementById("etcApplyInfo").classList.add("hidden");
+    document.getElementById("holidayApplyInfo").classList.add("hidden");
+
+    document.getElementById("applyTypeInfo").innerText = "[" + data.applyType + "]";
+
+    if (applyType === "연장근로") {
+      document.getElementById("overtimeApplyInfo").classList.remove("hidden");
+      document.getElementById("overtimeWorkDate").innerText = formatDate(data.workDate) || "-";
+      document.getElementById("overTimeReason").innerText = data.reason || "-";
+      document.getElementById("overtime").innerText = data.overtime || "-";
+    } else if (applyType === "휴일근무") {
+      document.getElementById("holidayApplyInfo").classList.remove("hidden");
+      document.getElementById("holidayWorkDate").innerText = formatDate(data.workDate) || "-";
+      document.getElementById("holidayReason").innerText = data.reason || "-";
+      document.getElementById("holidayTime").innerText = data.holiday || "-";
+    } else if (applyType === "조퇴" || applyType === "외출" || applyType === "전반차" || applyType === "후반차") {
+      document.getElementById("earlyLeaveApplyInfo").classList.remove("hidden");
+      document.getElementById("earlyLeaveDate").innerText = formatDate(data.targetDate) || "-";
+      document.getElementById("earlyLeaveReason").innerText = data.reason || "-";
+      document.getElementById("earlyLeaveTime").innerText = formatTime(data.startTime) + '~' + formatTime(data.endTime);
+    } else {
+      document.getElementById("etcApplyInfo").classList.remove("hidden");
+      document.getElementById("etcDate").innerText = formatDate(data.targetDate) || "-";
+      document.getElementById("etcReason").innerText = data.reason || "-";
+      document.getElementById("etcTime").innerText = formatDate(data.targetDate) + '~' + formatDate(data.targetEndDate);
+    }
 
     // 근무 정보
-    document.getElementById('workDate').innerText = detail3.workDate || '-';
-    document.getElementById('startTime').innerText = detail3.checkInTime || '-';
-    document.getElementById('endTime').innerText = detail3.checkOutTime || '-';
+    document.getElementById('workDate').innerText = formatDate(data.targetDate) || '-';
+    document.getElementById('startTime').innerText = formatTime2(data.checkInTime) || '-';
+    document.getElementById('endTime').innerText = formatTime2(data.checkOutTime) || '-';
 
+    /*
     // 결재 정보(예시)
     if(detail4 && detail4.length > 0) {
       let html = '';
@@ -229,6 +293,7 @@
       document.getElementById('approvalList').innerHTML = `
       <tr><td class="border px-2 py-1 text-center" colspan="7">결재 정보 없음</td></tr>`;
     }
+
      */
   }
 
@@ -237,6 +302,20 @@
     // 날짜 포맷 예: 20250411 -> 2025-04-11 또는 이미 - 포함된 경우는 그대로 반환
     if (yyyymmdd.includes('-')) return yyyymmdd;
     return yyyymmdd.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+  }
+
+  function formatTime(hhmm) {
+    if (!hhmm) return '-';
+    // 날짜 포맷 예: 20250411 -> 2025-04-11 또는 이미 - 포함된 경우는 그대로 반환
+    if (hhmm.includes('-')) return hhmm;
+    return hhmm.replace(/(\d{2})(\d{2})/, '$1:$2');
+  }
+
+  function formatTime2(hhmmss) {
+    if (!hhmmss) return '-';
+    // 날짜 포맷 예: 20250411 -> 2025-04-11 또는 이미 - 포함된 경우는 그대로 반환
+    if (hhmmss.includes('-')) return hhmmss;
+    return hhmmss.replace(/(\d{2})(\d{2})(\d{2})/, '$1:$2:$3');
   }
 
 </script>

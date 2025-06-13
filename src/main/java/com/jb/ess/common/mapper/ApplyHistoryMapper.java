@@ -43,7 +43,7 @@ public interface ApplyHistoryMapper {
             NULL AS endTime,        
             etc.TARGET_END_DATE AS targetEndDate,
             etc.EMP_CODE AS empCode,
-            etc.SHIFT_CODE AS applyType,
+            shift.SHIFT_NAME AS applyType,
             etc.STATUS AS status,
             etc.APPLY_DATE_TIME AS applyDateTime,
             dept.DEPT_NAME AS deptName,
@@ -52,6 +52,8 @@ public interface ApplyHistoryMapper {
         FROM HRTATTAPLETC etc
         LEFT JOIN ORGDEPTMASTER dept ON etc.DEPT_CODE = dept.DEPT_CODE
         LEFT JOIN HRIMASTER emp ON etc.EMP_CODE = emp.EMP_CODE
+        LEFT JOIN HRTSHIFTMASTER shift ON etc.SHIFT_CODE = shift.SHIFT_CODE
+        
         WHERE (etc.APPLICANT_CODE = #{empCode} OR etc.EMP_CODE = #{empCode})
         AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
@@ -128,7 +130,7 @@ public interface ApplyHistoryMapper {
             etc.TARGET_START_DATE AS targetDate,
             etc.TARGET_END_DATE AS targetEndDate,
             etc.EMP_CODE AS empCode,
-            etc.SHIFT_CODE AS applyType,
+            shift.SHIFT_NAME AS applyType,
             etc.STATUS AS status,
             etc.APPLICANT_CODE AS applyEmpCode,
             etc.REASON AS reason,
@@ -138,6 +140,7 @@ public interface ApplyHistoryMapper {
         FROM HRTATTAPLETC etc
         LEFT JOIN ORGDEPTMASTER dept ON etc.DEPT_CODE = dept.DEPT_CODE
         LEFT JOIN HRIMASTER emp ON etc.EMP_CODE = emp.EMP_CODE
+        LEFT JOIN HRTSHIFTMASTER shift ON etc.SHIFT_CODE = shift.SHIFT_CODE
         WHERE (etc.APPLICANT_CODE = #{empCode} OR etc.EMP_CODE = #{empCode})
         AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}

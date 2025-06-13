@@ -50,6 +50,7 @@ public class HistoryService {
             applyList = applyHistoryMapper.getApplyListEtc(DateUtil.reverseFormatDate(startDate),
                                                            DateUtil.reverseFormatDate(endDate),
                                                            status, empCode);
+
         }
 
         setApplyList(applyList);
@@ -79,7 +80,9 @@ public class HistoryService {
 
                 // 기타근태
             } else {
-
+                ShiftMaster shift = shiftMasterMapper.findShiftByName(applyHistory.getShiftName());
+                applyHistory.setStartTime(shift == null ? "-" : shift.getWorkOnHhmm());
+                applyHistory.setEndTime(shift == null ? "-" : shift.getWorkOffHhmm());
             }
 
             // 신청자 사번, 이름, 부서명
