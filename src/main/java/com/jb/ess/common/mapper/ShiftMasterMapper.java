@@ -3,6 +3,7 @@ package com.jb.ess.common.mapper;
 import com.jb.ess.common.domain.ShiftMaster;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
@@ -42,4 +43,17 @@ public interface ShiftMasterMapper {
         WHERE SHIFT_NAME = #{planType}
     """)
     String findShiftCodeByPlanType(String planType);
+
+    @Select("""
+        SELECT SHIFT_NAME
+        FROM HRTSHIFTMASTER
+        WHERE SHIFT_CODE = (
+            SELECT SHIFT_CODE
+            FROM HRTWORKEMPCALENDAR
+            WHERE EMP_CODE = #{empCode}
+            AND YYYYMMDD = #{date}
+        )
+    """)
+    String findShiftNameByEmpCodeAndDate(@Param("empCode") String empCode,
+                                         @Param("date") String date);
 }

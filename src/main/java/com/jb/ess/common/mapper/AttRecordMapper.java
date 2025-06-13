@@ -36,4 +36,13 @@ public interface AttRecordMapper {
     """)
     Map<String, Object> getAttendanceRecordInfo(@Param("empCode") String empCode,
                                                 @Param("workDate") String workDate);
+
+    @Select("""
+        SELECT CHECK_IN_TIME, CHECK_OUT_TIME
+        FROM HRTATTRECORD
+        WHERE EMP_CODE = #{empCode}
+        AND WORK_DATE = #{workDate}
+    """)
+    AttendanceRecord getCheckInOutTimeByEmpCodeAndWorkDate(@Param("empCode") String empCode,
+                                                           @Param("workDate") String workDate);
 }

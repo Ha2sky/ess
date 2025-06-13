@@ -75,9 +75,18 @@
         </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
-        <tr th:each="item : ${attList}" class="hover:bg-gray-50 cursor-pointer">
-            <!--th:onclick="|showDetails('${item.applyDate}', '${item.targetDate}', '${item.deptName}', '${item.empCode}', '${item.empName}', '${item.shiftName}', '${item.status}')|">-->
-          <td class="border px-4 py-2 text-center"
+        <tr th:each="item : ${applyList}" class="hover:bg-gray-50 cursor-pointer"
+            th:attr="data-apply-emp-code=${item.applyEmpCode},
+             data-apply-emp-name=${item.applyEmpName},
+             data-apply-dept-name=${item.applyDeptName},
+             data-target-emp-code=${item.targetEmpCode},
+             data-target-emp-name=${item.targetEmpName},
+             data-target-dept-name=${item.targetDeptName},
+             data-apply-date=${item.applyDate},
+             data-shift-name=${item.shiftName}"
+            onclick="showDetails(this.dataset)">
+
+        <td class="border px-4 py-2 text-center"
               th:text="|${T(com.jb.ess.common.util.DateUtil).formatDate(item.applyDate)}|"></td>
           <td class="border px-4 py-2 text-center"
               th:text="${item.targetEndDate == null} ?
@@ -109,12 +118,12 @@
     <!-- 신청 정보 -->
     <div class="border rounded-lg p-4 mb-4">
       <div class="grid grid-cols-2 gap-4 mb-2">
-        <div><strong>신청자</strong>: <span id="appEmpCode">-</span></div>
-        <div><strong>부서명</strong>: <span id="appDeptCode">-</span></div>
+        <div><strong>신청자</strong>: <span id="appEmpCodeName">-</span></div>
+        <div><strong>부서명</strong>: <span id="appDeptName">-</span></div>
       </div>
       <div class="grid grid-cols-2 gap-4 mb-2">
-        <div><strong>대상자</strong>: <span id="targetEmpCode">-</span></div>
-        <div><strong>부서명</strong>: <span id="targetDeptCode">-</span></div>
+        <div><strong>대상자</strong>: <span id="targetEmpCodeName">-</span></div>
+        <div><strong>부서명</strong>: <span id="targetDeptName">-</span></div>
       </div>
       <div class="grid grid-cols-2 gap-4 mb-2">
         <div><strong>신청일</strong>: <span id="applyDate">-</span></div>
@@ -179,48 +188,57 @@
 </div>
 
 <script>
-  function showDetails(applyDate, targetDate, deptName, empCode, empName, shiftName, status) {
-    document.getElementById('applyDate').innerText = formatDate(applyDate);
-    document.getElementById('targetDate').innerText = formatDate(targetDate);
-    document.getElementById('deptName').innerText = deptName;
-    document.getElementById('empInfo').innerText = `${empCode} / ${empName}`;
-    document.getElementById('shiftName').innerText = shiftName;
-    document.getElementById('status').innerText = status;
+  function showDetails(data) {
+    // 기본 신청정보
+    console.log(data);
+    document.getElementById('appEmpCodeName').innerText = data.applyEmpCode + '/' + data.applyEmpName;
+    document.getElementById('appDeptName').innerText = data.applyDeptName;
+    document.getElementById('targetEmpCodeName').innerText = data.targetEmpCode + '/' + data.targetEmpName;
+    document.getElementById('targetDeptName').innerText = data.targetDeptName;
+    document.getElementById('applyDate').innerText = formatDate(data.applyDate);
+    document.getElementById('applyType').innerText = data.shiftName || '-';
 
-    // 가상의 신청정보/근무/결재 데이터
-    document.getElementById('changePeriod').innerText = '2025-04-11 ~ 2025-04-11';
-    document.getElementById('changeType').innerText = '정상출근';
-    document.getElementById('reason').innerText = '업무요청';
+    /*
+    // 신청정보(변경) — 예시로 임시 값, 실제 detail2 등에 맞게 변경 필요
+    document.getElementById('changePeriod').innerText = detail2.changePeriod || '-';
+    document.getElementById('changeType').innerText = detail2.changeType || '-';
+    document.getElementById('reason').innerText = detail2.reason || '-';
 
-    document.getElementById('workDate').innerText = '2025-04-11';
-    document.getElementById('startTime').innerText = '07:11:49';
-    document.getElementById('endTime').innerText = '16:27:38';
+    // 근무 정보
+    document.getElementById('workDate').innerText = detail3.workDate || '-';
+    document.getElementById('startTime').innerText = detail3.checkInTime || '-';
+    document.getElementById('endTime').innerText = detail3.checkOutTime || '-';
 
-    document.getElementById('approvalList').innerHTML = `
-    <tr>
-      <td class="border px-2 py-1 text-center">1</td>
-      <td class="border px-2 py-1 text-center">결재</td>
-      <td class="border px-2 py-1 text-center">단체부</td>
-      <td class="border px-2 py-1 text-center">팀장</td>
-      <td class="border px-2 py-1 text-center">홍길동</td>
-      <td class="border px-2 py-1 text-center text-green-600 font-semibold">승인</td>
-      <td class="border px-2 py-1 text-center">2025-04-11</td>
-    </tr>
-    <tr>
-      <td class="border px-2 py-1 text-center">2</td>
-      <td class="border px-2 py-1 text-center">결재</td>
-      <td class="border px-2 py-1 text-center">단체부</td>
-      <td class="border px-2 py-1 text-center">팀장</td>
-      <td class="border px-2 py-1 text-center">김철수</td>
-      <td class="border px-2 py-1 text-center text-gray-500 font-semibold">대기</td>
-      <td class="border px-2 py-1 text-center">-</td>
-    </tr>
-  `;
+    // 결재 정보(예시)
+    if(detail4 && detail4.length > 0) {
+      let html = '';
+      detail4.forEach((approval, idx) => {
+        html += `
+      <tr>
+        <td class="border px-2 py-1 text-center">${idx + 1}</td>
+        <td class="border px-2 py-1 text-center">${approval.type || '-'}</td>
+        <td class="border px-2 py-1 text-center">${approval.dept || '-'}</td>
+        <td class="border px-2 py-1 text-center">${approval.position || '-'}</td>
+        <td class="border px-2 py-1 text-center">${approval.name || '-'}</td>
+        <td class="border px-2 py-1 text-center ${approval.status === '승인' ? 'text-green-600 font-semibold' : 'text-gray-500 font-semibold'}">${approval.status || '-'}</td>
+        <td class="border px-2 py-1 text-center">${approval.date || '-'}</td>
+      </tr>`;
+      });
+      document.getElementById('approvalList').innerHTML = html;
+    } else {
+      document.getElementById('approvalList').innerHTML = `
+      <tr><td class="border px-2 py-1 text-center" colspan="7">결재 정보 없음</td></tr>`;
+    }
+     */
   }
 
   function formatDate(yyyymmdd) {
+    if (!yyyymmdd) return '-';
+    // 날짜 포맷 예: 20250411 -> 2025-04-11 또는 이미 - 포함된 경우는 그대로 반환
+    if (yyyymmdd.includes('-')) return yyyymmdd;
     return yyyymmdd.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
   }
+
 </script>
 
 <!-- startDate, endDate, 상태, 근태유형 디폴트 값 -->
@@ -258,6 +276,5 @@
     }
   });
 </script>
-
 </body>
 </html>

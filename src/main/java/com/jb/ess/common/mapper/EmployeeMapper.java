@@ -90,4 +90,11 @@ public interface EmployeeMapper {
     """)
     /* 특정 부서에 소속된 사원코드 리스트 */
     List<String> findEmpCodesByDeptCode(String deptCode);
+
+    @Select("""
+        SELECT EMP_NAME
+        FROM HRIMASTER
+        WHERE EMP_CODE = #{empCode}
+    """)
+    String findEmpNameByEmpCode(String empCode);
 }

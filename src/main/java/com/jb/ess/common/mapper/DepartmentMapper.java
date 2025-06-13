@@ -122,4 +122,15 @@ public interface DepartmentMapper {
     """)
         /* deptCode가 사용중인 workPatternCode 반환 */
     String findWorkPatternCodeByDeptCode(String deptCode);
+
+    @Select("""
+        SELECT DEPT_NAME
+        FROM ORGDEPTMASTER
+        WHERE DEPT_CODE = (
+            SELECT DEPT_CODE
+            FROM HRIMASTER
+            WHERE EMP_CODE = #{empCode}
+        )
+    """)
+    String findDeptNameByEmpCode(String empCode);
 }

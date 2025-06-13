@@ -1,7 +1,7 @@
 package com.jb.ess.attendance.controller;
 
 import com.jb.ess.attendance.service.HistoryService;
-import com.jb.ess.common.domain.AttHistory;
+import com.jb.ess.common.domain.ApplyHistory;
 import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.security.CustomUserDetails;
 import java.time.LocalDate;
@@ -35,9 +35,9 @@ public class HistoryController {
         model.addAttribute("applyType", applyType);
         model.addAttribute("status", status);
 
-       List<AttHistory> attList = historyService.setAttList(startDate, endDate, applyType, status, user.getUsername());
+       List<ApplyHistory> applyList = historyService.getApplyList(startDate, endDate, applyType, status, user.getUsername());
 
-       model.addAttribute("attList", attList);
+       model.addAttribute("applyList", applyList);
         return "user/history";
     }
 }
