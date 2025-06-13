@@ -56,8 +56,10 @@
 <div class="max-w-full mx-auto p-4">
   <!-- 헤더 -->
   <div class="mb-4">
-    <h1 class="text-xl font-bold text-gray-800">부서원 일근태 승인</h1>
-    <div class="text-xs text-gray-500 mt-1">
+    <!-- 수정: 글씨크기 키우기 (text-xl -> text-2xl) -->
+    <h1 class="text-2xl font-bold text-gray-800">부서원 일근태 승인</h1>
+    <!-- 수정: 글씨크기 키우기 (text-xs -> text-sm) -->
+    <div class="text-sm text-gray-500 mt-1">
       <span>🏠 근태 / 일 근태 승인 / 부서원 일근태 승인</span>
     </div>
   </div>
@@ -78,24 +80,28 @@
           <input type="hidden" name="activeTab" id="activeTabInput" th:value="${activeTab}">
 
           <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">대상일자</label>
+            <!-- 수정: 글씨크기 키우기 (text-sm -> text-base) -->
+            <label class="block text-base font-medium text-gray-700 mb-1">대상일자</label>
             <div class="flex space-x-1">
-              <input type="date" name="startDate" th:value="${startDate}"
-                     class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+              <!-- 수정: 기본값을 이번달 1일부터 말일까지로 설정 -->
+              <input type="date" name="startDate" th:value="${startDate}" id="startDateInput"
+                     class="w-full text-sm border border-gray-300 rounded px-2 py-1">
               <span class="text-gray-500">~</span>
-              <input type="date" name="endDate" th:value="${endDate}"
-                     class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+              <input type="date" name="endDate" th:value="${endDate}" id="endDateInput"
+                     class="w-full text-sm border border-gray-300 rounded px-2 py-1">
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">사번</label>
+            <!-- 수정: 글씨크기 키우기 (text-sm -> text-base) -->
+            <label class="block text-base font-medium text-gray-700 mb-1">사번</label>
             <input type="text" name="empCode" th:value="${empCode}" placeholder="Search..."
-                   class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+                   class="w-full text-sm border border-gray-300 rounded px-2 py-1">
           </div>
           <!-- 근태유형 드롭다운 옵션 변경 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">근태유형</label>
-            <select name="applyType" class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+            <!-- 수정: 글씨크기 키우기 (text-sm -> text-base) -->
+            <label class="block text-base font-medium text-gray-700 mb-1">근태유형</label>
+            <select name="applyType" class="w-full text-sm border border-gray-300 rounded px-2 py-1">
               <option value="">전체</option>
               <option value="일반근태" th:selected="${applyType == '일반근태'}">일반근태</option>
               <option value="기타근태" th:selected="${applyType == '기타근태'}">기타근태</option>
@@ -107,10 +113,10 @@
             </button>
           </div>
           <div class="col-span-3 text-right">
-            <button type="button" id="bulkApproveBtn" class="bg-green-500 text-white px-3 py-1 rounded text-xs mr-1">
+            <button type="button" id="bulkApproveBtn" class="bg-green-500 text-white px-3 py-1 rounded text-sm mr-1">
               일괄승인
             </button>
-            <button type="button" id="bulkRejectBtn" class="bg-red-500 text-white px-3 py-1 rounded text-xs">
+            <button type="button" id="bulkRejectBtn" class="bg-red-500 text-white px-3 py-1 rounded text-sm">
               일괄반려
             </button>
           </div>
@@ -120,15 +126,16 @@
       <!-- 탭 메뉴 -->
       <div class="border-b border-gray-200 mb-4">
         <nav class="flex space-x-1">
-          <button id="pendingTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+          <!-- 수정: 글씨크기 키우기 (text-sm -> text-base) -->
+          <button id="pendingTab" class="tab-button px-4 py-2 text-base font-medium rounded-t"
                   th:classappend="${activeTab == 'pending' ? 'text-white bg-red-500' : 'text-gray-500 bg-gray-200'}">
             결재할 문서 (<span th:text="${#lists.size(pendingGenerals) + #lists.size(pendingEtcs)}">0</span>)
           </button>
-          <button id="approvedTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+          <button id="approvedTab" class="tab-button px-4 py-2 text-base font-medium rounded-t"
                   th:classappend="${activeTab == 'approved' ? 'text-white bg-blue-500' : 'text-gray-500 bg-gray-200'}">
             승인된 문서 (<span th:text="${#lists.size(approvedGenerals) + #lists.size(approvedEtcs)}">0</span>)
           </button>
-          <button id="rejectedTab" class="tab-button px-4 py-2 text-sm font-medium rounded-t"
+          <button id="rejectedTab" class="tab-button px-4 py-2 text-base font-medium rounded-t"
                   th:classappend="${activeTab == 'rejected' ? 'text-white bg-green-500' : 'text-gray-500 bg-gray-200'}">
             반려된 문서 (<span th:text="${#lists.size(rejectedGenerals) + #lists.size(rejectedEtcs)}">0</span>)
           </button>
@@ -139,7 +146,8 @@
       <div class="table-container tab-content">
         <!-- 결재할 문서 -->
         <div id="pendingPanel" class="document-panel" th:style="${activeTab == 'pending' ? 'display: block;' : 'display: none;'}">
-          <table class="w-full text-xs">
+          <!-- 수정: 글씨크기 키우기 (text-xs -> text-sm) -->
+          <table class="w-full text-sm">
             <thead class="table-header">
             <tr>
               <th class="px-2 py-2 text-center">
@@ -189,7 +197,8 @@
 
         <!-- 승인된 문서 -->
         <div id="approvedPanel" class="document-panel" th:style="${activeTab == 'approved' ? 'display: block;' : 'display: none;'}">
-          <table class="w-full text-xs">
+          <!-- 수정: 글씨크기 키우기 (text-xs -> text-sm) -->
+          <table class="w-full text-sm">
             <thead class="table-header">
             <tr>
               <th class="px-2 py-2 text-center">결재번호</th>
@@ -237,7 +246,8 @@
 
         <!-- 반려된 문서 -->
         <div id="rejectedPanel" class="document-panel" th:style="${activeTab == 'rejected' ? 'display: block;' : 'display: none;'}">
-          <table class="w-full text-xs">
+          <!-- 수정: 글씨크기 키우기 (text-xs -> text-sm) -->
+          <table class="w-full text-sm">
             <thead class="table-header">
             <tr>
               <th class="px-2 py-2 text-center">결재번호</th>
@@ -288,8 +298,10 @@
     <!-- 우측 영역 (상세 정보) -->
     <div class="col-span-4">
       <div class="detail-section p-4">
-        <h3 class="text-lg font-bold mb-4">신청 상세</h3>
-        <div id="detailContent" class="text-sm">
+        <!-- 수정: 글씨크기 키우기 (text-lg -> text-xl) -->
+        <h3 class="text-xl font-bold mb-4">신청 상세</h3>
+        <!-- 수정: 글씨크기 키우기 (text-sm -> text-base) -->
+        <div id="detailContent" class="text-base">
           <p class="text-gray-500">문서를 선택하세요.</p>
         </div>
       </div>
@@ -331,6 +343,32 @@
       let selectedRow = null;
       let selectedType = null;
       let selectedNo = null;
+
+      // 수정: 페이지 로드 시 이번달 1일부터 말일까지 기본값 설정
+      function setCurrentMonthDates() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth(); // 0부터 시작 (6월 = 5)
+
+        // 이번달 1일 (타임존 문제 해결)
+        const firstDay = new Date(year, month, 1);
+        const firstDayStr = year + '-' +
+                           String(month + 1).padStart(2, '0') + '-01';
+
+        // 이번달 마지막일 (타임존 문제 해결)
+        const lastDay = new Date(year, month + 1, 0);
+        const lastDayStr = year + '-' +
+                          String(month + 1).padStart(2, '0') + '-' +
+                          String(lastDay.getDate()).padStart(2, '0');
+
+        console.log('올바른 날짜 설정:', firstDayStr, 'to', lastDayStr);
+
+        $('#startDateInput').val(firstDayStr);
+        $('#endDateInput').val(lastDayStr);
+      }
+
+      // 페이지 로드 시 날짜 기본값 설정
+      setCurrentMonthDates();
 
       // 현재 활성 탭 정보를 서버에서 가져오기
       let currentActiveTab = '[[${activeTab}]]' || 'pending';
@@ -409,7 +447,7 @@
                   if (data.applyInfo) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">신청 정보</h4>';
-                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div class="grid grid-cols-2 gap-2 text-sm">';
                       html += '<div><span class="font-medium">신청번호:</span> ' + (data.applyInfo.APPLY_GENERAL_NO || data.applyInfo.APPLY_ETC_NO) + '</div>';
                       html += '<div><span class="font-medium">신청일자:</span> ' + data.applyInfo.APPLY_DATE + '</div>';
 
@@ -438,7 +476,7 @@
                   if (data.applicantInfo) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">상신자 정보</h4>';
-                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div class="grid grid-cols-2 gap-2 text-sm">';
                       html += '<div><span class="font-medium">사번:</span> ' + data.applicantInfo.EMP_CODE + '</div>';
                       html += '<div><span class="font-medium">성명:</span> ' + data.applicantInfo.EMP_NAME + '</div>';
                       html += '<div><span class="font-medium">부서:</span> ' + data.applicantInfo.DEPT_NAME + '</div>';
@@ -449,7 +487,7 @@
                   if (data.targetInfo) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">대상자 정보</h4>';
-                      html += '<div class="grid grid-cols-2 gap-2 text-xs">';
+                      html += '<div class="grid grid-cols-2 gap-2 text-sm">';
                       html += '<div><span class="font-medium">사번:</span> ' + data.targetInfo.EMP_CODE + '</div>';
                       html += '<div><span class="font-medium">성명:</span> ' + data.targetInfo.EMP_NAME + '</div>';
                       html += '<div><span class="font-medium">부서:</span> ' + data.targetInfo.DEPT_NAME + '</div>';
@@ -461,7 +499,7 @@
                   if (data.attendanceInfo) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">근태기 정보</h4>';
-                      html += '<div class="text-xs">';
+                      html += '<div class="text-sm">';
                       html += '<table class="w-full border border-gray-300">';
                       html += '<thead class="bg-gray-100">';
                       html += '<tr>';
@@ -486,7 +524,7 @@
                   if (data.approvalHistory && data.approvalHistory.length > 0) {
                       html += '<div class="mb-4">';
                       html += '<h4 class="font-bold mb-2">결재자 정보</h4>';
-                      html += '<div class="text-xs">';
+                      html += '<div class="text-sm">';
                       html += '<table class="w-full border border-gray-300">';
                       html += '<thead class="bg-gray-100">';
                       html += '<tr>';

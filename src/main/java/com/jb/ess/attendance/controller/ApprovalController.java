@@ -57,8 +57,14 @@ public class ApprovalController {
 
             if (startDate == null || endDate == null) {
                 LocalDate today = LocalDate.now();
-                startDate = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-                endDate = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                // 수정: 이번달 1일부터 말일까지로 설정
+                LocalDate firstDay = today.withDayOfMonth(1);
+                LocalDate lastDay = today.withDayOfMonth(today.lengthOfMonth());
+
+                startDate = firstDay.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                endDate = lastDay.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+                log.debug("기본 날짜 설정: startDate={}, endDate={}", startDate, endDate);
             }
 
             String approverCode = user.getUsername();
