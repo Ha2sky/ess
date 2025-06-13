@@ -69,7 +69,7 @@ public interface ApprovalMapper {
                                                      @Param("endDate") String endDate,
                                                      @Param("empCode") String empCode);
 
-    // 수정: 승인된 일반근태 문서 조회 - 부서장 자동승인 문서도 포함
+    // 승인된 일반근태 문서 조회
     @Select("""
         <script>
         SELECT g.APPLY_GENERAL_NO, g.EMP_CODE, g.TIME_ITEM_CODE, g.APPLY_DATE, 
@@ -112,7 +112,7 @@ public interface ApprovalMapper {
                                                               @Param("applyType") String applyType,
                                                               @Param("empCode") String empCode);
 
-    // 수정: 승인된 기타근태 문서 조회 - 부서장 자동승인 문서도 포함
+    // 승인된 기타근태 문서 조회
     @Select("""
         <script>
         SELECT e.APPLY_ETC_NO, e.EMP_CODE, e.SHIFT_CODE, e.APPLY_DATE,

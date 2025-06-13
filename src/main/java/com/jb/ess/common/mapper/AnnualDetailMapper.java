@@ -28,4 +28,13 @@ public interface AnnualDetailMapper {
         WHERE EMP_CODE = #{empCode}
     """)
     void updateBalanceDay(@Param("empCode") String empCode, @Param("balanceDay") BigDecimal balanceDay);
+
+    @Update("""
+        UPDATE HRTANNUALDETAIL 
+        SET BALANCE_DAY = BALANCE_DAY - #{deductDays}
+        WHERE EMP_CODE = #{empCode} 
+        AND BALANCE_DAY >= #{deductDays}
+    """)
+    boolean updateBalanceDayWithCheck(@Param("empCode") String empCode,
+                                      @Param("deductDays") BigDecimal deductDays);
 }

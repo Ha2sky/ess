@@ -47,11 +47,9 @@
             <option value="조퇴외출반차">조퇴/외출/반차</option>
           </select>
         </div>
-        <!-- 수정: 신청근무 드롭다운 추가 -->
         <div>
           <label class="block text-sm font-medium text-gray-700">신청근무</label>
           <select id="generalWorkTypeFilter" class="mt-1 block w-full border border-gray-300 rounded p-2">
-            <!-- 수정: 부서장 로그인 시 전체 옵션 제거, 기본값 설정 -->
           </select>
         </div>
         <div>
@@ -219,13 +217,13 @@
       };
 
       let shiftMasters = [];
-      // 수정: 기타근태 조회 중복 방지를 위한 플래그
       let isEtcSearching = false;
+      let isGeneralSearching = false;
 
       // 신청근무 옵션 정의
       const workTypeOptions = {
           '연장근로': [
-              { value: '연장', text: '연장' }, // 수정: 연장을 기본으로
+              { value: '연장', text: '연장' },
               { value: '조출연장', text: '조출연장' }
           ],
           '휴일근로': [
@@ -273,7 +271,6 @@
       // 근태 마스터 로드
       loadShiftMasters();
 
-      // 수정: 초기 데이터 로드 시 신청근무 기본값 설정
       updateWorkTypeFilter('연장근로');
 
       // 초기 데이터 로드
@@ -303,15 +300,12 @@
       $('#cancelGeneralBtn').click(cancelGeneralApply);
       $('#cancelEtcBtn').click(cancelEtcApply);
 
-      // 수정: 근태신청종류 변경 시 테이블 초기화 및 신청근무 옵션 업데이트
       $('#generalApplyType').change(function() {
           const selectedType = $(this).val();
 
-          // 수정: 근태신청종류 변경 시 테이블 초기화
           $('#generalEmployeeBody').empty();
 
           updateWorkTypeOptions(selectedType);
-          // 수정: 신청근무 필터 옵션도 업데이트
           updateWorkTypeFilter(selectedType);
 
           const isLeaveType = selectedType === '조퇴외출반차';
@@ -321,13 +315,11 @@
           // 테이블 헤더 숨기기/보이기
           $('#generalEmployeeTable thead th:eq(10)').toggleClass('hidden', isLeaveType);
 
-          // 수정: 근태신청종류 변경 후 자동으로 다시 조회
           setTimeout(function() {
               searchGeneralEmployees();
           }, 100);
       });
 
-      // 수정: 신청근무 필터 변경 시 테이블 업데이트
       $('#generalWorkTypeFilter').change(function() {
           const selectedWorkType = $(this).val();
           updateEmployeeWorkTypes(selectedWorkType);
@@ -364,7 +356,6 @@
           });
       }
 
-      // 수정: 신청근무 필터 업데이트 함수 - 부서장 권한 고려
       function updateWorkTypeFilter(applyType) {
           const options = workTypeOptions[applyType] || [];
           const filterSelect = $('#generalWorkTypeFilter');
@@ -372,7 +363,6 @@
 
           filterSelect.empty();
 
-          // 수정: 부서장인 경우 전체 옵션 제거
           if (currentUser.isHeader !== 'Y') {
               filterSelect.append('<option value="">전체</option>');
           }
@@ -381,7 +371,6 @@
               filterSelect.append(`<option value="${option.value}">${option.text}</option>`);
           });
 
-          // 수정: 기본값 설정 (첫 번째 옵션 자동 선택)
           if (options.length > 0 && (!currentValue || !options.some(opt => opt.value === currentValue))) {
               filterSelect.val(options[0].value);
           } else if (options.some(opt => opt.value === currentValue)) {
@@ -389,7 +378,6 @@
           }
       }
 
-      // 수정: 사원별 신청근무 일괄 업데이트 함수
       function updateEmployeeWorkTypes(selectedWorkType) {
           if (!selectedWorkType) return;
 
@@ -397,14 +385,19 @@
               const workSelect = $(this).find('.work-select');
               if (workSelect.length > 0) {
                   workSelect.val(selectedWorkType);
-                  // 수정: 신청근무 변경 시 시간 제한 검증
                   validateWorkTimeRestrictions($(this));
               }
           });
       }
 
-      // 수정: 일반근태 사원 조회 - 정렬 강화 및 필터링 개선
       function searchGeneralEmployees() {
+          if (isGeneralSearching) {
+              console.log('이미 조회 중입니다.');
+              return;
+          }
+
+          isGeneralSearching = true;
+
           const deptCode = $('#generalDeptSelect').val();
           const workDate = $('#generalWorkDate').val();
           const applyTypeCategory = $('#generalApplyType').val();
@@ -412,12 +405,14 @@
           if (!deptCode) {
               console.error('부서코드가 선택되지 않았습니다.');
               alert('부서를 선택해주세요.');
+              isGeneralSearching = false;
               return;
           }
 
           if (!workDate) {
               console.error('근무일이 설정되지 않았습니다.');
               alert('근무일을 선택해주세요.');
+              isGeneralSearching = false;
               return;
           }
 
@@ -425,11 +420,10 @@
 
           console.log('사원 조회 요청:', { deptCode, workDate: formattedWorkDate, applyTypeCategory });
 
-          // 수정: 정렬 강화 - 직급순 우선
           $.get('/user/apply/employees', {
               deptCode: deptCode,
               workDate: formattedWorkDate,
-              sortBy: 'position,empCode,empName',
+              sortBy: 'gradeOrder,empCode',
               applyTypeCategory: applyTypeCategory
           })
           .done(function(employees) {
@@ -440,12 +434,14 @@
               console.error('사원 조회 실패:', { xhr, status, error });
               console.error('응답 내용:', xhr.responseText);
               alert('사원 조회에 실패했습니다: ' + (xhr.responseText || error));
+          })
+          .always(function() {
+              isGeneralSearching = false;
           });
       }
 
       // 기타근태 사원 조회
       function searchEtcEmployees() {
-          // 수정: 중복 조회 방지
           if (isEtcSearching) {
               console.log('이미 조회 중입니다.');
               return;
@@ -471,12 +467,11 @@
 
           const formattedWorkDate = workDate.replace(/-/g, '');
 
-          // 수정: 정렬 파라미터 강화 (직위, 사번, 이름 순)
           $.get('/user/apply/employees', {
               deptCode: deptCode,
               workDate: formattedWorkDate,
               workPlan: workPlan,
-              sortBy: 'position,empCode,empName'
+              sortBy: 'gradeOrder,empCode'
           })
           .done(function(employees) {
               displayEtcEmployees(employees);
@@ -486,18 +481,75 @@
               alert('사원 조회에 실패했습니다: ' + (xhr.responseText || error));
           })
           .always(function() {
-              // 수정: 조회 완료 후 플래그 해제
               isEtcSearching = false;
           });
       }
 
-      // 일반근태 사원 목록 표시
+      function forceSortTableByGrade(tbody) {
+          const rows = Array.from(tbody.find('tr'));
+
+          console.log('정렬 전 행 수:', rows.length);
+
+          rows.sort(function(a, b) {
+              const aEmpCode = $(a).find('td:eq(1)').text().trim();
+              const aPositionName = $(a).find('td:eq(3)').text().trim();
+              const bEmpCode = $(b).find('td:eq(1)').text().trim();
+              const bPositionName = $(b).find('td:eq(3)').text().trim();
+
+              console.log('비교:', aEmpCode, aPositionName, 'vs', bEmpCode, bPositionName);
+
+              const gradeOrder = {
+                  '사장': 1,
+                  '부사장': 2,
+                  '전무': 3,
+                  '전무보': 4,
+                  '상무': 5,
+                  '상무보': 6,
+                  '이사': 7,
+                  '부장': 8,
+                  '차장': 9,
+                  '과장': 10,
+                  '대리': 11,
+                  '사원': 12
+              };
+
+              const aGrade = gradeOrder[aPositionName] || 999;
+              const bGrade = gradeOrder[bPositionName] || 999;
+
+              if (aGrade !== bGrade) {
+                  return aGrade - bGrade;
+              }
+
+              const aEmpNum = parseInt(aEmpCode.replace(/\D/g, '')) || 0;
+              const bEmpNum = parseInt(bEmpCode.replace(/\D/g, '')) || 0;
+
+              console.log('사번 비교:', aEmpNum, 'vs', bEmpNum);
+
+              return aEmpNum - bEmpNum;
+          });
+
+          tbody.empty();
+
+          rows.forEach(function(row) {
+              tbody.append(row);
+          });
+
+          console.log('정렬 완료 - 최종 순서:');
+          tbody.find('tr').each(function(index) {
+              const empCode = $(this).find('td:eq(1)').text().trim();
+              const positionName = $(this).find('td:eq(3)').text().trim();
+              console.log(`${index + 1}. ${empCode} ${positionName}`);
+          });
+      }
+
       function displayGeneralEmployees(employees) {
           const tbody = $('#generalEmployeeBody');
           tbody.empty();
 
-          // 수정: 선택된 신청근무 가져오기
           const selectedWorkType = $('#generalWorkTypeFilter').val();
+
+          let processedCount = 0;
+          const totalCount = employees.length;
 
           employees.forEach(function(emp) {
               // 근무정보 조회
@@ -505,7 +557,6 @@
                   const applyType = $('#generalApplyType').val();
                   const isLeaveType = applyType === '조퇴외출반차';
 
-                  // 신청근무 드롭다운 옵션 생성 - 수정: 고정값으로 설정
                   const workOptions = workTypeOptions[applyType] || [];
                   let workSelectHtml = '';
                   workOptions.forEach(function(option) {
@@ -513,17 +564,14 @@
                       workSelectHtml += `<option value="${option.value}" ${selected}>${option.text}</option>`;
                   });
 
-                  // 수정: 현재 근태신청종류에 해당하는 신청 상태만 표시
                   const applyNo = emp.applyGeneralNo || '';
                   const status = emp.generalApplyStatus || '대기';
 
-                  // 수정: 실적 표시 개선 - 신청된 내용도 반영
                   let recordDisplay = workInfo.record.shiftName || '-';
                   if (workInfo.appliedRecord && workInfo.appliedRecord.shiftName) {
                       recordDisplay = workInfo.appliedRecord.shiftName;
                   }
 
-                  // 수정: 미래 날짜의 경우 결근 체크 로직 개선
                   const workDate = $('#generalWorkDate').val().replace(/-/g, '');
                   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
                   const isFutureDate = workDate > today;
@@ -573,7 +621,15 @@
                   `;
                   tbody.append(row);
 
-                  // 수정: 현재 근태신청종류와 매치되는 신청 데이터만 복원
+                  processedCount++;
+
+                  if (processedCount === totalCount) {
+                      setTimeout(function() {
+                          console.log('모든 사원 처리 완료 - 강제 정렬 시작');
+                          forceSortTableByGrade(tbody);
+                      }, 100);
+                  }
+
                   if (applyNo) {
                       loadSavedGeneralData(applyNo, tbody.find('tr:last'), applyType);
                   }
@@ -584,12 +640,10 @@
                       calculateExpectedHours(currentRow, emp.empCode);
                   });
 
-                  // 수정: 신청근무 변경 시 시간 제한 검증
                   currentRow.find('.work-select').on('change', function() {
                       validateWorkTimeRestrictions(currentRow);
                   });
 
-                  // 초기 예상근로시간 계산
                   calculateExpectedHours(currentRow, emp.empCode);
 
                   // 상태별 버튼 활성화/비활성화
@@ -598,7 +652,6 @@
           });
       }
 
-      // 수정: 근무시간 제한 검증 함수
       function validateWorkTimeRestrictions(row) {
           const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
           const startTimeInput = row.find('.start-time');
@@ -634,25 +687,24 @@
           }
       }
 
-      // 기타근태 사원 목록 표시
       function displayEtcEmployees(employees) {
           const tbody = $('#etcEmployeeBody');
           tbody.empty();
 
+          let processedCount = 0;
+          const totalCount = employees.length;
+
           employees.forEach(function(emp) {
               // 근무정보 조회
               loadWorkInfo(emp.empCode, $('#etcWorkDate').val().replace(/-/g, ''), function(workInfo) {
-                  // 실제 신청번호와 상태 사용
                   const applyNo = emp.applyEtcNo || '';
                   const status = emp.etcApplyStatus || '대기';
 
-                  // 수정: 실적 표시 개선 - 신청된 내용도 반영
                   let recordDisplay = workInfo.record.shiftName || '-';
                   if (workInfo.appliedRecord && workInfo.appliedRecord.shiftName) {
                       recordDisplay = workInfo.appliedRecord.shiftName;
                   }
 
-                  // 수정: 미래 날짜의 경우 결근 체크 로직 개선
                   const workDate = $('#etcWorkDate').val().replace(/-/g, '');
                   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
                   const isFutureDate = workDate > today;
@@ -686,7 +738,7 @@
                               <input type="date" class="end-date w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
-                              <span class="annual-balance">${parseFloat(currentAnnual.balanceDay).toFixed(2)}</span>
+                              <span class="annual-balance">0.00</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <select class="apply-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
@@ -707,7 +759,15 @@
                   `;
                   tbody.append(row);
 
-                  // 근태 마스터 옵션 (수정: 휴일/휴무일 제외)
+                  processedCount++;
+
+                  if (processedCount === totalCount) {
+                      setTimeout(function() {
+                          console.log('모든 사원 처리 완료 - 강제 정렬 시작 (기타근태)');
+                          forceSortTableByGrade(tbody);
+                      }, 100);
+                  }
+
                   const shiftSelect = tbody.find('tr:last .shift-select');
                   shiftMasters.forEach(function(shift) {
                       // 휴일, 휴무일 제외
@@ -716,19 +776,12 @@
                       }
                   });
 
-                  // 수정: 날짜 변경 시 휴일/휴무일 검증
                   const currentRow = tbody.find('tr:last');
                   currentRow.find('.start-date, .end-date').on('change', function() {
                       validateEtcDateRange(currentRow);
                   });
 
-                  // 수정: 연차잔여 정확한 조회
-                  loadAnnualBalance(emp.empCode, function(annual) {
-                      const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
-                      if (balanceDay !== '0.00') { // 수정: 0.00 방지
-                          tbody.find('tr:last .annual-balance').text(balanceDay);
-                      }
-                  });
+                  loadAnnualBalanceStable(emp.empCode, currentRow);
 
                   // 기존 신청 데이터가 있으면 복원
                   if (applyNo) {
@@ -741,7 +794,6 @@
           });
       }
 
-      // 수정: 기타근태 날짜 범위 검증 함수
       function validateEtcDateRange(row) {
           const startDate = row.find('.start-date').val();
           const endDate = row.find('.end-date').val();
@@ -764,7 +816,6 @@
           });
       }
 
-      // 수정: 예상근로시간 계산 - 휴게시간 차감 및 결근자 제외
       function calculateExpectedHours(row, empCode) {
           const applyType = $('#generalApplyType').val();
           const startTime = row.find('.start-time').val();
@@ -776,7 +827,6 @@
               return;
           }
 
-          // 수정: 결근자인 경우 예상근로시간에서 제외
           const isAbsent = row.data('is-absent') === true;
           if (isAbsent) {
               row.find('.expected-hours').text('0.00');
@@ -784,7 +834,7 @@
           }
 
           if (!startTime || !endTime) {
-              // 시간이 입력되지 않은 경우 기본 주간 예상근로시간 표시
+              // 시간이 입력되지 않은 경우 현재 실적 기반 주간 예상근로시간 표시
               calculateWeeklyExpectedHours(empCode, 0, function(weeklyHours, isValid) {
                   const expectedHoursSpan = row.find('.expected-hours');
                   expectedHoursSpan.text(weeklyHours.toFixed(2));
@@ -807,17 +857,11 @@
           const diffMs = end - start;
           let diffHours = diffMs / (1000 * 60 * 60);
 
-          // 수정: 휴게시간 차감 로직 강화
           let dailyHours = diffHours;
 
-          // 4시간 이상 근무 시 1시간 휴게시간 차감
-          if (diffHours >= 4) {
-              dailyHours = diffHours - 1;
-          }
-
-          // 8시간 이상 근무 시 추가 휴게시간 차감 (30분)
-          if (diffHours >= 8) {
-              dailyHours = diffHours - 1.5;
+          if (diffHours >= 2) {
+              // 2시간 이상 근무 시 30분 휴게시간 차감
+              dailyHours = diffHours - 0.5;
           }
 
           const hours = Math.floor(dailyHours);
@@ -832,7 +876,6 @@
               const expectedHoursSpan = row.find('.expected-hours');
               expectedHoursSpan.text(weeklyHours.toFixed(2));
 
-              // 수정: 부서장의 경우에도 52시간 초과 검증
               if (!isValid) {
                   expectedHoursSpan.addClass('text-red-500 font-bold');
                   expectedHoursSpan.attr('title', `주 52시간 초과 (현재: ${weeklyHours.toFixed(2)}시간)`);
@@ -843,16 +886,19 @@
           });
       }
 
-      // 주간 예상근로시간 계산
       function calculateWeeklyExpectedHours(empCode, requestHours, callback) {
           const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
           $.get(`/user/apply/workInfo/${empCode}/${workDate}`)
               .done(function(workInfo) {
-                  const baseWeeklyHours = 40.0; // 기본 주 40시간
-                  const currentExpectedHours = parseFloat(workInfo.expectedHours || '0');
-                  const totalWeeklyHours = baseWeeklyHours + currentExpectedHours + requestHours;
+                  let baseWeeklyHours = 40.0; // 기본 주 40시간
+                  let currentAppliedHours = parseFloat(workInfo.expectedHours || '0');
 
+                  if (workInfo.appliedRecord && workInfo.appliedRecord.shiftCode === '14-1') {
+                      baseWeeklyHours += parseFloat(workInfo.appliedRecord.workHours || '8');
+                  }
+
+                  const totalWeeklyHours = baseWeeklyHours + currentAppliedHours + requestHours;
                   const isValid = totalWeeklyHours <= 52.0;
 
                   callback(totalWeeklyHours, isValid);
@@ -865,16 +911,13 @@
               });
       }
 
-      // 수정: 저장된 일반근태 데이터 복원 함수 - 근태신청종류 매치 확인 강화
       function loadSavedGeneralData(applyNo, row, currentApplyType) {
           $.get(`/user/apply/general/${applyNo}`)
               .done(function(data) {
                   if (data) {
-                      // 수정: 저장된 신청의 근태신청종류 확인
                       const savedApplyType = data.applyType;
                       const savedApplyCategory = getApplyCategoryFromType(savedApplyType);
 
-                      // 수정: 현재 선택된 근태신청종류와 매치되는 경우만 복원
                       if (savedApplyCategory === currentApplyType) {
                           // 저장된 데이터로 폼 필드 복원
                           row.find('.work-select').val(data.applyType || '');
@@ -893,7 +936,6 @@
                               calculateExpectedHours(row, row.data('emp-code'));
                           }
                       } else {
-                          // 수정: 다른 종류의 신청은 기본 상태로 표시
                           row.find('.status-field').text('대기');
                       }
                   }
@@ -903,7 +945,6 @@
               });
       }
 
-      // 수정: 근태신청종류 매핑 함수 추가
       function getApplyCategoryFromType(applyType) {
           if (['조출연장', '연장'].includes(applyType)) {
               return '연장근로';
@@ -963,7 +1004,6 @@
           }
 
           let hasWaiting = false, hasSaved = false, hasSubmitted = false;
-          // 수정: 결근 사원 체크
           let hasAbsent = false;
 
           selectedRows.each(function() {
@@ -977,7 +1017,6 @@
               if (isAbsent) hasAbsent = true;
           });
 
-          // 수정: 결근 사원이 선택된 경우 저장/상신 비활성화
           if (hasAbsent) {
               $('#saveGeneralBtn, #saveEtcBtn, #submitGeneralBtn, #submitEtcBtn').prop('disabled', true);
           } else {
@@ -1004,23 +1043,32 @@
               .fail(function() {
                   callback({
                       plan: '',
-                      empCalendarPlan: '', // 수정: empCalendar 계획 추가
+                      empCalendarPlan: '',
                       record: {checkInTime: '-', checkOutTime: '-', shiftCode: '', shiftName: '-'},
-                      appliedRecord: null, // 수정: 신청된 실적 추가
+                      appliedRecord: null,
                       expectedHours: '0.00'
                   });
               });
       }
 
-      // 수정: 연차잔여 조회 함수 - 안정적인 조회
+      function loadAnnualBalanceStable(empCode, row) {
+          $.get(`/user/apply/annual/${empCode}`)
+              .done(function(annual) {
+                  const balanceDay = parseFloat(annual.balanceDay || '0').toFixed(2);
+                  row.find('.annual-balance').text(balanceDay);
+              })
+              .fail(function() {
+                  row.find('.annual-balance').text('0.00');
+              });
+      }
+
       function loadAnnualBalance(empCode, callback) {
           $.get(`/user/apply/annual/${empCode}`)
               .done(function(annual) {
                   callback(annual);
               })
               .fail(function() {
-                  // 수정: 실패 시에도 유효한 데이터 반환
-                  callback({balanceDay: currentAnnual.balanceDay || '0'});
+                  callback({balanceDay: '0'});
               });
       }
 
@@ -1033,7 +1081,6 @@
               return;
           }
 
-          // 수정: 결근 사원 체크
           const absentRows = selectedRows.filter(function() {
               return $(this).data('is-absent') === true;
           });
@@ -1082,7 +1129,6 @@
                           alert('저장되었습니다.');
                           updateButtonStates();
 
-                          // 수정: 휴일근로 신청 후 실적 업데이트
                           if (workSelect === '휴일근무') {
                               setTimeout(function() {
                                   loadWorkInfo(empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(updatedWorkInfo) {
@@ -1112,7 +1158,6 @@
               return;
           }
 
-          // 수정: 결근 사원 체크
           const absentRows = selectedRows.filter(function() {
               return $(this).data('is-absent') === true;
           });
@@ -1171,7 +1216,6 @@
                           // 버튼 상태 업데이트
                           updateButtonStates();
 
-                          // 수정: 연차 신청 후 실적 업데이트
                           setTimeout(function() {
                               loadWorkInfo(empCode, $('#etcWorkDate').val().replace(/-/g, ''), function(updatedWorkInfo) {
                                   if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
@@ -1290,7 +1334,6 @@
               return;
           }
 
-          // 수정: 결근 사원 체크
           const absentRows = selectedRows.filter(function() {
               return $(this).data('is-absent') === true;
           });
@@ -1300,7 +1343,6 @@
               return;
           }
 
-          // 수정: 부서장의 경우에도 52시간 초과 검증
           const invalidRows = selectedRows.filter(function() {
               const expectedHoursSpan = $(this).find('.expected-hours');
               return expectedHoursSpan.hasClass('text-red-500');
@@ -1353,7 +1395,6 @@
               return;
           }
 
-          // 수정: 결근 사원 체크
           const absentRows = selectedRows.filter(function() {
               return $(this).data('is-absent') === true;
           });
@@ -1384,7 +1425,6 @@
                           const finalStatus = currentUser.isHeader === 'Y' ? '승인완료' : '상신';
                           row.find('.status-field').text(finalStatus);
 
-                          // 수정: 승인완료 시 연차 차감 안정화 (연차/전반차/후반차)
                           if (finalStatus === '승인완료') {
                               const shiftCode = row.find('.shift-select').val();
                               const selectedShift = shiftMasters.find(shift => shift.shiftCode === shiftCode);
@@ -1393,13 +1433,12 @@
                                   const endDate = row.find('.end-date').val().replace(/-/g, '');
                                   let requestDays = calculateRequestDays(startDate, endDate);
 
-                                  // 수정: 반차의 경우 0.5일 차감
                                   if (selectedShift.shiftName.includes('반차')) {
                                       requestDays = 0.5;
                                   }
 
                                   const currentBalance = parseFloat(row.find('.annual-balance').text());
-                                  const newBalance = Math.max(0, currentBalance - requestDays); // 수정: 음수 방지
+                                  const newBalance = Math.max(0, currentBalance - requestDays);
                                   row.find('.annual-balance').text(newBalance.toFixed(2));
                               }
                           }
@@ -1480,7 +1519,6 @@
                   success: function(response) {
                       if (response === 'success') {
                           row.find('.status-field').text('저장');
-                          // 수정: 상신취소 시 연차 복원
                           const shiftCode = row.find('.shift-select').val();
                           const selectedShift = shiftMasters.find(shift => shift.shiftCode === shiftCode);
                           if (selectedShift && (selectedShift.shiftName.includes('연차') || selectedShift.shiftName.includes('반차'))) {

@@ -39,10 +39,10 @@ public interface AttendanceApplyMapper {
     @Select("SELECT TOP 1 TIME_ITEM_CODE FROM HRTTIMEITEM ORDER BY TIME_ITEM_CODE")
     String getValidTimeItemCode();
 
-    // 수정: 기존 일반근태 신청 조회 - 근태신청종류별 필터링 (메소드명 변경)
+    // 일반근태 신청 조회
     @Select("""
         <script>
-        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
         FROM HRTATTAPLGENERAL 
         WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
         AND STATUS != '삭제'
@@ -66,7 +66,7 @@ public interface AttendanceApplyMapper {
 
     // 기존 일반근태 신청 조회 (전체)
     @Select("""
-        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
         FROM HRTATTAPLGENERAL 
         WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
         AND STATUS != '삭제'
@@ -76,7 +76,7 @@ public interface AttendanceApplyMapper {
 
     // 기존 기타근태 신청 조회
     @Select("""
-        SELECT TOP 1 APPLY_ETC_NO, STATUS, REASON
+        SELECT TOP 1 APPLY_ETC_NO, STATUS, REASON, SHIFT_CODE, TARGET_START_DATE, TARGET_END_DATE
         FROM HRTATTAPLETC 
         WHERE EMP_CODE = #{empCode} 
         AND TARGET_START_DATE <= #{workDate} AND TARGET_END_DATE >= #{workDate}
@@ -99,12 +99,13 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
-    // 수정: 부서별 사원 조회 (정렬 조건 강화) - 부서장용 (직급 높은 순 → 사번 낮은 순)
+    // 부서별 사원 조회 - 부서장용
     @Select("""
         <script>
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
                wc.SHIFT_CODE as workPlan,
-               sm.SHIFT_NAME as workPlanName
+               sm.SHIFT_NAME as workPlanName,
+               ISNULL(p.POSITION_CODE, '999') as gradeOrder
         FROM HRIMASTER h
         LEFT JOIN HRTGRADEINFO p ON h.POSITION_CODE = p.POSITION_CODE
         LEFT JOIN HRTDUTYINFO d ON h.DUTY_CODE = d.DUTY_CODE
@@ -118,12 +119,22 @@ public interface AttendanceApplyMapper {
             AND sm.SHIFT_NAME = #{workPlan}
         </if>
         ORDER BY 
-            CASE 
-                WHEN p.POSITION_CODE IS NULL THEN 999 
-                ELSE CAST(p.POSITION_CODE AS INT) 
-            END ASC, 
-            h.EMP_CODE ASC, 
-            h.EMP_NAME ASC
+            CASE h.POSITION_CODE
+                WHEN '110' THEN 1   -- 사장
+                WHEN '120' THEN 2   -- 부사장
+                WHEN '130' THEN 3   -- 전무
+                WHEN '140' THEN 4   -- 전무보
+                WHEN '150' THEN 5   -- 상무
+                WHEN '160' THEN 6   -- 상무보
+                WHEN '170' THEN 7   -- 이사
+                WHEN '210' THEN 8   -- 부장
+                WHEN '220' THEN 9   -- 차장
+                WHEN '230' THEN 10  -- 과장
+                WHEN '240' THEN 11  -- 대리
+                WHEN '250' THEN 12  -- 사원
+                ELSE 999
+            END ASC,
+            h.EMP_CODE ASC
         </script>
     """)
     List<Employee> findEmployeesByDeptWithSort(@Param("deptCode") String deptCode,
@@ -131,11 +142,12 @@ public interface AttendanceApplyMapper {
                                                @Param("workPlan") String workPlan,
                                                @Param("sortBy") String sortBy);
 
-    // 수정: 현재 사원 정보 조회 (근무계획 포함) - 일반 사원용 (정렬 강화)
+    // 현재 사원 정보 조회 - 일반 사원용
     @Select("""
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
                wc.SHIFT_CODE as workPlan,
-               sm.SHIFT_NAME as workPlanName
+               sm.SHIFT_NAME as workPlanName,
+               ISNULL(p.POSITION_CODE, '999') as gradeOrder
         FROM HRIMASTER h
         LEFT JOIN HRTGRADEINFO p ON h.POSITION_CODE = p.POSITION_CODE
         LEFT JOIN HRTDUTYINFO d ON h.DUTY_CODE = d.DUTY_CODE
@@ -145,12 +157,22 @@ public interface AttendanceApplyMapper {
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.EMP_CODE = #{empCode}
         ORDER BY 
-            CASE 
-                WHEN p.POSITION_CODE IS NULL THEN 999 
-                ELSE CAST(p.POSITION_CODE AS INT) 
-            END ASC, 
-            h.EMP_CODE ASC, 
-            h.EMP_NAME ASC
+            CASE h.POSITION_CODE
+                WHEN '110' THEN 1   -- 사장
+                WHEN '120' THEN 2   -- 부사장
+                WHEN '130' THEN 3   -- 전무
+                WHEN '140' THEN 4   -- 전무보
+                WHEN '150' THEN 5   -- 상무
+                WHEN '160' THEN 6   -- 상무보
+                WHEN '170' THEN 7   -- 이사
+                WHEN '210' THEN 8   -- 부장
+                WHEN '220' THEN 9   -- 차장
+                WHEN '230' THEN 10  -- 과장
+                WHEN '240' THEN 11  -- 대리
+                WHEN '250' THEN 12  -- 사원
+                ELSE 999
+            END ASC,
+            h.EMP_CODE ASC
     """)
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
@@ -296,11 +318,16 @@ public interface AttendanceApplyMapper {
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
 
-    // 수정: 실적 업데이트 메서드 추가 - 휴일근로, 연차 신청 후 실적 변경용
+    // 실적 업데이트 메서드
     @Update("""
-        UPDATE HRTWORKEMPCALENDAR
-        SET SHIFT_CODE = #{shiftCode}
-        WHERE EMP_CODE = #{empCode} AND YYYYMMDD = #{workDate}
+        MERGE HRTATTRECORD AS target
+        USING (SELECT #{empCode} AS EMP_CODE, #{workDate} AS WORK_YMD, #{shiftCode} AS SHIFT_CODE) AS source
+        ON target.EMP_CODE = source.EMP_CODE AND target.WORK_YMD = source.WORK_YMD
+        WHEN MATCHED THEN
+            UPDATE SET SHIFT_CODE = source.SHIFT_CODE
+        WHEN NOT MATCHED THEN
+            INSERT (EMP_CODE, WORK_YMD, SHIFT_CODE)
+            VALUES (source.EMP_CODE, source.WORK_YMD, source.SHIFT_CODE);
     """)
     void updateAttendanceRecordByShiftCode(@Param("empCode") String empCode,
                                            @Param("workDate") String workDate,

@@ -27,7 +27,7 @@ public interface AttRecordMapper {
     void insertAttRecord(@Param("empCode") String empCode,
                          @Param("workDate") String workDate);
 
-    // 수정: 근태기 정보 조회를 위한 메서드 추가
+    // 근태기 정보 조회를 위한 메서드
     @Select("""
         SELECT CHECK_IN_TIME, CHECK_OUT_TIME, WORK_DATE
         FROM HRTATTRECORD
