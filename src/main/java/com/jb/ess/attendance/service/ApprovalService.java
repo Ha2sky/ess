@@ -6,7 +6,6 @@ import com.jb.ess.common.domain.AttendanceApplyEtc;
 import com.jb.ess.common.domain.ApprovalHistory;
 import com.jb.ess.common.domain.Employee;
 import com.jb.ess.common.domain.AnnualDetail;
-import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.mapper.AttendanceApplyMapper;
 import com.jb.ess.common.mapper.DepartmentMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
@@ -18,11 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
-import java.math.BigDecimal;
 
 @Slf4j
 @Service
@@ -33,7 +32,6 @@ public class ApprovalService {
     private final AttendanceApplyMapper attendanceApplyMapper;
     private final DepartmentMapper departmentMapper;
     private final ShiftMasterMapper shiftMasterMapper;
-    // 수정: 연차 차감을 위한 매퍼 추가
     private final AnnualDetailMapper annualDetailMapper;
     private final AttRecordMapper attRecordMapper;
 
@@ -52,7 +50,9 @@ public class ApprovalService {
         }
     }
 
-    // 수정: 근태기 정보 조회 메서드 - 시간 포맷팅 개선
+    /**
+     * 근태기 정보 조회 메서드 - 시간 포맷팅 개선
+     */
     public List<Map<String, Object>> getAttendanceInfo(String type, String applyNo) {
         try {
             List<Map<String, Object>> attendanceList = new ArrayList<>();
@@ -60,12 +60,10 @@ public class ApprovalService {
             if ("general".equals(type)) {
                 AttendanceApplyGeneral apply = attendanceApplyMapper.findGeneralApplyByNo(applyNo);
                 if (apply != null) {
-                    // 해당 날짜의 근태기 정보 조회
                     Map<String, Object> attendance = attRecordMapper.getAttendanceRecordInfo(apply.getEmpCode(), apply.getTargetDate());
                     if (attendance != null) {
                         Map<String, Object> attendanceInfo = new HashMap<>();
                         attendanceInfo.put("WORK_DATE", formatDateString(apply.getTargetDate()));
-                        // 수정: 시간 포맷팅 개선 (HHMMSS -> HH:MM)
                         attendanceInfo.put("CHECK_IN_TIME", formatTimeForDisplay(attendance.get("CHECK_IN_TIME")));
                         attendanceInfo.put("CHECK_OUT_TIME", formatTimeForDisplay(attendance.get("CHECK_OUT_TIME")));
                         attendanceList.add(attendanceInfo);
@@ -74,18 +72,14 @@ public class ApprovalService {
             } else if ("etc".equals(type)) {
                 AttendanceApplyEtc apply = attendanceApplyMapper.findEtcApplyByNo(applyNo);
                 if (apply != null) {
-                    // 시작일부터 종료일까지의 근태기 정보 조회
                     String startDate = apply.getTargetStartDate();
                     String endDate = apply.getTargetEndDate();
-
-                    // 날짜 범위 내 모든 날짜에 대해 근태기 정보 조회
                     List<String> dateRange = getDateRange(startDate, endDate);
                     for (String date : dateRange) {
                         Map<String, Object> attendance = attRecordMapper.getAttendanceRecordInfo(apply.getEmpCode(), date);
                         Map<String, Object> attendanceInfo = new HashMap<>();
                         attendanceInfo.put("WORK_DATE", formatDateString(date));
                         if (attendance != null) {
-                            // 수정: 시간 포맷팅 개선 (HHMMSS -> HH:MM)
                             attendanceInfo.put("CHECK_IN_TIME", formatTimeForDisplay(attendance.get("CHECK_IN_TIME")));
                             attendanceInfo.put("CHECK_OUT_TIME", formatTimeForDisplay(attendance.get("CHECK_OUT_TIME")));
                         } else {
@@ -104,32 +98,26 @@ public class ApprovalService {
         }
     }
 
-    // 수정: 시간 포맷팅 메서드 추가 (HHMMSS -> HH:MM)
+    /**
+     * 시간 포맷팅 메서드 (HHMMSS -> HH:MM)
+     */
     private String formatTimeForDisplay(Object timeObj) {
         if (timeObj == null) {
             return "-";
         }
-
         String timeStr = timeObj.toString().trim();
         if (timeStr.isEmpty() || "-".equals(timeStr)) {
             return "-";
         }
-
         try {
-            // HHMMSS 형태인 경우 HH:MM으로 변환
             if (timeStr.length() == 6 && timeStr.matches("\\d{6}")) {
                 return timeStr.substring(0, 2) + ":" + timeStr.substring(2, 4);
-            }
-            // HHMM 형태인 경우 HH:MM으로 변환
-            else if (timeStr.length() == 4 && timeStr.matches("\\d{4}")) {
+            } else if (timeStr.length() == 4 && timeStr.matches("\\d{4}")) {
                 return timeStr.substring(0, 2) + ":" + timeStr.substring(2, 4);
-            }
-            // 이미 HH:MM 형태인 경우 그대로 반환
-            else if (timeStr.matches("\\d{2}:\\d{2}")) {
+            } else if (timeStr.matches("\\d{2}:\\d{2}")) {
                 return timeStr;
-            }
-            else {
-                return timeStr; // 그 외의 경우 원본 반환
+            } else {
+                return timeStr;
             }
         } catch (Exception e) {
             log.warn("시간 포맷팅 실패: timeStr={}", timeStr, e);
@@ -137,20 +125,20 @@ public class ApprovalService {
         }
     }
 
-    // 수정: 날짜 범위 생성 메서드 추가
+    /**
+     * 날짜 범위 생성 메서드
+     */
     private List<String> getDateRange(String startDate, String endDate) {
         List<String> dateList = new ArrayList<>();
         try {
             int start = Integer.parseInt(startDate);
             int end = Integer.parseInt(endDate);
-
-            // 간단한 날짜 범위 생성 (같은 월 내에서만)
             for (int date = start; date <= end; date++) {
                 dateList.add(String.valueOf(date));
             }
         } catch (Exception e) {
             log.warn("날짜 범위 생성 실패: startDate={}, endDate={}", startDate, endDate, e);
-            dateList.add(startDate); // 최소한 시작일은 포함
+            dateList.add(startDate);
         }
         return dateList;
     }
@@ -161,26 +149,20 @@ public class ApprovalService {
     public Map<String, Object> getGeneralApplyDetail(String applyGeneralNo) {
         try {
             log.debug("일반근태 상세 정보 조회: applyGeneralNo={}", applyGeneralNo);
-
             Map<String, Object> detail = new HashMap<>();
 
-            // 기본 신청 정보
             AttendanceApplyGeneral applyInfo = attendanceApplyMapper.findGeneralApplyByNo(applyGeneralNo);
             if (applyInfo == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
             }
 
-            // 신청자 정보 (상신자)
             Employee applicantInfo = attendanceApplyMapper.findEmployeeByEmpCode(applyInfo.getApplicantCode());
-            // 대상자 정보
             Employee targetInfo = attendanceApplyMapper.findEmployeeByEmpCode(applyInfo.getEmpCode());
 
-            // Map 형태로 변환 - 강화된 로직
             Map<String, Object> applyInfoMap = convertGeneralToMap(applyInfo);
             Map<String, Object> applicantInfoMap = convertEmployeeToMapEnhanced(applicantInfo, "상신자");
             Map<String, Object> targetInfoMap = convertEmployeeToMapEnhanced(targetInfo, "대상자");
 
-            // 결재 이력 - 완전 강화
             List<ApprovalHistory> approvalHistory = getGeneralApprovalHistory(applyGeneralNo);
             List<Map<String, Object>> historyList = new ArrayList<>();
 
@@ -188,23 +170,16 @@ public class ApprovalService {
                 ApprovalHistory history = approvalHistory.get(i);
                 Map<String, Object> historyMap = new HashMap<>();
 
-                // 순번
                 historyMap.put("ORDER_NUM", i + 1);
                 historyMap.put("APPROVER_CODE", history.getApproverCode());
 
-                // 결재자 정보
                 Employee approverInfo = attendanceApplyMapper.findEmployeeByEmpCode(history.getApproverCode());
                 if (approverInfo != null) {
                     historyMap.put("APPROVER_NAME", approverInfo.getEmpName());
-
-                    // 부서명 조회
                     String deptName = getDepartmentNameEnhanced(approverInfo);
                     historyMap.put("DEPT_NAME", deptName);
-
-                    // 직책명
                     String positionName = getPositionNameEnhanced(approverInfo);
                     historyMap.put("POSITION_NAME", positionName);
-
                     historyMap.put("DUTY_NAME", approverInfo.getDutyName() != null ? approverInfo.getDutyName() : "-");
                 } else {
                     historyMap.put("APPROVER_NAME", history.getApproverCode());
@@ -213,10 +188,8 @@ public class ApprovalService {
                     historyMap.put("DUTY_NAME", "-");
                 }
 
-                // 구분 (일반결재/기타결재)
                 historyMap.put("CATEGORY", "일반결재");
 
-                // 수정: 결과부분 undefined 문제 해결
                 String approvalStatus = history.getApprovalStatus();
                 if (approvalStatus != null && !approvalStatus.trim().isEmpty()) {
                     historyMap.put("APPROVAL_STATUS", approvalStatus);
@@ -224,10 +197,8 @@ public class ApprovalService {
                     historyMap.put("APPROVAL_STATUS", "대기");
                 }
 
-                // 결재완료일 실제 데이터 표시
                 String approvalDate = history.getApprovalDate();
                 if (approvalDate != null && !approvalDate.trim().isEmpty() && !"-".equals(approvalDate)) {
-                    // 날짜 포맷팅 (yyyyMMddHHmmss -> yyyy-MM-dd HH:mm:ss)
                     try {
                         if (approvalDate.length() >= 8) {
                             String formattedDate = approvalDate.substring(0, 4) + "-" +
@@ -249,7 +220,6 @@ public class ApprovalService {
                     historyMap.put("APPROVAL_DATE", "-");
                 }
 
-                // 반려 사유 표시
                 String rejectReason = history.getRejectReason();
                 if ("반려".equals(history.getApprovalStatus())) {
                     historyMap.put("REJECT_REASON", rejectReason != null ? rejectReason : "-");
@@ -278,26 +248,20 @@ public class ApprovalService {
     public Map<String, Object> getEtcApplyDetail(String applyEtcNo) {
         try {
             log.debug("기타근태 상세 정보 조회: applyEtcNo={}", applyEtcNo);
-
             Map<String, Object> detail = new HashMap<>();
 
-            // 기본 신청 정보
             AttendanceApplyEtc applyInfo = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
             if (applyInfo == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
             }
 
-            // 신청자 정보 (상신자)
             Employee applicantInfo = attendanceApplyMapper.findEmployeeByEmpCode(applyInfo.getApplicantCode());
-            // 대상자 정보
             Employee targetInfo = attendanceApplyMapper.findEmployeeByEmpCode(applyInfo.getEmpCode());
 
-            // Map 형태로 변환 - 강화된 로직
             Map<String, Object> applyInfoMap = convertEtcToMap(applyInfo);
             Map<String, Object> applicantInfoMap = convertEmployeeToMapEnhanced(applicantInfo, "상신자");
             Map<String, Object> targetInfoMap = convertEmployeeToMapEnhanced(targetInfo, "대상자");
 
-            // 결재 이력 - 완전 강화
             List<ApprovalHistory> approvalHistory = getEtcApprovalHistory(applyEtcNo);
             List<Map<String, Object>> historyList = new ArrayList<>();
 
@@ -305,21 +269,16 @@ public class ApprovalService {
                 ApprovalHistory history = approvalHistory.get(i);
                 Map<String, Object> historyMap = new HashMap<>();
 
-                // 순번
                 historyMap.put("ORDER_NUM", i + 1);
                 historyMap.put("APPROVER_CODE", history.getApproverCode());
 
-                // 결재자 정보 완전 강화
                 Employee approverInfo = attendanceApplyMapper.findEmployeeByEmpCode(history.getApproverCode());
                 if (approverInfo != null) {
                     historyMap.put("APPROVER_NAME", approverInfo.getEmpName());
-
                     String deptName = getDepartmentNameEnhanced(approverInfo);
                     historyMap.put("DEPT_NAME", deptName);
-
                     String positionName = getPositionNameEnhanced(approverInfo);
                     historyMap.put("POSITION_NAME", positionName);
-
                     historyMap.put("DUTY_NAME", approverInfo.getDutyName() != null ? approverInfo.getDutyName() : "-");
                 } else {
                     historyMap.put("APPROVER_NAME", history.getApproverCode());
@@ -328,10 +287,8 @@ public class ApprovalService {
                     historyMap.put("DUTY_NAME", "-");
                 }
 
-                // 구분 (기타결재)
                 historyMap.put("CATEGORY", "기타결재");
 
-                // 수정: 결과부분 undefined 문제 해결
                 String approvalStatus = history.getApprovalStatus();
                 if (approvalStatus != null && !approvalStatus.trim().isEmpty()) {
                     historyMap.put("APPROVAL_STATUS", approvalStatus);
@@ -339,10 +296,8 @@ public class ApprovalService {
                     historyMap.put("APPROVAL_STATUS", "대기");
                 }
 
-                // 결재완료일 실제 데이터 표시
                 String approvalDate = history.getApprovalDate();
                 if (approvalDate != null && !approvalDate.trim().isEmpty() && !"-".equals(approvalDate)) {
-                    // 날짜 포맷팅 (yyyyMMddHHmmss -> yyyy-MM-dd HH:mm:ss)
                     try {
                         if (approvalDate.length() >= 8) {
                             String formattedDate = approvalDate.substring(0, 4) + "-" +
@@ -364,7 +319,6 @@ public class ApprovalService {
                     historyMap.put("APPROVAL_DATE", "-");
                 }
 
-                // 반려 사유 표시
                 String rejectReason = history.getRejectReason();
                 if ("반려".equals(history.getApprovalStatus())) {
                     historyMap.put("REJECT_REASON", rejectReason != null ? rejectReason : "-");
@@ -387,7 +341,9 @@ public class ApprovalService {
         }
     }
 
-    // 수정: 일반근태 사유 표시 로직 개선
+    /**
+     * 일반근태 사유 표시 로직 개선
+     */
     private Map<String, Object> convertGeneralToMap(AttendanceApplyGeneral apply) {
         Map<String, Object> map = new HashMap<>();
         map.put("APPLY_GENERAL_NO", apply.getApplyGeneralNo());
@@ -399,7 +355,6 @@ public class ApprovalService {
         map.put("END_TIME", apply.getEndTime());
         map.put("APPLY_TYPE", apply.getApplyType());
 
-        // 수정: 사유 표시 로직 개선 (사무처리 -> -)
         String reason = apply.getReason();
         if (reason == null || reason.trim().isEmpty()) {
             map.put("REASON", "-");
@@ -409,7 +364,6 @@ public class ApprovalService {
 
         map.put("TIME_ITEM_NAME", "주간");
 
-        // 시간 범위 계산
         if (apply.getStartTime() != null && apply.getEndTime() != null) {
             String startFormatted = formatTime(apply.getStartTime());
             String endFormatted = formatTime(apply.getEndTime());
@@ -430,11 +384,9 @@ public class ApprovalService {
         map.put("TARGET_START_DATE", formatDateString(apply.getTargetStartDate()));
         map.put("TARGET_END_DATE", formatDateString(apply.getTargetEndDate()));
 
-        // 수정: 기타근태 사유 표시
         String reason = apply.getReason();
         map.put("REASON", reason != null && !reason.trim().isEmpty() ? reason : "-");
 
-        // 실제 근태명 조회 및 표시
         if (apply.getShiftCode() != null) {
             try {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
@@ -467,7 +419,7 @@ public class ApprovalService {
             map.put("POSITION_NAME", positionName);
 
             map.put("DUTY_NAME", emp.getDutyName() != null ? emp.getDutyName() : "-");
-            map.put("TYPE", type); // 상신자/대상자 구분
+            map.put("TYPE", type);
         } else {
             map.put("EMP_CODE", "-");
             map.put("EMP_NAME", "-");
@@ -487,13 +439,10 @@ public class ApprovalService {
         if (emp == null) return "-";
 
         String deptName = emp.getDeptName();
-
-        // 1차: Employee 객체에서 직접 조회
         if (deptName != null && !deptName.trim().isEmpty() && !"-".equals(deptName)) {
             return deptName;
         }
 
-        // 2차: 부서코드로 부서마스터에서 조회
         if (emp.getDeptCode() != null && !emp.getDeptCode().trim().isEmpty()) {
             try {
                 var dept = departmentMapper.findByDeptCode(emp.getDeptCode());
@@ -519,7 +468,6 @@ public class ApprovalService {
             return positionName;
         }
 
-        // 부서장 여부 확인하여 기본 직책명 설정
         if ("Y".equals(emp.getIsHeader())) {
             return "부서장";
         }
@@ -551,13 +499,12 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 결재할 일반근태 문서 조회 - 부서장 자동승인 문서 제외
+     * 결재할 일반근태 문서 조회
      */
     public List<AttendanceApplyGeneral> getPendingGeneralApprovals(String approverCode, String startDate, String endDate, String applyType, String empCode) {
         try {
             log.debug("결재할 일반근태 문서 조회: approverCode={}, startDate={}, endDate={}, applyType={}, empCode={}",
                     approverCode, startDate, endDate, applyType, empCode);
-
             List<AttendanceApplyGeneral> result = approvalMapper.findPendingGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
             log.debug("결재할 일반근태 문서 수: {}", result.size());
             return result;
@@ -574,7 +521,6 @@ public class ApprovalService {
         try {
             log.debug("결재할 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
                     approverCode, startDate, endDate, empCode);
-
             List<AttendanceApplyEtc> result = approvalMapper.findPendingEtcApprovals(approverCode, startDate, endDate, empCode);
             log.debug("결재할 기타근태 문서 수: {}", result.size());
             return result;
@@ -585,13 +531,12 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 승인된 일반근태 문서 조회 - 부서장 자동승인 문서도 포함
+     * 승인된 일반근태 문서 조회
      */
     public List<AttendanceApplyGeneral> getApprovedGeneralApprovals(String approverCode, String startDate, String endDate, String applyType, String empCode) {
         try {
             log.debug("승인된 일반근태 문서 조회: approverCode={}, startDate={}, endDate={}, applyType={}, empCode={}",
                     approverCode, startDate, endDate, applyType, empCode);
-
             List<AttendanceApplyGeneral> result = approvalMapper.findApprovedGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
             log.debug("승인된 일반근태 문서 수: {}", result.size());
             return result;
@@ -608,7 +553,6 @@ public class ApprovalService {
         try {
             log.debug("반려된 일반근태 문서 조회: approverCode={}, startDate={}, endDate={}, applyType={}, empCode={}",
                     approverCode, startDate, endDate, applyType, empCode);
-
             List<AttendanceApplyGeneral> result = approvalMapper.findRejectedGeneralApprovals(approverCode, startDate, endDate, applyType, empCode);
             log.debug("반려된 일반근태 문서 수: {}", result.size());
             return result;
@@ -619,14 +563,13 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 일반근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
+     * 수정: 일반근태 승인 처리 - 올바른 실적 업데이트 로직 적용
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
         try {
             log.debug("일반근태 승인 처리 시작: applyGeneralNo={}, approverCode={}", applyGeneralNo, approverCode);
 
-            // 신청 상태 확인
             AttendanceApplyGeneral apply = attendanceApplyMapper.findGeneralApplyByNo(applyGeneralNo);
             if (apply == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
@@ -636,7 +579,6 @@ public class ApprovalService {
                 throw new RuntimeException("상신 상태인 신청만 승인할 수 있습니다. 현재 상태: " + apply.getStatus());
             }
 
-            // 결재 이력 업데이트
             ApprovalHistory currentHistory = approvalMapper.findGeneralApprovalHistoryByApprover(applyGeneralNo, approverCode);
             if (currentHistory == null) {
                 throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
@@ -646,13 +588,20 @@ public class ApprovalService {
             currentHistory.setApprovalStatus("승인");
             approvalMapper.updateApprovalHistory(currentHistory);
 
-            // 신청 상태 업데이트
             attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
 
-            // 수정: 전반차/후반차의 경우 연차 차감
-            if ("전반차".equals(apply.getApplyType()) || "후반차".equals(apply.getApplyType())) {
+            // 수정: 올바른 실적 업데이트 로직
+            String applyType = apply.getApplyType();
+            if ("휴일근무".equals(applyType)) {
+                // 휴일근무만 실적을 변경
+                attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
+                log.debug("휴일근무 승인 완료: 실적 변경 (14-1)");
+            } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
+                // 수정: 전반차/후반차는 연차 차감만 하고 실적은 변경하지 않음
                 deductAnnualLeave(apply.getEmpCode(), new BigDecimal("0.5"));
+                log.debug("전반차/후반차 승인 완료: 연차 차감만 실행 (실적 변경 없음)");
             }
+            // 연장, 조출연장, 조퇴, 외근, 외출은 실적 변경하지 않음 (시간만 조정)
 
             log.info("일반근태 승인 처리 완료: applyGeneralNo={}", applyGeneralNo);
         } catch (Exception e) {
@@ -662,14 +611,13 @@ public class ApprovalService {
     }
 
     /**
-     * 수정: 기타근태 승인 처리 - 연차 차감 및 실적 업데이트 포함
+     * 수정: 기타근태 승인 처리 - 연차도 실적 변경하지 않음 (동적 계산)
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
         try {
             log.debug("기타근태 승인 처리 시작: applyEtcNo={}, approverCode={}", applyEtcNo, approverCode);
 
-            // 신청 상태 확인
             AttendanceApplyEtc apply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
             if (apply == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
@@ -679,7 +627,6 @@ public class ApprovalService {
                 throw new RuntimeException("상신 상태인 신청만 승인할 수 있습니다. 현재 상태: " + apply.getStatus());
             }
 
-            // 결재 이력 업데이트
             ApprovalHistory currentHistory = approvalMapper.findEtcApprovalHistoryByApprover(applyEtcNo, approverCode);
             if (currentHistory == null) {
                 throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
@@ -689,20 +636,21 @@ public class ApprovalService {
             currentHistory.setApprovalStatus("승인");
             approvalMapper.updateApprovalHistory(currentHistory);
 
-            // 신청 상태 업데이트
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
-            // 수정: 연차 차감 및 실적 업데이트
+            // 수정: 연차도 실적 변경하지 않고 동적 계산으로 처리
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
-                    // 연차의 경우 1.0일 차감
+                    // 수정: 연차 차감만 하고 실적은 동적 계산으로 처리 (계획 보존)
                     deductAnnualLeave(apply.getEmpCode(), BigDecimal.ONE);
+                    // 이 줄 삭제! 계획을 바꾸는 원인
+                    // attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetStartDate(), "06");
+                    log.debug("연차 승인 완료: 연차 차감만 실행 (실적은 동적 계산으로 처리)");
+                } else {
+                    // 연차가 아닌 기타근태는 실적 변경하지 않음
+                    log.debug("기타근태 승인 완료: 실적 변경 없음 (shiftName={})", shiftName);
                 }
-
-                // 실적 업데이트
-                attendanceApplyMapper.updateAttendanceRecordByEtcApply(apply.getEmpCode(),
-                        apply.getTargetStartDate(), apply.getShiftCode());
             }
 
             log.info("기타근태 승인 처리 완료: applyEtcNo={}", applyEtcNo);
@@ -712,7 +660,9 @@ public class ApprovalService {
         }
     }
 
-    // 수정: 연차 차감 메서드 추가
+    /**
+     * 연차 차감 메서드
+     */
     @Transactional
     private void deductAnnualLeave(String empCode, BigDecimal deductDays) {
         try {
@@ -745,7 +695,6 @@ public class ApprovalService {
         try {
             log.debug("일반근태 반려 처리 시작: applyGeneralNo={}, approverCode={}", applyGeneralNo, approverCode);
 
-            // 신청 상태 확인
             AttendanceApplyGeneral apply = attendanceApplyMapper.findGeneralApplyByNo(applyGeneralNo);
             if (apply == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
@@ -755,7 +704,6 @@ public class ApprovalService {
                 throw new RuntimeException("상신 상태인 신청만 반려할 수 있습니다. 현재 상태: " + apply.getStatus());
             }
 
-            // 결재 이력 업데이트
             ApprovalHistory currentHistory = approvalMapper.findGeneralApprovalHistoryByApprover(applyGeneralNo, approverCode);
             if (currentHistory == null) {
                 throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
@@ -766,7 +714,6 @@ public class ApprovalService {
             currentHistory.setRejectReason(rejectReason);
             approvalMapper.updateApprovalHistory(currentHistory);
 
-            // 신청 상태 업데이트
             attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "반려");
 
             log.info("일반근태 반려 처리 완료: applyGeneralNo={}", applyGeneralNo);
@@ -784,7 +731,6 @@ public class ApprovalService {
         try {
             log.debug("기타근태 반려 처리 시작: applyEtcNo={}, approverCode={}", applyEtcNo, approverCode);
 
-            // 신청 상태 확인
             AttendanceApplyEtc apply = attendanceApplyMapper.findEtcApplyByNo(applyEtcNo);
             if (apply == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
@@ -794,7 +740,6 @@ public class ApprovalService {
                 throw new RuntimeException("상신 상태인 신청만 반려할 수 있습니다. 현재 상태: " + apply.getStatus());
             }
 
-            // 결재 이력 업데이트
             ApprovalHistory currentHistory = approvalMapper.findEtcApprovalHistoryByApprover(applyEtcNo, approverCode);
             if (currentHistory == null) {
                 throw new RuntimeException("결재 이력을 찾을 수 없습니다.");
@@ -805,10 +750,9 @@ public class ApprovalService {
             currentHistory.setRejectReason(rejectReason);
             approvalMapper.updateApprovalHistory(currentHistory);
 
-            // 신청 상태 업데이트
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "반려");
 
-            log.info("기타근태 반려 처리 완료: applyEtcNo={}", applyEtcNo);
+            log.info("기타근태 반료 처리 완료: applyEtcNo={}", applyEtcNo);
         } catch (Exception e) {
             log.error("기타근태 반려 처리 실패: applyEtcNo={}", applyEtcNo, e);
             throw new RuntimeException("반려 처리에 실패했습니다: " + e.getMessage(), e);
@@ -852,7 +796,6 @@ public class ApprovalService {
         try {
             log.debug("승인된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
                     approverCode, startDate, endDate, empCode);
-
             List<AttendanceApplyEtc> result = approvalMapper.findApprovedEtcApprovals(approverCode, startDate, endDate, empCode);
             log.debug("승인된 기타근태 문서 수: {}", result.size());
             return result;
@@ -869,7 +812,6 @@ public class ApprovalService {
         try {
             log.debug("반려된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
                     approverCode, startDate, endDate, empCode);
-
             List<AttendanceApplyEtc> result = approvalMapper.findRejectedEtcApprovals(approverCode, startDate, endDate, empCode);
             log.debug("반려된 기타근태 문서 수: {}", result.size());
             return result;

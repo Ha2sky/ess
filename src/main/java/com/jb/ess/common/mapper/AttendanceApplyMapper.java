@@ -23,15 +23,6 @@ public interface AttendanceApplyMapper {
     """)
     Employee findEmployeeByEmpCode(String empCode);
 
-    // 하위부서 조회
-    @Select("""
-        SELECT DEPT_CODE, DEPT_NAME, PARENT_DEPT, DEPT_LEADER, DEPT_CATEGORY
-        FROM ORGDEPTMASTER
-        WHERE PARENT_DEPT = #{parentDeptCode} OR DEPT_CODE = #{parentDeptCode}
-        ORDER BY DEPT_CODE
-    """)
-    List<Department> findSubDepartments(String parentDeptCode);
-
     // 필터링된 근태 마스터 조회
     @Select("""
         <script>
@@ -49,39 +40,6 @@ public interface AttendanceApplyMapper {
     // 유효한 TIME_ITEM_CODE 조회
     @Select("SELECT TOP 1 TIME_ITEM_CODE FROM HRTTIMEITEM ORDER BY TIME_ITEM_CODE")
     String getValidTimeItemCode();
-
-    // 계획 근태코드 조회
-    @Select("""
-        SELECT SHIFT_CODE FROM HRTWORKEMPCALENDAR 
-        WHERE EMP_CODE = #{empCode} AND YYYYMMDD = #{workDate}
-    """)
-    String getPlannedShiftCode(@Param("empCode") String empCode, @Param("workDate") String workDate);
-
-    // 근태코드로 근태명 조회
-    @Select("SELECT SHIFT_NAME FROM HRTSHIFTMASTER WHERE SHIFT_CODE = #{shiftCode}")
-    String getShiftNameByCode(String shiftCode);
-
-    // 실적 조회
-    @Select("""
-        SELECT CHECK_IN_TIME as checkInTime, CHECK_OUT_TIME as checkOutTime 
-        FROM HRTATTRECORD 
-        WHERE EMP_CODE = #{empCode} AND WORK_DATE = #{workDate}
-    """)
-    Map<String, String> getAttendanceRecord(@Param("empCode") String empCode, @Param("workDate") String workDate);
-
-    // 예상근로시간 조회
-    @Select("""
-        SELECT 
-            CASE 
-                WHEN WORK_TYPE_CODE = 'FULL' THEN '8.00'
-                WHEN WORK_TYPE_CODE = 'HALF' THEN '4.00'
-                WHEN WORK_TYPE_CODE = 'NOFF' OR WORK_TYPE_CODE = 'POFF' THEN '0.00'
-                ELSE '8.00'
-            END as expectedHours
-        FROM HRTSHIFTMASTER 
-        WHERE SHIFT_CODE = #{shiftCode}
-    """)
-    String getExpectedWorkHours(String shiftCode);
 
     // 수정: 기존 일반근태 신청 조회 - 근태신청종류별 필터링 (메소드명 변경)
     @Select("""
@@ -143,27 +101,7 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
-    // 수정: 부서별 사원 조회 (근무계획 포함) - 부서장용 (정렬 수정: 직위 높은 순 → 사번 낮은 순)
-    @Select("""
-        SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
-               wc.SHIFT_CODE as workPlan,
-               sm.SHIFT_NAME as workPlanName
-        FROM HRIMASTER h
-        LEFT JOIN HRTGRADEINFO p ON h.POSITION_CODE = p.POSITION_CODE
-        LEFT JOIN HRTDUTYINFO d ON h.DUTY_CODE = d.DUTY_CODE
-        LEFT JOIN ORGDEPTMASTER dept ON h.DEPT_CODE = dept.DEPT_CODE
-        LEFT JOIN HRTWORKEMPCALENDAR wc ON h.EMP_CODE = wc.EMP_CODE 
-               AND wc.YYYYMMDD = #{workDate}
-        LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
-        WHERE h.DEPT_CODE = #{deptCode}
-        AND h.EMP_STATE = 'WORK'
-        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
-    """)
-    List<Employee> findEmployeesByDept(@Param("deptCode") String deptCode,
-                                       @Param("workDate") String workDate,
-                                       @Param("workPlan") String workPlan);
-
-    // 수정: 부서별 사원 조회 (정렬 조건 개선) - 부서장용 (직위 높은 순 → 사번 낮은 순)
+    // 수정: 부서별 사원 조회 (정렬 조건 강화) - 부서장용 (직급 높은 순 → 사번 낮은 순)
     @Select("""
         <script>
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
@@ -181,7 +119,13 @@ public interface AttendanceApplyMapper {
         <if test="workPlan != null and workPlan != ''">
             AND sm.SHIFT_NAME = #{workPlan}
         </if>
-        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
+        ORDER BY 
+            CASE 
+                WHEN p.POSITION_CODE IS NULL THEN 999 
+                ELSE CAST(p.POSITION_CODE AS INT) 
+            END ASC, 
+            h.EMP_CODE ASC, 
+            h.EMP_NAME ASC
         </script>
     """)
     List<Employee> findEmployeesByDeptWithSort(@Param("deptCode") String deptCode,
@@ -189,7 +133,7 @@ public interface AttendanceApplyMapper {
                                                @Param("workPlan") String workPlan,
                                                @Param("sortBy") String sortBy);
 
-    // 수정: 현재 사원 정보 조회 (근무계획 포함) - 일반 사원용 (정렬 추가)
+    // 수정: 현재 사원 정보 조회 (근무계획 포함) - 일반 사원용 (정렬 강화)
     @Select("""
         SELECT h.*, p.POSITION_NAME, d.DUTY_NAME, dept.DEPT_NAME,
                wc.SHIFT_CODE as workPlan,
@@ -202,7 +146,13 @@ public interface AttendanceApplyMapper {
                AND wc.YYYYMMDD = #{workDate}
         LEFT JOIN HRTSHIFTMASTER sm ON wc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE h.EMP_CODE = #{empCode}
-        ORDER BY ISNULL(p.POSITION_CODE, 999) DESC, h.EMP_CODE ASC
+        ORDER BY 
+            CASE 
+                WHEN p.POSITION_CODE IS NULL THEN 999 
+                ELSE CAST(p.POSITION_CODE AS INT) 
+            END ASC, 
+            h.EMP_CODE ASC, 
+            h.EMP_NAME ASC
     """)
     List<Employee> findCurrentEmployeeWithCalendar(@Param("empCode") String empCode,
                                                    @Param("workDate") String workDate);
@@ -348,15 +298,15 @@ public interface AttendanceApplyMapper {
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
 
-    // 수정: 기타근태 승인완료 시 실적 업데이트
+    // 수정: 실적 업데이트 메서드 추가 - 휴일근로, 연차 신청 후 실적 변경용
     @Update("""
-        UPDATE HRTATTRECORD 
+        UPDATE HRTWORKEMPCALENDAR
         SET SHIFT_CODE = #{shiftCode}
-        WHERE EMP_CODE = #{empCode} AND WORK_DATE = #{workDate}
+        WHERE EMP_CODE = #{empCode} AND YYYYMMDD = #{workDate}
     """)
-    void updateAttendanceRecordByEtcApply(@Param("empCode") String empCode,
-                                          @Param("workDate") String workDate,
-                                          @Param("shiftCode") String shiftCode);
+    void updateAttendanceRecordByShiftCode(@Param("empCode") String empCode,
+                                           @Param("workDate") String workDate,
+                                           @Param("shiftCode") String shiftCode);
 
     @Select("""
         SELECT APPLY_TYPE
@@ -408,7 +358,7 @@ public interface AttendanceApplyMapper {
     """)
         // 승인된 연장, 조출연장
     List<AttendanceApplyGeneral> findApprovedOverTimes(@Param("empCode") String empCode,
-                                                      @Param("workYmd") String workYmd);
+                                                       @Param("workYmd") String workYmd);
 
     @Select("""
         SELECT *
@@ -421,4 +371,123 @@ public interface AttendanceApplyMapper {
         // 승인된 휴일근무
     AttendanceApplyGeneral findApprovedOverTime2(@Param("empCode") String empCode,
                                                  @Param("workYmd") String workYmd);
+
+    @Select("""
+        SELECT
+            general.APPLY_DATE AS applyDate,
+            general.TARGET_DATE AS targetDate,
+            NULL AS targetEndDate,
+            general.EMP_CODE AS empCode,
+            general.APPLY_TYPE AS applyType,
+            general.STATUS AS status,
+            dept.DEPT_NAME AS deptName,
+            emp.EMP_NAME AS empName
+        
+        FROM HRTATTAPLGENERAL general
+        LEFT JOIN ORGDEPTMASTER dept ON general.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRIMASTER emp ON general.EMP_CODE = emp.EMP_CODE
+        
+        WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
+        AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
+        AND general.STATUS LIKE CONCAT(#{status}, '%')
+        
+        UNION ALL
+        
+        SELECT
+            etc.APPLY_DATE AS applyDate,
+            etc.TARGET_START_DATE AS targetDate,
+            etc.TARGET_END_DATE AS targetEndDate,
+            etc.EMP_CODE AS empCode,
+            etc.SHIFT_CODE AS applyType,
+            etc.STATUS AS status,
+            dept.DEPT_NAME AS deptName,
+            emp.EMP_NAME AS empName
+        FROM HRTATTAPLETC etc
+        LEFT JOIN ORGDEPTMASTER dept ON etc.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRIMASTER emp ON etc.EMP_CODE = emp.EMP_CODE
+        WHERE (etc.APPLICANT_CODE = #{empCode} OR etc.EMP_CODE = #{empCode})
+        AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
+        AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
+        AND etc.STATUS LIKE CONCAT(#{status}, '%')
+        
+        ORDER BY applyDate, targetDate, applyType DESC;
+    """)
+    List<AttHistory> getAllAttList(@Param("startDate") String startDate, @Param("endDate") String endDate,
+                                   @Param("status") String status, @Param("empCode") String empCode);
+
+    @Select("""
+        SELECT
+            general.APPLY_DATE AS applyDate,
+            general.TARGET_DATE AS targetDate,
+            NULL AS targetEndDate,
+            general.EMP_CODE AS empCode,
+            general.APPLY_TYPE AS applyType,
+            general.STATUS AS status,
+            dept.DEPT_NAME AS deptName,
+            emp.EMP_NAME AS empName
+        
+        FROM HRTATTAPLGENERAL general
+        LEFT JOIN ORGDEPTMASTER dept ON general.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRIMASTER emp ON general.EMP_CODE = emp.EMP_CODE
+        
+        WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
+        AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
+        AND general.STATUS LIKE CONCAT(#{status}, '%')
+        AND general.APPLY_TYPE LIKE CONCAT('%', #{applyType}, '%')
+        
+        ORDER BY applyDate, targetDate, applyType DESC;
+    """)
+    List<AttHistory> getAttList(@Param("startDate") String startDate, @Param("endDate") String endDate,
+                                @Param("applyType") String applyType, @Param("status") String status,
+                                @Param("empCode") String empCode);
+
+    @Select("""
+        SELECT
+            general.APPLY_DATE AS applyDate,
+            general.TARGET_DATE AS targetDate,
+            NULL AS targetEndDate,
+            general.EMP_CODE AS empCode,
+            general.APPLY_TYPE AS applyType,
+            general.STATUS AS status,
+            dept.DEPT_NAME AS deptName,
+            emp.EMP_NAME AS empName
+        
+        FROM HRTATTAPLGENERAL general
+        LEFT JOIN ORGDEPTMASTER dept ON general.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRIMASTER emp ON general.EMP_CODE = emp.EMP_CODE
+        
+        WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
+        AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
+        AND general.STATUS LIKE CONCAT(#{status}, '%')
+        AND general.APPLY_TYPE IN ('%조퇴%', '%외출%', '%반차%')
+        
+        ORDER BY applyDate, targetDate, applyType DESC;
+    """)
+        /* 조퇴, 외출, 반차 신청 리스트 */
+    List<AttHistory> getAttList2(@Param("startDate") String startDate, @Param("endDate") String endDate,
+                                 @Param("status") String status, @Param("empCode") String empCode);
+
+    @Select("""
+        SELECT
+            etc.APPLY_DATE AS applyDate,
+            etc.TARGET_START_DATE AS targetDate,
+            etc.TARGET_END_DATE AS targetEndDate,
+            etc.EMP_CODE AS empCode,
+            etc.SHIFT_CODE AS applyType,
+            etc.STATUS AS status,
+            dept.DEPT_NAME AS deptName,
+            emp.EMP_NAME AS empName
+        FROM HRTATTAPLETC etc
+        LEFT JOIN ORGDEPTMASTER dept ON etc.DEPT_CODE = dept.DEPT_CODE
+        LEFT JOIN HRIMASTER emp ON etc.EMP_CODE = emp.EMP_CODE
+        WHERE (etc.APPLICANT_CODE = #{empCode} OR etc.EMP_CODE = #{empCode})
+        AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
+        AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
+        AND etc.STATUS LIKE CONCAT(#{status}, '%')
+        
+        ORDER BY applyDate, targetDate, applyType DESC;
+    """)
+        /* 기타근태 신청 리스트 */
+    List<AttHistory> getAttListEtc(@Param("startDate") String startDate, @Param("endDate") String endDate,
+                                   @Param("status") String status, @Param("empCode") String empCode);
 }

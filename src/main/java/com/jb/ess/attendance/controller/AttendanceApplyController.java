@@ -76,7 +76,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 수정: 부서별 사원 조회 API - 근태신청종류별 필터링 추가
+    // 수정: 부서별 사원 조회 API - 근태신청종류별 필터링 추가 및 정렬 강화
     @GetMapping("/employees")
     @ResponseBody
     public List<Employee> getEmployeesByDept(@RequestParam String deptCode,
@@ -113,15 +113,18 @@ public class AttendanceApplyController {
             log.debug("사원 조회 요청: empCode={}, deptCode={}, workDate={}, sortBy={}, applyTypeCategory={}",
                     empCode, deptCode, workDate, sortBy, applyTypeCategory);
 
+            // 수정: 기본 정렬을 직위순으로 강화 설정
+            String finalSortBy = (sortBy != null && !sortBy.trim().isEmpty()) ? sortBy : "position,empCode,empName";
+
             // 부서장인 경우 부서원 전체, 일반 사원인 경우 본인만 조회
             if ("Y".equals(currentEmp.getIsHeader())) {
                 // 수정: 근태신청종류별 필터링 적용
                 if (applyTypeCategory != null && !applyTypeCategory.trim().isEmpty()) {
                     // 근태신청종류가 지정된 경우 필터링된 조회
-                    return attendanceApplyService.getEmployeesByDeptWithApplyType(deptCode, workDate, workPlan, sortBy, applyTypeCategory);
+                    return attendanceApplyService.getEmployeesByDeptWithApplyType(deptCode, workDate, workPlan, finalSortBy, applyTypeCategory);
                 } else {
                     // 근태신청종류가 지정되지 않은 경우 전체 조회
-                    return attendanceApplyService.getEmployeesByDept(deptCode, workDate, workPlan, sortBy);
+                    return attendanceApplyService.getEmployeesByDept(deptCode, workDate, workPlan, finalSortBy);
                 }
             } else {
                 // 수정: 일반 사원도 근태신청종류별 필터링 적용
@@ -178,15 +181,21 @@ public class AttendanceApplyController {
         }
     }
 
-    // 근무계획/실적/예상근로시간 조회 API
+    // 수정: 근무계획/실적/예상근로시간 조회 API - empCalendar 활용 강화
     @GetMapping("/workInfo/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
         try {
-            return attendanceApplyService.getWorkInfo(empCode, workDate);
+            return attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
         } catch (Exception e) {
             log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
-            return Map.of("plan", "", "record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "", "shiftName", ""), "expectedHours", "0.00");
+            return Map.of(
+                    "plan", "",
+                    "empCalendarPlan", "",
+                    "record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "", "shiftName", ""),
+                    "appliedRecord", null,
+                    "expectedHours", "0.00"
+            );
         }
     }
 
@@ -264,6 +273,11 @@ public class AttendanceApplyController {
 
             attendanceApplyService.saveGeneralApply(apply);
 
+            // 수정: 휴일근로 신청 후 실적 업데이트 처리
+            if ("휴일근무".equals(apply.getApplyType())) {
+                attendanceApplyService.updateWorkRecordForHolidayWork(apply.getEmpCode(), apply.getTargetDate());
+            }
+
             // 저장된 데이터 조회 및 반환
             AttendanceApplyGeneral savedApply = attendanceApplyService.getSavedGeneralApply(apply.getApplyGeneralNo());
             response.put("result", "success");
@@ -307,6 +321,11 @@ public class AttendanceApplyController {
             }
 
             attendanceApplyService.saveEtcApply(apply);
+
+            // 수정: 연차/반차 신청 후 실적 업데이트 처리
+            if (apply.getShiftCode() != null) {
+                attendanceApplyService.updateWorkRecordForAnnualLeave(apply.getEmpCode(), apply.getTargetStartDate(), apply.getShiftCode());
+            }
 
             // 저장된 데이터 조회 및 반환
             AttendanceApplyEtc savedApply = attendanceApplyService.getSavedEtcApply(apply.getApplyEtcNo());
