@@ -9,7 +9,6 @@ import com.jb.ess.common.mapper.EmpCalendarMapper;
 import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.util.DateUtil;
-import com.jb.ess.common.util.DurationParseUtil;
 import com.jb.ess.common.util.WorkHoursCalculator;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -84,11 +83,10 @@ public class EmpAttService {
 
         for (LocalDate date = weekStart; !date.isAfter(weekEnd); date = date.plusDays(1)) {
             String ymd = DateUtil.reverseFormatDate(date);
-            List<AttendanceApplyGeneral> overtimes = attendanceApplyMapper.findApprovedOverTimes(empCode, ymd);
-            AttendanceApplyGeneral overtime2 = attendanceApplyMapper.findApprovedOverTime2(empCode, ymd);
 
             // 공휴일 && 휴일근무X 스킵
-            if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd)) && overtime2 == null)
+            if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd)) && !Objects.equals(
+                empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd), "14-1"))
                 continue;
 
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, ymd);
@@ -128,36 +126,53 @@ public class EmpAttService {
                 }
             }
 
-            /* 연장근무 */
-            Duration overtimeHours = Duration.ZERO;
-            for (AttendanceApplyGeneral overtime : overtimes) {
-                shift = shiftMasterMapper.findShiftByCode(empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd));
-                shift.setWorkOnHhmm(overtime.getStartTime());
-                shift.setWorkOffHhmm(overtime.getEndTime());
-                overtimeHours = DurationParseUtil.parseHourStringToDuration(emp.getOverTime()).plus(WorkHoursCalculator.getTotalWorkTime(shift));
-                emp.setOverTime(String.format("%.2f", overtimeHours.toMinutes() / 60.0));
-            }
-
-            /* 휴일근무 */
-            Duration overtime2Hours = Duration.ZERO;
-            if (overtime2 != null) {
-                shift = shiftMasterMapper.findShiftByCode("14-1");
-                shift.setWorkOnHhmm(overtime2.getStartTime());
-                shift.setWorkOffHhmm(overtime2.getEndTime());
-                shift.setWorkOnDayType("N0");
-                shift.setWorkOffDayType("N0");
-                overtime2Hours = DurationParseUtil.parseHourStringToDuration(emp.getOverTime2()).plus(WorkHoursCalculator.getTotalWorkTime(shift));
-                emp.setOverTime2(String.format("%.2f", overtime2Hours.toMinutes() / 60.0));
-            }
-
+            // 연장근무
+            Duration overtimeHours = getOvertimeHours(emp.getEmpCode(), ymd);
+            emp.setOverTime(String.format("%.2f", overtimeHours.toMinutes() / 60.0));
             workHours = workHours.plus(overtimeHours);
-            workHours = workHours.plus(overtime2Hours);
+
+            // 휴일근무
+            Duration holidayWorkHours = getHolidayWorkHours(emp.getEmpCode(), ymd);
+            emp.setHolidayWork(String.format("%.2f", holidayWorkHours.toMinutes() / 60.0));
+            workHours = workHours.plus(holidayWorkHours);
         }
 
         if (emp.getOverTime() == null) emp.setOverTime("-");
-        if (emp.getOverTime2() == null) emp.setOverTime2("-");
+        if (emp.getHolidayWork() == null) emp.setHolidayWork("-");
 
         return workHours;
+    }
+
+    /* 연장근무 */
+    public Duration getOvertimeHours(String empCode, String ymd) {
+        List<AttendanceApplyGeneral> overtimes = attendanceApplyMapper.findApprovedOverTimes(empCode, ymd);
+        Duration overtimeHours = Duration.ZERO;
+
+        for (AttendanceApplyGeneral overtime : overtimes) {
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode(empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd));
+            shift.setWorkOnHhmm(overtime.getStartTime());
+            shift.setWorkOffHhmm(overtime.getEndTime());
+            overtimeHours = overtimeHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
+        }
+
+        return overtimeHours;
+    }
+
+    /* 휴일근무 */
+    public Duration getHolidayWorkHours(String empCode, String ymd) {
+        AttendanceApplyGeneral holidayWork = attendanceApplyMapper.findApprovedOverTime2(empCode, ymd);
+        Duration holidayWorkHours = Duration.ZERO;
+
+        if (holidayWork != null) {
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode("14-1");
+            shift.setWorkOnHhmm(holidayWork.getStartTime());
+            shift.setWorkOffHhmm(holidayWork.getEndTime());
+            shift.setWorkOnDayType("N0");
+            shift.setWorkOffDayType("N0");
+            holidayWorkHours = holidayWorkHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
+        }
+
+        return holidayWorkHours;
     }
 
     public List<Employee> setAttendanceInfo(List<Employee> empList, LocalDate weekStart, LocalDate weekEnd, LocalDate workDate) {
@@ -184,7 +199,7 @@ public class EmpAttService {
 
             if (cal == null) {
                 emp.setShiftCode(null);
-            } else if ("Y".equals(cal.getHolidayYn())) {
+            } else if ("Y".equals(cal.getHolidayYn()) && !Objects.equals(cal.getShiftCode(), "14-1")) {
                 emp.setShiftCode(cal.getShiftCode()); // 휴일인 경우 실적 유지
             } else {
                 // 실근무일인 경우
@@ -217,10 +232,14 @@ public class EmpAttService {
                     checkInDateTime = null;
                 }
 
-
                 // 출근시간 전
                 if (nowDateTime.isBefore(workOnDateTime)) {
-                    emp.setShiftCode(null);
+                    // 실적이 변경된 경우 (근태 신청)
+                    if (!Objects.equals(cal.getShiftCode(), cal.getShiftCodeOrig())) {
+                        emp.setShiftCode(cal.getShiftCode());
+                        emp.setTimeItemNames(List.of(shiftMasterMapper.findShiftNameByShiftCode(cal.getShiftCode())));
+                    }
+                    else emp.setShiftCode(null);
                 // 출근시간 후
                 } else {
                     // 출퇴근 기록 없음

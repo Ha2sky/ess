@@ -54,6 +54,6 @@ public class Employee implements Serializable {
     private String applyEtcNo;          // 기타근태 신청번호
     private String etcApplyStatus;      // 기타근태 신청상태
 
-    private String overTime;    // 연장근무 시간
-    private String overTime2;   // 조출연장 시간
+    private String overTime;        // 연장근무 시간
+    private String holidayWork;     // 휴일근무 시간
 }

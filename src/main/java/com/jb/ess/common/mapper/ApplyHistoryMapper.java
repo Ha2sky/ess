@@ -31,6 +31,7 @@ public interface ApplyHistoryMapper {
         WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
         AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
         AND general.STATUS LIKE CONCAT(#{status}, '%')
+        AND general.STATUS != N'저장'
         
         UNION ALL
         
@@ -58,8 +59,9 @@ public interface ApplyHistoryMapper {
         AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.STATUS LIKE CONCAT(#{status}, '%')
+        AND etc.STATUS != N'저장'
         
-        ORDER BY applyDate, targetDate, applyType DESC;
+        ORDER BY applyDate, targetDate, applyType;
     """)
     List<ApplyHistory> getAllApplyList(@Param("startDate") String startDate, @Param("endDate") String endDate,
                                        @Param("status") String status, @Param("empCode") String empCode);
@@ -86,9 +88,10 @@ public interface ApplyHistoryMapper {
         WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
         AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
         AND general.STATUS LIKE CONCAT(#{status}, '%')
+        AND general.STATUS != N'저장'
         AND general.APPLY_TYPE LIKE CONCAT('%', #{applyType}, '%')
         
-        ORDER BY applyDate, targetDate, applyType DESC;
+        ORDER BY applyDate, targetDate, applyType;
     """)
     List<ApplyHistory> getApplyList(@Param("startDate") String startDate, @Param("endDate") String endDate,
                                     @Param("applyType") String applyType, @Param("status") String status,
@@ -116,9 +119,10 @@ public interface ApplyHistoryMapper {
         WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
         AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
         AND general.STATUS LIKE CONCAT(#{status}, '%')
-        AND general.APPLY_TYPE IN ('%조퇴%', '%외출%', '%반차%')
+        AND general.STATUS != N'저장'
+        AND general.APPLY_TYPE IN (N'%조퇴%', N'%외출%', N'%반차%')
         
-        ORDER BY applyDate, targetDate, applyType DESC;
+        ORDER BY applyDate, targetDate, applyType;
     """)
         /* 조퇴, 외출, 반차 신청 리스트 */
     List<ApplyHistory> getApplyList2(@Param("startDate") String startDate, @Param("endDate") String endDate,
@@ -145,8 +149,9 @@ public interface ApplyHistoryMapper {
         AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.STATUS LIKE CONCAT(#{status}, '%')
+        AND etc.STATUS != N'저장'
         
-        ORDER BY applyDate, targetDate, applyType DESC;
+        ORDER BY applyDate, targetDate, applyType;
     """)
         /* 기타근태 신청 리스트 */
     List<ApplyHistory> getApplyListEtc(@Param("startDate") String startDate, @Param("endDate") String endDate,

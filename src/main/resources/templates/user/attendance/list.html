@@ -106,7 +106,7 @@
           th:text="${emp.timeItemNames != null && !#lists.isEmpty(emp.timeItemNames) ? #strings.listJoin(emp.timeItemNames, ', ') : '-'}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkInTime}"></td>
       <td class="time-value border px-2 py-1" th:data-time="${emp.checkOutTime}"></td>
-      <td class="border px-2 py-1" th:text="${emp.overTime2}"></td>
+      <td class="border px-2 py-1" th:text="${emp.holidayWork}"></td>
       <td class="border px-2 py-1" th:text="${emp.overTime}"></td>
       <td class="border px-2 py-1 bg-red-200">52.00</td>
       <td class="border px-2 py-1" th:text="${emp.workHours}"></td>
