@@ -10,6 +10,7 @@ import com.jb.ess.common.mapper.EmpCalendarMapper;
 import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.util.DateUtil;
+import com.jb.ess.common.util.WorkHoursCalculator;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -64,28 +65,25 @@ public class HistoryService {
 
     // 근태 신청 상세
     public List<ApplyHistory> setApplyList(List<ApplyHistory> applyList) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-
         for (ApplyHistory applyHistory : applyList) {
             String targetDate = applyHistory.getTargetDate();
-            LocalDate localTargetDate = LocalDate.parse(targetDate, formatter);
-            LocalDate monday = localTargetDate.with(DayOfWeek.MONDAY);
-            LocalDate sunday = localTargetDate.with(DayOfWeek.SUNDAY);
 
             // 연장근로
             if (applyHistory.getApplyType().equals("연장") || applyHistory.getApplyType().equals("조출연장")) {
-                Duration overtimeHours = Duration.ZERO;
-                for (LocalDate date = monday; !date.isAfter(sunday); date = date.plusDays(1)) {
-                    overtimeHours = overtimeHours.plus(empAttService.getOvertimeHours(applyHistory.getEmpCode(), DateUtil.reverseFormatDate(date)));
-                }
-                applyHistory.setOvertime(String.format("%.2f", overtimeHours.toMinutes() / 60.0));
+                ShiftMaster shift = shiftMasterMapper.findShiftByCode(empCalendarMapper.findShiftCodeByEmpCodeAndDate(
+                    applyHistory.getEmpCode(), targetDate));
+                shift.setWorkOnHhmm(applyHistory.getStartTime());
+                shift.setWorkOffHhmm(applyHistory.getEndTime());
+                applyHistory.setOvertime(String.format("%.2f", WorkHoursCalculator.getTotalWorkTime(shift).toMinutes() / 60.0));
 
                 // 휴일근로
             } else if (applyHistory.getApplyType().equals("휴일근무")) {
-                Duration holidayWorkHours = Duration.ZERO;
-                for (LocalDate date = monday; !date.isAfter(sunday); date = date.plusDays(1)) {
-                    holidayWorkHours = holidayWorkHours.plus(empAttService.getHolidayWorkHours(applyHistory.getEmpCode(), DateUtil.reverseFormatDate(date)));
-                }
+                ShiftMaster shift = shiftMasterMapper.findShiftByCode("14-1");
+                shift.setWorkOnHhmm(applyHistory.getStartTime());
+                shift.setWorkOffHhmm(applyHistory.getEndTime());
+                shift.setWorkOnDayType("N0");
+                shift.setWorkOffDayType("N0");
+                Duration holidayWorkHours = WorkHoursCalculator.getTotalWorkTime(shift);
                 applyHistory.setHoliday(String.format("%.2f", holidayWorkHours.toMinutes() / 60.0));
 
                 // 조퇴 / 외출 / 반차
