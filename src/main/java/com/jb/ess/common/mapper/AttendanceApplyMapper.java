@@ -99,6 +99,63 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
+    // 해당일 연차/휴가 신청 확인 (기타근태 - 연장근로 검증용)
+    @Select("""
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+        FROM HRTATTAPLETC etc
+        INNER JOIN HRTSHIFTMASTER sm ON etc.SHIFT_CODE = sm.SHIFT_CODE
+        WHERE etc.EMP_CODE = #{empCode} 
+        AND etc.TARGET_START_DATE <= #{workDate} AND etc.TARGET_END_DATE >= #{workDate}
+        AND etc.STATUS IN ('승인완료', '상신')
+        AND sm.SHIFT_NAME IN ('연차', '휴가')
+    """)
+    boolean hasAnnualOrVacationApply(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 해당일 반차/조퇴 신청 확인 (일반근태 - 일반 연장근로 검증용)
+    @Select("""
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} 
+        AND TARGET_DATE = #{workDate}
+        AND STATUS IN ('승인완료', '상신')
+        AND APPLY_TYPE IN ('조퇴', '외근', '외출', '전반차', '후반차')
+    """)
+    boolean hasHalfDayOrEarlyLeaveApply(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 해당일 휴일근무 8시간 이상 신청 확인 (연장근로 검증용)
+    @Select("""
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} 
+        AND TARGET_DATE = #{workDate}
+        AND STATUS IN ('승인완료', '상신')
+        AND APPLY_TYPE = '휴일근무'
+        AND DATEDIFF(MINUTE, 
+            CAST(STUFF(STUFF(FORMAT(START_TIME, '0000'), 3, 0, ':'), 6, 0, ':') AS TIME),
+            CAST(STUFF(STUFF(FORMAT(END_TIME, '0000'), 3, 0, ':'), 6, 0, ':') AS TIME)
+        ) >= 480
+    """)
+    boolean hasHolidayWorkOver8Hours(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용)
+    @Select("""
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} 
+        AND TARGET_DATE = #{workDate}
+        AND STATUS IN ('승인완료', '상신')
+        AND APPLY_TYPE IN ('조퇴', '외근', '외출', '전반차', '후반차')
+        AND (
+            (START_TIME <= #{startTime} AND END_TIME > #{startTime}) OR
+            (START_TIME < #{endTime} AND END_TIME >= #{endTime}) OR
+            (START_TIME >= #{startTime} AND END_TIME <= #{endTime})
+        )
+    """)
+    boolean hasTimeOverlap(@Param("empCode") String empCode,
+                           @Param("workDate") String workDate,
+                           @Param("startTime") String startTime,
+                           @Param("endTime") String endTime);
+
     // 부서별 사원 조회 - 부서장용
     @Select("""
         <script>

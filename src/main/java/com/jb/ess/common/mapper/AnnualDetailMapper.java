@@ -37,4 +37,12 @@ public interface AnnualDetailMapper {
     """)
     boolean updateBalanceDayWithCheck(@Param("empCode") String empCode,
                                       @Param("deductDays") BigDecimal deductDays);
+
+    // USE_DAY 증가 메서드 추가
+    @Update("""
+        UPDATE HRTANNUALDETAIL 
+        SET USE_DAY = USE_DAY + #{useDays}
+        WHERE EMP_CODE = #{empCode}
+    """)
+    void updateUseDayIncrease(@Param("empCode") String empCode, @Param("useDays") BigDecimal useDays);
 }

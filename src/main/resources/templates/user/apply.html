@@ -583,7 +583,7 @@
                   }
 
                   const row = `
-                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}">
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}" data-plan="${workInfo.empCalendarPlan || workInfo.plan || ''}" data-record="${recordDisplay}">
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="checkbox" class="emp-checkbox">
                           </td>
@@ -716,7 +716,7 @@
                   }
 
                   const row = `
-                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}">
+                      <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}" data-plan="${workInfo.empCalendarPlan || workInfo.plan || ''}" data-record="${recordDisplay}">
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="checkbox" class="emp-checkbox">
                           </td>
@@ -818,17 +818,31 @@
 
       function calculateExpectedHours(row, empCode) {
           const applyType = $('#generalApplyType').val();
+          const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
           const startTime = row.find('.start-time').val();
           const endTime = row.find('.end-time').val();
+          const planShift = row.data('plan');
+          const recordShift = row.data('record');
 
           // 조퇴외출반차의 경우 예상근로시간 계산 불필요
           if (applyType === '조퇴외출반차') {
-              row.find('.expected-hours').text('0.00');
+              // 전반차, 후반차는 -4시간으로 표시
+              if (workType === '전반차' || workType === '후반차') {
+                  row.find('.expected-hours').text('-4.00');
+              } else {
+                  row.find('.expected-hours').text('0.00');
+              }
               return;
           }
 
           const isAbsent = row.data('is-absent') === true;
           if (isAbsent) {
+              row.find('.expected-hours').text('0.00');
+              return;
+          }
+
+          // 연차, 결근, 휴일인 경우 0.00 처리
+          if (['연차', '결근', '휴일', '휴무일', '휴직'].includes(recordShift)) {
               row.find('.expected-hours').text('0.00');
               return;
           }
@@ -1072,7 +1086,7 @@
               });
       }
 
-      // 일반근태 저장
+      // 일반근태 저장 - 요구사항에 맞는 검증 로직 추가
       function saveGeneralApply() {
           const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
 
@@ -1086,66 +1100,140 @@
           });
 
           if (absentRows.length > 0) {
-              alert('결근 사원은 근태 신청을 할 수 없습니다.');
+              alert('실적이 결근일 경우 신청할 수 없습니다.');
               return;
           }
 
+          let hasError = false;
+
           selectedRows.each(function() {
+              if (hasError) return false;
+
               const row = $(this);
               const empCode = row.data('emp-code');
               const workSelect = row.find('.work-select').val() || row.find('.work-type-display').text();
               const startTime = row.find('.start-time').val().replace(':', '');
               const endTime = row.find('.end-time').val().replace(':', '');
               const reason = row.find('.reason-field').val();
+              const planShift = row.data('plan');
+              const recordShift = row.data('record');
 
               const applyType = $('#generalApplyType').val();
-              if (applyType !== '조퇴외출반차') {
-                  const expectedHoursSpan = row.find('.expected-hours');
-                  if (expectedHoursSpan.hasClass('text-red-500')) {
-                      alert(`${row.find('td:eq(2)').text()} 사원: 주 52시간을 초과합니다.`);
-                      return;
+
+              // 연장근로 검증
+              if (workSelect === '연장' || workSelect === '조출연장') {
+                  // 실적이 결근일 경우 신청 불가
+                  if (recordShift === '결근') {
+                      alert(`${row.find('td:eq(2)').text()} 사원: 실적이 결근일 경우 연장근무를 신청할 수 없습니다.`);
+                      hasError = true;
+                      return false;
+                  }
+
+                  // 시간 검증
+                  if (startTime && endTime) {
+                      const startTimeInt = parseInt(startTime);
+                      const endTimeInt = parseInt(endTime);
+
+                      if (startTimeInt >= endTimeInt) {
+                          alert(`${row.find('td:eq(2)').text()} 사원: 시작시간이 종료시간보다 늦을 수 없습니다.`);
+                          hasError = true;
+                          return false;
+                      }
+
+                      if (workSelect === '연장') {
+                          if (startTimeInt < 1620) {
+                              alert(`${row.find('td:eq(2)').text()} 사원: 정상근무시간(16:20) 이후에만 연장근무를 신청할 수 있습니다.`);
+                              hasError = true;
+                              return false;
+                          }
+                      } else if (workSelect === '조출연장') {
+                          if (startTimeInt >= 730) {
+                              alert(`${row.find('td:eq(2)').text()} 사원: 정상근무시간(07:30) 이전에만 조출연장을 신청할 수 있습니다.`);
+                              hasError = true;
+                              return false;
+                          }
+                      }
                   }
               }
 
-              const data = {
-                  empCode: empCode,
-                  timeItemCode: 'T001',
-                  targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
-                  startTime: startTime,
-                  endTime: endTime,
-                  applyType: workSelect,
-                  reason: reason
-              };
-
-              $.ajax({
-                  url: '/user/apply/general',
-                  method: 'POST',
-                  contentType: 'application/json',
-                  data: JSON.stringify(data),
-                  success: function(response) {
-                      if (response.result === 'success') {
-                          row.find('.status-field').text('저장');
-                          row.attr('data-apply-no', response.data.applyGeneralNo);
-                          alert('저장되었습니다.');
-                          updateButtonStates();
-
-                          if (workSelect === '휴일근무') {
-                              setTimeout(function() {
-                                  loadWorkInfo(empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(updatedWorkInfo) {
-                                      if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
-                                          row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
-                                      }
-                                  });
-                              }, 500);
-                          }
-                      } else {
-                          alert('저장 실패: ' + response.message);
-                      }
-                  },
-                  error: function() {
-                      alert('저장에 실패했습니다.');
+              // 휴일근로 검증
+              if (workSelect === '휴일근무') {
+                  // 휴일 또는 휴무일에만 신청 가능
+                  if (planShift !== '휴일' && planShift !== '휴무일') {
+                      alert(`${row.find('td:eq(2)').text()} 사원: 휴일근로는 휴일 또는 휴무일에만 신청할 수 있습니다.`);
+                      hasError = true;
+                      return false;
                   }
-              });
+
+                  // 연차, 휴가, 결근 등의 날은 신청 불가
+                  if (['연차', '휴가', '결근'].includes(recordShift)) {
+                      alert(`${row.find('td:eq(2)').text()} 사원: 연차, 휴가, 결근 등의 날에는 휴일근로를 신청할 수 없습니다.`);
+                      hasError = true;
+                      return false;
+                  }
+              }
+
+              // 조퇴/외출/반차 검증 (일반근태)
+              if (['조퇴', '외근', '외출', '전반차', '후반차'].includes(workSelect)) {
+                  // 정상 근무가 아닌 경우 신청 불가
+                  if (['결근', '연차', '휴가', '휴일', '휴직'].includes(recordShift)) {
+                      alert(`${row.find('td:eq(2)').text()} 사원: 정상 근무가 아닌 경우에는 ${workSelect}을(를) 신청할 수 없습니다.`);
+                      hasError = true;
+                      return false;
+                  }
+              }
+
+              // 조퇴/외출/반차가 아닌 경우 주 52시간 검증
+              if (applyType !== '조퇴외출반차') {
+                  const expectedHoursSpan = row.find('.expected-hours');
+                  if (expectedHoursSpan.hasClass('text-red-500')) {
+                      alert(`${row.find('td:eq(2)').text()} 사원: 주 52시간을 초과할 수 없습니다.`);
+                      hasError = true;
+                      return false;
+                  }
+              }
+
+              if (!hasError) {
+                  const data = {
+                      empCode: empCode,
+                      timeItemCode: 'T001',
+                      targetDate: $('#generalWorkDate').val().replace(/-/g, ''),
+                      startTime: startTime,
+                      endTime: endTime,
+                      applyType: workSelect,
+                      reason: reason
+                  };
+
+                  $.ajax({
+                      url: '/user/apply/general',
+                      method: 'POST',
+                      contentType: 'application/json',
+                      data: JSON.stringify(data),
+                      success: function(response) {
+                          if (response.result === 'success') {
+                              row.find('.status-field').text('저장');
+                              row.attr('data-apply-no', response.data.applyGeneralNo);
+                              alert('저장되었습니다.');
+                              updateButtonStates();
+
+                              if (workSelect === '휴일근무') {
+                                  setTimeout(function() {
+                                      loadWorkInfo(empCode, $('#generalWorkDate').val().replace(/-/g, ''), function(updatedWorkInfo) {
+                                          if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
+                                              row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
+                                          }
+                                      });
+                                  }, 500);
+                              }
+                          } else {
+                              alert('저장 실패: ' + response.message);
+                          }
+                      },
+                      error: function() {
+                          alert('저장에 실패했습니다.');
+                      }
+                  });
+              }
           });
       }
 
@@ -1339,7 +1427,7 @@
           });
 
           if (absentRows.length > 0) {
-              alert('결근 사원은 근태 신청을 할 수 없습니다.');
+              alert('실적이 결근일 경우 신청할 수 없습니다.');
               return;
           }
 
