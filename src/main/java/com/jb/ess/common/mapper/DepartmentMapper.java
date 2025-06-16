@@ -48,7 +48,7 @@ public interface DepartmentMapper {
 
     // 수정: 전체 부서 구조 조회를 위한 메서드 추가 (하위부서 재귀 검색용)
     @Select("""
-        SELECT DEPT_CODE, DEPT_NAME, DEPT_CATEGORY, PARENT_DEPT, USE_YN, 
+        SELECT DEPT_CODE, DEPT_NAME, DEPT_CATEGORY, PARENT_DEPT, USE_YN,
                START_DATE, END_DATE, DEPT_LEADER, WORK_PATTERN_CODE
         FROM ORGDEPTMASTER
         WHERE USE_YN = 'Y'

@@ -11,7 +11,7 @@ public class ApplyHistory {
     private String deptName;     // 부서명
 
     private String applyType;    // 신청근태
-    private String status;       // 상태
+    private String status;       // 상태 (승인완료, 승인중, 반려)
     private String reason;       // 사유
 
     private String startTime;    // 시작시간
@@ -37,4 +37,18 @@ public class ApplyHistory {
 
     private String checkInTime;     // 출근 (HH:mm:SS)
     private String checkOutTime;    // 퇴근 (HH:mm:SS)
+
+    private String applicantDeptName;   // 상신자 부서명
+    private String applicantDutyName;   // 상신자 직책명
+    private String applicantEmpName;    // 상신자 이름
+    private String applicantEmpCode;    // 상신자 사번
+    private String applyResult;         // 상신 결과
+
+    private String approvalDeptName;    // 결재자 부서명
+    private String approvalDutyName;    // 결재자 직책명
+    private String approvalEmpName;     // 결재자 이름
+    private String approvalEmpCode;     // 결재자 사번
+    private String approvalResult;      // 결재 결과
+
+    private String approvalDate;        // 결재일
 }

@@ -11,11 +11,10 @@ import com.jb.ess.common.mapper.EmployeeMapper;
 import com.jb.ess.common.mapper.ShiftMasterMapper;
 import com.jb.ess.common.util.DateUtil;
 import com.jb.ess.common.util.WorkHoursCalculator;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +27,6 @@ public class HistoryService {
     private final ShiftMasterMapper shiftMasterMapper;
     private final DepartmentMapper departmentMapper;
     private final AttRecordMapper attRecordMapper;
-    private final EmpAttService empAttService;
 
     public List<ApplyHistory> getApplyList(LocalDate startDate, LocalDate endDate,
                                        String applyType, String status, String empCode) {
@@ -122,9 +120,43 @@ public class HistoryService {
                 applyHistory.setCheckInTime(attrecord.getCheckInTime());
                 applyHistory.setCheckOutTime(attrecord.getCheckOutTime());
             }
-            /*
-            if (Objects.equals(applyHistory.getApplyEmpCode(), applyHistory.getEmpCode()) &&
-                ) */
+
+            // 결재 정보
+            // 신청자 == 대상자 && 부서장 X
+            if (Objects.equals(applyHistory.getApplyEmpCode(), applyHistory.getEmpCode()) && Objects.equals(
+                employeeMapper.findIsHeader(
+                    applyHistory.getApplyEmpCode()).getIsHeader(), "N")) {
+
+                // 상신자
+                applyHistory.setApplicantDeptName(applyHistory.getApplyDeptName());
+                applyHistory.setApplicantDutyName(employeeMapper.findDutyNameByEmpCode(applyHistory.getApplyEmpCode()));
+                applyHistory.setApplicantEmpName(applyHistory.getApplyEmpName());
+                applyHistory.setApplicantEmpCode(applyHistory.getApplyEmpCode());
+                applyHistory.setApplyResult("상신완료");
+
+                // 결재자
+                applyHistory.setApprovalDeptName(applyHistory.getApplicantDeptName());
+                String approvalEmpCode = departmentMapper.findDepartmentLeader(applyHistory.getApprovalDeptName());
+                applyHistory.setApprovalDutyName(employeeMapper.findDutyNameByEmpCode(approvalEmpCode));
+                applyHistory.setApprovalEmpName(employeeMapper.findEmpNameByEmpCode(approvalEmpCode));
+                applyHistory.setApprovalEmpCode(approvalEmpCode);
+                applyHistory.setApprovalResult(applyHistory.getStatus());
+            // 신청자 != 대상자
+            } else {
+                // 상신자
+                applyHistory.setApplicantDeptName(applyHistory.getApplyDeptName());
+                applyHistory.setApplicantDutyName(employeeMapper.findDutyNameByEmpCode(applyHistory.getApplyEmpCode()));
+                applyHistory.setApplicantEmpName(applyHistory.getApplyEmpName());
+                applyHistory.setApplicantEmpCode(applyHistory.getApplyEmpCode());
+                applyHistory.setApplyResult("상신완료");
+
+                // 결재자
+                applyHistory.setApprovalDeptName(applyHistory.getApplyDeptName());
+                applyHistory.setApprovalDutyName(employeeMapper.findDutyNameByEmpCode(applyHistory.getApplyEmpCode()));
+                applyHistory.setApprovalEmpName(applyHistory.getApplyEmpName());
+                applyHistory.setApprovalEmpCode(applyHistory.getApplyEmpCode());
+                applyHistory.setApprovalResult("승인완료");
+            }
         }
 
         return applyList;

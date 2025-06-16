@@ -97,4 +97,15 @@ public interface EmployeeMapper {
         WHERE EMP_CODE = #{empCode}
     """)
     String findEmpNameByEmpCode(String empCode);
+
+    @Select("""
+        SELECT DUTY_NAME
+        FROM HRTDUTYINFO
+        WHERE DUTY_CODE = (
+            SELECT DUTY_CODE
+            FROM HRIMASTER
+            WHERE EMP_CODE = #{empCode}
+        )
+    """)
+    String findDutyNameByEmpCode(String empCode);
 }

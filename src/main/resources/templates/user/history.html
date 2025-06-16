@@ -50,7 +50,6 @@
         </select>
       </div>
 
-
       <!-- 조회 버튼 -->
       <div class="w-16">
         <button type="submit"
@@ -93,7 +92,18 @@
              data-holiday=${item.holiday},
              data-apply-type=${item.applyType},
              data-check-in-time=${item.checkInTime},
-             data-check-out-Time=${item.checkOutTime}"
+             data-check-out-time=${item.checkOutTime},
+             data-applicant-dept-name=${item.applicantDeptName},
+             data-applicant-duty-name=${item.applicantDutyName},
+             data-applicant-emp-name=${item.applicantEmpName},
+             data-applicant-emp-code=${item.applicantEmpCode},
+             data-apply-result=${item.applyResult},
+             data-approval-dept-name=${item.approvalDeptName},
+             data-approval-duty-name=${item.approvalDutyName},
+             data-approval-emp-name=${item.approvalEmpName},
+             data-approval-emp-code=${item.approvalEmpCode},
+             data-approval-result=${item.approvalResult}"
+
             onclick="showDetails(this.dataset)">
 
         <td class="border px-4 py-2 text-center"
@@ -110,7 +120,7 @@
           <td class="border px-4 py-2 text-center" th:text="${item.applyType}"></td>
           <td class="border px-4 py-2 text-center"
               th:classappend="
-            ${item.status} == '승인' ? 'bg-green-100 text-green-800' :
+            ${item.status} == '승인완료' ? 'bg-green-100 text-green-800' :
             (${item.status} == '반려' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800')">
             [[${item.status}]]
           </td>
@@ -208,13 +218,14 @@
           <th class="border px-2 py-1">부서</th>
           <th class="border px-2 py-1">직책</th>
           <th class="border px-2 py-1">이름</th>
+          <th class="border px-2 py-1">사번</th>
           <th class="border px-2 py-1">결재상태</th>
           <th class="border px-2 py-1">결재일자</th>
         </tr>
         </thead>
         <tbody id="approvalList">
         <tr>
-          <td class="border px-2 py-1 text-center" colspan="7">결재 정보 없음</td>
+          <td class="border px-2 py-1 text-center">결재 정보 없음</td>
         </tr>
         </tbody>
       </table>
@@ -271,29 +282,32 @@
     document.getElementById('startTime').innerText = formatTime2(data.checkInTime) || '-';
     document.getElementById('endTime').innerText = formatTime2(data.checkOutTime) || '-';
 
-    /*
-    // 결재 정보(예시)
-    if(detail4 && detail4.length > 0) {
-      let html = '';
-      detail4.forEach((approval, idx) => {
-        html += `
-      <tr>
-        <td class="border px-2 py-1 text-center">${idx + 1}</td>
-        <td class="border px-2 py-1 text-center">${approval.type || '-'}</td>
-        <td class="border px-2 py-1 text-center">${approval.dept || '-'}</td>
-        <td class="border px-2 py-1 text-center">${approval.position || '-'}</td>
-        <td class="border px-2 py-1 text-center">${approval.name || '-'}</td>
-        <td class="border px-2 py-1 text-center ${approval.status === '승인' ? 'text-green-600 font-semibold' : 'text-gray-500 font-semibold'}">${approval.status || '-'}</td>
-        <td class="border px-2 py-1 text-center">${approval.date || '-'}</td>
-      </tr>`;
-      });
-      document.getElementById('approvalList').innerHTML = html;
-    } else {
-      document.getElementById('approvalList').innerHTML = `
-      <tr><td class="border px-2 py-1 text-center" colspan="7">결재 정보 없음</td></tr>`;
-    }
+    // 결재 정보
+    let html = '';
+    html += `
+    <tr>
+      <td class="border px-2 py-1 text-center">1</td>
+      <td class="border px-2 py-1 text-center">상신</td>
+      <td class="border px-2 py-1 text-center">${data.applicantDeptName}</td>
+      <td class="border px-2 py-1 text-center">${data.applicantDutyName}</td>
+      <td class="border px-2 py-1 text-center">${data.applicantEmpName}</td>
+      <td class="border px-2 py-1 text-center">${data.applicantEmpCode}</td>
+      <td class="border px-2 py-1 text-center text-green-600 font-semibold">${data.applyResult}</td>
+      <td class="border px-2 py-1 text-center">-</td>
+    </tr>`;
 
-     */
+    html += `
+    <tr>
+      <td class="border px-2 py-1 text-center">2</td>
+      <td class="border px-2 py-1 text-center">결재</td>
+      <td class="border px-2 py-1 text-center">${data.approvalDeptName}</td>
+      <td class="border px-2 py-1 text-center">${data.approvalDutyName}</td>
+      <td class="border px-2 py-1 text-center">${data.approvalEmpName}</td>
+      <td class="border px-2 py-1 text-center">${data.approvalEmpCode}</td>
+      <td class="border px-2 py-1 text-center ${data.approvalResult === '승인완료' ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}">${data.approvalResult}</td>
+      <td class="border px-2 py-1 text-center">-</td>
+    </tr>`
+    document.getElementById('approvalList').innerHTML = html;
   }
 
   function formatDate(yyyymmdd) {
