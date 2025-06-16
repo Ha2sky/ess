@@ -1,7 +1,6 @@
 package com.jb.ess.common.mapper;
 
 import com.jb.ess.common.domain.EmpCalendar;
-import com.jb.ess.common.domain.ShiftMaster;
 import com.jb.ess.common.sql.EmpCalendarSqlProvider;
 import java.util.List;
 
@@ -76,19 +75,6 @@ public interface EmpCalendarMapper {
     """)
     String findShiftCodeByEmpCodeAndDate(@Param("empCode") String empCode,
                                          @Param("date") String date);
-
-    @Select("""
-        SELECT *
-        FROM HRTSHIFTMASTER
-        WHERE SHIFT_CODE = (
-            SELECT SHIFT_CODE
-            FROM HRTWORKEMPCALENDAR
-            WHERE EMP_CODE = #{empCode}
-            AND YYYYMMDD = #{date}
-        )
-    """)
-    ShiftMaster findShiftByEmpCodeAndDate(@Param("empCode") String empCode,
-                                          @Param("date") String date);
 
     @Select("""
         SELECT SHIFT_CODE,
