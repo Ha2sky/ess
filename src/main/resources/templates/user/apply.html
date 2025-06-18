@@ -239,34 +239,34 @@
       };
 
       // 탭 전환 기능
-    $('.tab-button').click(function() {
-      $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
-      $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
+      $('.tab-button').click(function() {
+        $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
+        $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
 
-      $('.tab-panel').addClass('hidden');
+        $('.tab-panel').addClass('hidden');
 
-      if (this.id === 'generalTab') {
-        $('#generalPanel').removeClass('hidden');
-      } else {
-        $('#etcPanel').removeClass('hidden');
+        if (this.id === 'generalTab') {
+          $('#generalPanel').removeClass('hidden');
+        } else {
+          $('#etcPanel').removeClass('hidden');
+        }
+      });
+
+      // URL 쿼리 파라미터에서 'tab' 값 읽기
+      function getQueryParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
       }
-    });
 
-    // URL 쿼리 파라미터에서 'tab' 값 읽기
-    function getQueryParam(name) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(name);
-    }
-
-    // 페이지 로드 시 탭 활성화 처리
-    const activeTab = getQueryParam('tab');
-    if (activeTab === 'etc') {
-      // 기타근태신청 탭 활성화
-      $('#etcTab').click();
-    } else {
-      // 기본값은 일반근태 신청 탭 활성화
-      $('#generalTab').click();
-    }
+      // 페이지 로드 시 탭 활성화 처리
+      const activeTab = getQueryParam('tab');
+      if (activeTab === 'etc') {
+        // 기타근태신청 탭 활성화
+        $('#etcTab').click();
+      } else {
+        // 기본값은 일반근태 신청 탭 활성화
+        $('#generalTab').click();
+      }
 
       // 근태 마스터 로드
       loadShiftMasters();
@@ -320,8 +320,13 @@
           }, 100);
       });
 
+      // 신청근무별 관리
       $('#generalWorkTypeFilter').change(function() {
           const selectedWorkType = $(this).val();
+          if (selectedWorkType) {
+              // 신청근무별 기존 신청 조회 및 초기화
+              handleWorkTypeChange(selectedWorkType);
+          }
           updateEmployeeWorkTypes(selectedWorkType);
       });
 
@@ -388,6 +393,146 @@
                   validateWorkTimeRestrictions($(this));
               }
           });
+      }
+
+      // 신청근무별 관리 함수
+      function handleWorkTypeChange(selectedWorkType) {
+          $('#generalEmployeeTable tbody tr').each(function() {
+              const row = $(this);
+              const empCode = row.data('emp-code');
+              const workDate = $('#generalWorkDate').val().replace(/-/g, '');
+
+              // 기존 신청 조회 및 초기화
+              loadApplyByType(empCode, workDate, selectedWorkType, row);
+          });
+      }
+
+      // 신청근무별 기존 신청 조회
+      function loadApplyByType(empCode, workDate, applyType, row) {
+          $.get(`/user/apply/getApplyByType/${empCode}/${workDate}/${applyType}`)
+              .done(function(response) {
+                  if (response.hasExisting && response.status !== '삭제') {
+                      // 기존 신청이 있으면 해당 데이터로 채우기
+                      if (response.applyType === 'general') {
+                          row.find('.work-select').val(applyType);
+                          if (response.startTime) {
+                              row.find('.start-time').val(formatTimeDisplay(response.startTime));
+                          }
+                          if (response.endTime) {
+                              row.find('.end-time').val(formatTimeDisplay(response.endTime));
+                          }
+                          row.find('.reason-field').val(response.reason || '');
+                          row.find('.status-field').text(response.status || '대기');
+                          row.attr('data-apply-no', response.applyNo);
+                      }
+                  } else {
+                      // 기존 신청이 없으면 초기화
+                      row.find('.work-select').val(applyType);
+                      row.find('.start-time').val('');
+                      row.find('.end-time').val('');
+                      row.find('.reason-field').val('');
+                      row.find('.status-field').text('대기');
+                      row.removeAttr('data-apply-no');
+                  }
+
+                  // 시간 제한 적용
+                  validateWorkTimeRestrictions(row);
+                  updateButtonStates();
+              })
+              .fail(function() {
+                  console.error('신청근무별 조회 실패');
+              });
+      }
+
+      // 시간 제한 검증 로직 강화
+      function validateWorkTimeRestrictions(row) {
+          const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
+          const startTimeInput = row.find('.start-time');
+          const endTimeInput = row.find('.end-time');
+
+          // 전반차/후반차 시간 입력 비활성화
+          if (workType === '전반차' || workType === '후반차') {
+              startTimeInput.prop('disabled', true).val('');
+              endTimeInput.prop('disabled', true).val('');
+              startTimeInput.attr('placeholder', '반차는 시간 입력 불가');
+              endTimeInput.attr('placeholder', '반차는 시간 입력 불가');
+          }
+          // 조퇴는 시작시간만 입력
+          else if (workType === '조퇴') {
+              startTimeInput.prop('disabled', false);
+              endTimeInput.prop('disabled', true).val('');
+              startTimeInput.attr('placeholder', '조퇴 시작시간');
+              endTimeInput.attr('placeholder', '자동 계산됨');
+          }
+          // 조출연장 시간 제한
+          else if (workType === '조출연장') {
+              startTimeInput.prop('disabled', false);
+              endTimeInput.prop('disabled', false);
+              startTimeInput.attr('max', '07:30');
+              endTimeInput.attr('max', '07:30');
+              startTimeInput.attr('placeholder', '07:30 이전만');
+              endTimeInput.attr('placeholder', '07:30 이전만');
+
+              // 실시간 검증
+              startTimeInput.off('input.earlyOvertime').on('input.earlyOvertime', function() {
+                  validateEarlyOvertimeTime($(this).val(), row);
+              });
+              endTimeInput.off('input.earlyOvertime').on('input.earlyOvertime', function() {
+                  validateEarlyOvertimeTime($(this).val(), row);
+              });
+          }
+          // 일반 연장 시간 제한
+          else if (workType === '연장') {
+              startTimeInput.prop('disabled', false);
+              endTimeInput.prop('disabled', false);
+              startTimeInput.attr('min', '16:20');
+              startTimeInput.attr('placeholder', '16:20 이후만');
+              endTimeInput.attr('placeholder', '종료시간');
+
+              // 실시간 검증
+              startTimeInput.off('input.regularOvertime').on('input.regularOvertime', function() {
+                  validateRegularOvertimeTime($(this).val(), row);
+              });
+          }
+          else {
+              // 기타 근무의 경우 모든 제한 해제
+              startTimeInput.prop('disabled', false);
+              endTimeInput.prop('disabled', false);
+              startTimeInput.removeAttr('min max placeholder');
+              endTimeInput.removeAttr('min max placeholder');
+          }
+      }
+
+      // 조출연장 시간 제한 검증 API 호출
+      function validateEarlyOvertimeTime(time, row) {
+          if (!time) return;
+
+          $.post('/user/apply/validateEarlyOvertimeTime', { startTime: time })
+              .done(function(response) {
+                  if (!response.isValid) {
+                      alert(response.message);
+                      row.find('.start-time, .end-time').val('');
+                  }
+              })
+              .fail(function() {
+                  console.error('조출연장 시간 검증 실패');
+              });
+      }
+
+      // 일반연장 시간 제한 검증 API 호출
+      function validateRegularOvertimeTime(time, row) {
+          if (!time) return;
+
+          $.post('/user/apply/validateRegularOvertimeTime', { startTime: time })
+              .done(function(response) {
+                  if (!response.isValid) {
+                      alert(response.message);
+                      row.find('.start-time').val('');
+                  }
+              })
+              .fail(function() {
+                  console.error('일반연장 시간 검증 실패');
+              });
       }
 
       function searchGeneralEmployees() {
@@ -582,6 +727,8 @@
                       isAbsent = workInfo.record.shiftCode === '00' || workInfo.record.shiftName === '결근';
                   }
 
+                  const recordColor = isAbsent ? 'text-gray-700' : '';
+
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}" data-plan="${workInfo.empCalendarPlan || workInfo.plan || ''}" data-record="${recordDisplay}">
                           <td class="border border-gray-300 px-4 py-2">
@@ -592,7 +739,7 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.empCalendarPlan || workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2 ${isAbsent ? 'text-red-500 font-bold' : ''}">${recordDisplay}</td>
+                          <td class="border border-gray-300 px-4 py-2 ${recordColor}">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
                               <span class="work-type-display">${selectedWorkType || (workOptions[0] ? workOptions[0].text : '')}</span>
                               <select class="work-select hidden w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
@@ -606,7 +753,7 @@
                               <input type="time" class="end-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2 ${isLeaveType ? 'hidden' : ''}">
-                              <span class="expected-hours">0.00</span>
+                              <span class="expected-hours">${workInfo.expectedHours || '40.00'}</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력" ${isAbsent ? 'disabled' : ''}>
@@ -634,57 +781,22 @@
                       loadSavedGeneralData(applyNo, tbody.find('tr:last'), applyType);
                   }
 
-                  // 시간 변경 시 예상근로시간 자동 계산 이벤트 핸들러
+                  // 시간 변경 시 실시간 주 52시간 검증
                   const currentRow = tbody.find('tr:last');
                   currentRow.find('.start-time, .end-time').on('change', function() {
-                      calculateExpectedHours(currentRow, emp.empCode);
+                      calculateRealTimeWeeklyHours(currentRow, emp.empCode);
                   });
 
                   currentRow.find('.work-select').on('change', function() {
                       validateWorkTimeRestrictions(currentRow);
                   });
 
-                  calculateExpectedHours(currentRow, emp.empCode);
+                  calculateRealTimeWeeklyHours(currentRow, emp.empCode);
 
                   // 상태별 버튼 활성화/비활성화
                   updateButtonStates();
               });
           });
-      }
-
-      function validateWorkTimeRestrictions(row) {
-          const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
-          const startTimeInput = row.find('.start-time');
-          const endTimeInput = row.find('.end-time');
-
-          // 조출연장의 경우 07:30 이전만 허용
-          if (workType === '조출연장') {
-              startTimeInput.attr('max', '07:30');
-              endTimeInput.attr('max', '07:30');
-
-              // 현재 시간이 07:30 이후면 초기화
-              if (startTimeInput.val() && startTimeInput.val() > '07:30') {
-                  startTimeInput.val('');
-              }
-              if (endTimeInput.val() && endTimeInput.val() > '07:30') {
-                  endTimeInput.val('');
-              }
-          } else if (workType === '연장') {
-              // 일반 연장의 경우 16:20 이후만 허용
-              startTimeInput.attr('min', '16:20');
-
-              // 현재 시간이 16:20 이전이면 초기화
-              if (startTimeInput.val() && startTimeInput.val() < '16:20') {
-                  startTimeInput.val('');
-              }
-              // max 제한 해제
-              startTimeInput.removeAttr('max');
-              endTimeInput.removeAttr('max');
-          } else {
-              // 기타 근무의 경우 제한 해제
-              startTimeInput.removeAttr('min max');
-              endTimeInput.removeAttr('min max');
-          }
       }
 
       function displayEtcEmployees(employees) {
@@ -715,6 +827,8 @@
                       isAbsent = workInfo.record.shiftCode === '00' || workInfo.record.shiftName === '결근';
                   }
 
+                  const recordColor = isAbsent ? 'text-gray-700' : '';
+
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}" data-plan="${workInfo.empCalendarPlan || workInfo.plan || ''}" data-record="${recordDisplay}">
                           <td class="border border-gray-300 px-4 py-2">
@@ -725,7 +839,7 @@
                           <td class="border border-gray-300 px-4 py-2">${emp.positionName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${emp.deptName || ''}</td>
                           <td class="border border-gray-300 px-4 py-2">${workInfo.empCalendarPlan || workInfo.plan || ''}</td>
-                          <td class="border border-gray-300 px-4 py-2 ${isAbsent ? 'text-red-500 font-bold' : ''}">${recordDisplay}</td>
+                          <td class="border border-gray-300 px-4 py-2 ${recordColor}">${recordDisplay}</td>
                           <td class="border border-gray-300 px-4 py-2">
                               <select class="shift-select w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                                   <option value="">선택</option>
@@ -816,19 +930,27 @@
           });
       }
 
-      function calculateExpectedHours(row, empCode) {
+      // 실시간 주 52시간 검증
+      function calculateRealTimeWeeklyHours(row, empCode) {
           const applyType = $('#generalApplyType').val();
           const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
           const startTime = row.find('.start-time').val();
           const endTime = row.find('.end-time').val();
-          const planShift = row.data('plan');
-          const recordShift = row.data('record');
+          const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
-          // 조퇴외출반차의 경우 예상근로시간 계산 불필요
+          // 조퇴외출반차의 경우 별도 처리
           if (applyType === '조퇴외출반차') {
-              // 전반차, 후반차는 -4시간으로 표시
               if (workType === '전반차' || workType === '후반차') {
                   row.find('.expected-hours').text('-4.00');
+              } else if (workType === '조퇴') {
+                  // 조퇴 시간 계산
+                  if (startTime) {
+                      calculateEarlyLeaveHours(empCode, workDate, startTime, function(deductHours) {
+                          row.find('.expected-hours').text(`-${deductHours.toFixed(2)}`);
+                      });
+                  } else {
+                      row.find('.expected-hours').text('0.00');
+                  }
               } else {
                   row.find('.expected-hours').text('0.00');
               }
@@ -837,91 +959,81 @@
 
           const isAbsent = row.data('is-absent') === true;
           if (isAbsent) {
-              row.find('.expected-hours').text('0.00');
+              row.find('.expected-hours').text('40.00'); // 주간 예상근로시간 표시
               return;
           }
 
-          // 연차, 결근, 휴일인 경우 0.00 처리
-          if (['연차', '결근', '휴일', '휴무일', '휴직'].includes(recordShift)) {
-              row.find('.expected-hours').text('0.00');
-              return;
-          }
-
+          // 시간이 입력되지 않은 경우 예상근로시간 업데이트 API 호출
           if (!startTime || !endTime) {
-              // 시간이 입력되지 않은 경우 현재 실적 기반 주간 예상근로시간 표시
-              calculateWeeklyExpectedHours(empCode, 0, function(weeklyHours, isValid) {
-                  const expectedHoursSpan = row.find('.expected-hours');
-                  expectedHoursSpan.text(weeklyHours.toFixed(2));
-                  expectedHoursSpan.removeClass('text-red-500 font-bold');
-                  expectedHoursSpan.removeAttr('title');
+              updateExpectedHours(empCode, workDate, function(expectedHours) {
+                  row.find('.expected-hours').text(expectedHours);
+                  row.find('.expected-hours').removeClass('text-red-500 font-bold');
+                  row.find('.expected-hours').removeAttr('title');
               });
               return;
           }
 
-          // 시간 계산
-          const start = new Date(`2000-01-01T${startTime}:00`);
-          const end = new Date(`2000-01-01T${endTime}:00`);
-
-          if (end <= start) {
-              row.find('.expected-hours').text('0.00');
-              row.find('.expected-hours').addClass('text-red-500');
-              return;
-          }
-
-          const diffMs = end - start;
-          let diffHours = diffMs / (1000 * 60 * 60);
-
-          let dailyHours = diffHours;
-
-          if (diffHours >= 2) {
-              // 2시간 이상 근무 시 30분 휴게시간 차감
-              dailyHours = diffHours - 0.5;
-          }
-
-          const hours = Math.floor(dailyHours);
-          const minutes = Math.round((dailyHours - hours) * 60);
-
-          // 30분 단위로 조정
-          const adjustedMinutes = Math.round(minutes / 30) * 30;
-          const finalHours = hours + (adjustedMinutes / 60);
-
-          // 주간 총 근로시간 계산
-          calculateWeeklyExpectedHours(empCode, finalHours, function(weeklyHours, isValid) {
+          // 실시간 주 52시간 검증 API 호출
+          $.post('/user/apply/calculateWorkHours', {
+              empCode: empCode,
+              workDate: workDate,
+              startTime: startTime,
+              endTime: endTime,
+              applyType: workType
+          })
+          .done(function(response) {
               const expectedHoursSpan = row.find('.expected-hours');
-              expectedHoursSpan.text(weeklyHours.toFixed(2));
+              expectedHoursSpan.text(response.totalWeeklyHours.toFixed(2));
 
-              if (!isValid) {
+              if (!response.isValid) {
                   expectedHoursSpan.addClass('text-red-500 font-bold');
-                  expectedHoursSpan.attr('title', `주 52시간 초과 (현재: ${weeklyHours.toFixed(2)}시간)`);
+                  expectedHoursSpan.attr('title', response.message);
               } else {
                   expectedHoursSpan.removeClass('text-red-500 font-bold');
                   expectedHoursSpan.removeAttr('title');
               }
+          })
+          .fail(function() {
+              console.error('실시간 주 52시간 계산 실패');
+              row.find('.expected-hours').text('40.00');
           });
       }
 
-      function calculateWeeklyExpectedHours(empCode, requestHours, callback) {
-          const workDate = $('#generalWorkDate').val().replace(/-/g, '');
+      // 조퇴 시간 계산
+      function calculateEarlyLeaveHours(empCode, workDate, startTime, callback) {
+          // 서버에서 조퇴 시간 계산
+          // 임시로 클라이언트에서 계산 (16:20 - 시작시간)
+          try {
+              const startHour = parseInt(startTime.split(':')[0]);
+              const startMin = parseInt(startTime.split(':')[1]);
+              const startTotalMin = startHour * 60 + startMin;
 
-          $.get(`/user/apply/workInfo/${empCode}/${workDate}`)
-              .done(function(workInfo) {
-                  let baseWeeklyHours = 40.0; // 기본 주 40시간
-                  let currentAppliedHours = parseFloat(workInfo.expectedHours || '0');
+              const endTotalMin = 16 * 60 + 20; // 16:20
 
-                  if (workInfo.appliedRecord && workInfo.appliedRecord.shiftCode === '14-1') {
-                      baseWeeklyHours += parseFloat(workInfo.appliedRecord.workHours || '8');
+              if (endTotalMin > startTotalMin) {
+                  const diffMin = endTotalMin - startTotalMin;
+                  const diffHours = diffMin / 60.0;
+                  callback(diffHours);
+              } else {
+                  callback(0);
+              }
+          } catch (e) {
+              callback(2.0); // 기본 2시간
+          }
+      }
+
+      // 예상근로시간 실시간 업데이트 API 호출
+      function updateExpectedHours(empCode, workDate, callback) {
+          $.get(`/user/apply/updateExpectedHours/${empCode}/${workDate}`)
+              .done(function(response) {
+                  if (response.success) {
+                      callback(response.expectedHours);
+                  } else {
+                      callback('40.00'); // 주간 예상근로시간 기본값
                   }
-
-                  const totalWeeklyHours = baseWeeklyHours + currentAppliedHours + requestHours;
-                  const isValid = totalWeeklyHours <= 52.0;
-
-                  callback(totalWeeklyHours, isValid);
               })
               .fail(function() {
-                  // 데이터 조회 실패 시 기본값으로 계산
-                  const defaultWeeklyHours = 40.0 + requestHours; // 기본 40시간 + 신청시간
-                  const isValid = defaultWeeklyHours <= 52.0;
-                  callback(defaultWeeklyHours, isValid);
+                  callback('40.00'); // 주간 예상근로시간 기본값
               });
       }
 
@@ -945,9 +1057,9 @@
                           row.find('.reason-field').val(data.reason || '');
                           row.find('.status-field').text(data.status || '대기');
 
-                          // 복원 후 예상근로시간 재계산
+                          // 복원 후 실시간 검증
                           if (data.startTime && data.endTime) {
-                              calculateExpectedHours(row, row.data('emp-code'));
+                              calculateRealTimeWeeklyHours(row, row.data('emp-code'));
                           }
                       } else {
                           row.find('.status-field').text('대기');
@@ -1060,7 +1172,7 @@
                       empCalendarPlan: '',
                       record: {checkInTime: '-', checkOutTime: '-', shiftCode: '', shiftName: '-'},
                       appliedRecord: null,
-                      expectedHours: '0.00'
+                      expectedHours: '40.00'  // 주간 예상근로시간 기본값
                   });
               });
       }
@@ -1086,7 +1198,7 @@
               });
       }
 
-      // 일반근태 저장 - 요구사항에 맞는 검증 로직 추가
+      // 일반근태 저장
       function saveGeneralApply() {
           const selectedRows = $('#generalEmployeeTable .emp-checkbox:checked').closest('tr');
 
@@ -1297,11 +1409,9 @@
                   data: JSON.stringify(data),
                   success: function(response) {
                       if (response.result === 'success') {
-                          // 상태 업데이트 및 신청번호 설정
                           row.find('.status-field').text('저장');
                           row.attr('data-apply-no', response.data.applyEtcNo);
                           alert('저장되었습니다.');
-                          // 버튼 상태 업데이트
                           updateButtonStates();
 
                           setTimeout(function() {
@@ -1330,6 +1440,9 @@
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
           return diffDays;
       }
+
+      // 나머지 CRUD 함수들은 기존 코드와 동일하게 유지...
+      // (deleteGeneralApply, deleteEtcApply, submitGeneralApply, submitEtcApply, cancelGeneralApply, cancelEtcApply)
 
       // 일반근태 삭제
       function deleteGeneralApply() {
@@ -1462,7 +1575,7 @@
                           const finalStatus = currentUser.isHeader === 'Y' ? '승인완료' : '상신';
                           row.find('.status-field').text(finalStatus);
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');
-                          updateButtonStates(); // 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
                           alert('상신 실패: ' + response);
                       }
@@ -1532,7 +1645,7 @@
                           }
 
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');
-                          updateButtonStates(); // 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
                           alert('상신 실패: ' + response);
                       }
@@ -1570,7 +1683,7 @@
                       if (response === 'success') {
                           row.find('.status-field').text('저장');
                           alert('상신취소되었습니다.');
-                          updateButtonStates(); // 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
                           alert('상신취소 실패: ' + response);
                       }
@@ -1624,7 +1737,7 @@
                           }
 
                           alert('상신취소되었습니다.');
-                          updateButtonStates(); // 버튼 상태 업데이트
+                          updateButtonStates();
                       } else {
                           alert('상신취소 실패: ' + response);
                       }

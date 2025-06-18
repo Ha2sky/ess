@@ -74,12 +74,12 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyGeneral findGeneralApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 기존 기타근태 신청 조회
+    // 기존 기타근태 신청 조회 - BETWEEN 사용으로 변경
     @Select("""
         SELECT TOP 1 APPLY_ETC_NO, STATUS, REASON, SHIFT_CODE, TARGET_START_DATE, TARGET_END_DATE
         FROM HRTATTAPLETC 
         WHERE EMP_CODE = #{empCode} 
-        AND TARGET_START_DATE <= #{workDate} AND TARGET_END_DATE >= #{workDate}
+        AND #{workDate} BETWEEN TARGET_START_DATE AND TARGET_END_DATE
         AND STATUS != '삭제'
         ORDER BY APPLY_DATE DESC
     """)
@@ -99,13 +99,13 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
-    // 해당일 연차/휴가 신청 확인 (기타근태 - 연장근로 검증용)
+    // 해당일 연차/휴가 신청 확인 (기타근태 - 연장근로 검증용) - BETWEEN 사용으로 변경
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLETC etc
         INNER JOIN HRTSHIFTMASTER sm ON etc.SHIFT_CODE = sm.SHIFT_CODE
         WHERE etc.EMP_CODE = #{empCode} 
-        AND etc.TARGET_START_DATE <= #{workDate} AND etc.TARGET_END_DATE >= #{workDate}
+        AND #{workDate} BETWEEN etc.TARGET_START_DATE AND etc.TARGET_END_DATE
         AND etc.STATUS IN ('승인완료', '상신')
         AND sm.SHIFT_NAME IN ('연차', '휴가')
     """)
@@ -137,7 +137,7 @@ public interface AttendanceApplyMapper {
     """)
     boolean hasHolidayWorkOver8Hours(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용)
+    // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용) - 함수 사용으로 변경
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLGENERAL 
@@ -252,7 +252,12 @@ public interface AttendanceApplyMapper {
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLETC
         WHERE EMP_CODE = #{empCode}
-        AND ((TARGET_START_DATE <= #{endDate} AND TARGET_END_DATE >= #{startDate}))
+        AND (
+            (#{startDate} BETWEEN TARGET_START_DATE AND TARGET_END_DATE) OR
+            (#{endDate} BETWEEN TARGET_START_DATE AND TARGET_END_DATE) OR
+            (TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}) OR
+            (TARGET_END_DATE BETWEEN #{startDate} AND #{endDate})
+        )
         AND STATUS != '삭제'
     """)
     boolean checkDuplicateEtcApply(@Param("empCode") String empCode,
@@ -453,4 +458,50 @@ public interface AttendanceApplyMapper {
         // 승인된 휴일근무
     AttendanceApplyGeneral findApprovedOverTime2(@Param("empCode") String empCode,
                                                  @Param("workYmd") String workYmd);
+
+    // 계획 (SHIFT_CODE_ORIG) 조회
+    @Select("""
+        SELECT SHIFT_CODE_ORIG 
+        FROM HRTWORKEMPCALENDAR 
+        WHERE EMP_CODE = #{empCode} 
+        AND YYYYMMDD = #{workDate}
+    """)
+    String getOriginalShiftCode(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 일반근태 승인 완료 시 SHIFT_CODE 업데이트
+    @Update("""
+        UPDATE HRTWORKEMPCALENDAR 
+        SET SHIFT_CODE = CASE 
+            WHEN #{applyType} = '휴일근무' THEN '14-1'
+            WHEN #{applyType} = '전반차' THEN (
+                SELECT TOP 1 sm.SHIFT_CODE 
+                FROM HRTSHIFTMASTER sm 
+                WHERE sm.SHIFT_NAME = '전반차' AND sm.USE_YN = 'Y'
+            )
+            WHEN #{applyType} = '후반차' THEN (
+                SELECT TOP 1 sm.SHIFT_CODE 
+                FROM HRTSHIFTMASTER sm 
+                WHERE sm.SHIFT_NAME = '후반차' AND sm.USE_YN = 'Y'
+            )
+            ELSE SHIFT_CODE
+        END
+        WHERE EMP_CODE = #{empCode} 
+        AND YYYYMMDD = #{workDate}
+    """)
+    void updateShiftCodeAfterGeneralApproval(@Param("empCode") String empCode,
+                                             @Param("workDate") String workDate,
+                                             @Param("applyType") String applyType);
+
+    // 기타근태 승인 완료 시 SHIFT_CODE 업데이트
+    @Update("""
+        UPDATE HRTWORKEMPCALENDAR 
+        SET SHIFT_CODE = #{shiftCode}
+        WHERE EMP_CODE = #{empCode} 
+        AND YYYYMMDD >= #{startDate} 
+        AND YYYYMMDD <= #{endDate}
+    """)
+    void updateShiftCodeAfterEtcApproval(@Param("empCode") String empCode,
+                                         @Param("startDate") String startDate,
+                                         @Param("endDate") String endDate,
+                                         @Param("shiftCode") String shiftCode);
 }

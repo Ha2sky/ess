@@ -160,14 +160,22 @@ public class AttendanceApplyService {
 
             // 출근 기록이 없는 경우 계획 확인
             if (attRecord == null || attRecord.getCheckInTime() == null) {
-                EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
-                if (empCalendar != null && empCalendar.getShiftCode() != null) {
-                    String planShiftName = shiftMasterMapper.findShiftNameByShiftCode(empCalendar.getShiftCode());
-
+                String originalShiftCode = getOriginalShiftCode(empCode, workDate);
+                if (originalShiftCode != null) {
+                    String planShiftName = shiftMasterMapper.findShiftNameByShiftCode(originalShiftCode);
                     // 휴무일/휴일이 아닌 근무일인데 출근 기록이 없으면 결근
                     if (!"휴무일".equals(planShiftName) && !"휴일".equals(planShiftName)) {
                         log.debug("결근 판정: empCode={}, workDate={}, plan={}", empCode, workDate, planShiftName);
                         return true;
+                    }
+                } else {
+                    EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
+                    if (empCalendar != null && empCalendar.getShiftCode() != null) {
+                        String planShiftName = shiftMasterMapper.findShiftNameByShiftCode(empCalendar.getShiftCode());
+                        if (!"휴무일".equals(planShiftName) && !"휴일".equals(planShiftName)) {
+                            log.debug("결근 판정: empCode={}, workDate={}, plan={}", empCode, workDate, planShiftName);
+                            return true;
+                        }
                     }
                 }
             }
@@ -213,11 +221,21 @@ public class AttendanceApplyService {
     public Map<String, Object> getWorkInfoWithEmpCalendar(String empCode, String workDate) {
         Map<String, Object> workInfo = new HashMap<>();
         try {
-            EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
-            String planShiftCode = empCalendar != null ? empCalendar.getShiftCode() : null;
+            String originalShiftCode = getOriginalShiftCode(empCode, workDate);
             String empCalendarPlan = "";
-            if (planShiftCode != null) {
-                empCalendarPlan = shiftMasterMapper.findShiftNameByShiftCode(planShiftCode);
+
+            if (originalShiftCode != null) {
+                empCalendarPlan = shiftMasterMapper.findShiftNameByShiftCode(originalShiftCode);
+                log.debug("SHIFT_CODE_ORIG 기반 계획 조회: empCode={}, workDate={}, shiftCode={}, shiftName={}",
+                        empCode, workDate, originalShiftCode, empCalendarPlan);
+            } else {
+                EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
+                if (empCalendar != null && empCalendar.getShiftCode() != null) {
+                    originalShiftCode = empCalendar.getShiftCode();
+                    empCalendarPlan = shiftMasterMapper.findShiftNameByShiftCode(originalShiftCode);
+                    log.debug("기본 SHIFT_CODE 사용: empCode={}, workDate={}, shiftCode={}, shiftName={}",
+                            empCode, workDate, originalShiftCode, empCalendarPlan);
+                }
             }
 
             // 미래 날짜 체크
@@ -238,7 +256,7 @@ public class AttendanceApplyService {
 
                 record.put("checkInTime", checkInTime);
                 record.put("checkOutTime", checkOutTime);
-                record.put("shiftCode", planShiftCode);
+                record.put("shiftCode", originalShiftCode);
                 record.put("shiftName", actualShiftName);
 
                 log.debug("출근 시각 존재 - 실적 동적 계산: empCode={}, date={}, plan={}, actual={}",
@@ -247,13 +265,13 @@ public class AttendanceApplyService {
                 if (isFutureDate) {
                     record.put("checkInTime", "-");
                     record.put("checkOutTime", "-");
-                    record.put("shiftCode", planShiftCode != null ? planShiftCode : "");
+                    record.put("shiftCode", originalShiftCode != null ? originalShiftCode : "");
                     record.put("shiftName", "-");
                     log.debug("미래 날짜 - 표시: empCode={}, date={}", empCode, workDate);
                 } else {
                     record.put("checkInTime", "-");
                     record.put("checkOutTime", "-");
-                    record.put("shiftCode", planShiftCode != null ? planShiftCode : "00");
+                    record.put("shiftCode", originalShiftCode != null ? originalShiftCode : "00");
                     record.put("shiftName", actualShiftName);
                     log.debug("출근 기록 없음 - 실적 동적 계산: empCode={}, date={}, actual={}",
                             empCode, workDate, actualShiftName);
@@ -262,23 +280,23 @@ public class AttendanceApplyService {
 
             Map<String, String> appliedRecord = getAppliedRecord(empCode, workDate);
 
-            String dailyExpectedHours = calculateDailyExpectedHoursImproved(empCode, workDate);
+            String weeklyExpectedHours = calculateWeeklyExpectedHours(empCode, workDate);
 
             workInfo.put("plan", empCalendarPlan);
             workInfo.put("empCalendarPlan", empCalendarPlan);
             workInfo.put("record", record);
             workInfo.put("appliedRecord", appliedRecord);
-            workInfo.put("expectedHours", dailyExpectedHours);
+            workInfo.put("expectedHours", weeklyExpectedHours);
 
-            log.debug("근무정보 조회 완료 (empCalendar 기반): empCode={}, workDate={}, plan={}, actual={}, expectedHours={}",
-                    empCode, workDate, empCalendarPlan, actualShiftName, dailyExpectedHours);
+            log.debug("근무정보 조회 완료 (SHIFT_CODE_ORIG 기반): empCode={}, workDate={}, plan={}, actual={}, weeklyHours={}",
+                    empCode, workDate, empCalendarPlan, actualShiftName, weeklyExpectedHours);
         } catch (Exception e) {
             log.error("근무정보 조회 실패 (empCalendar 기반): empCode={}, workDate={}", empCode, workDate, e);
             workInfo.put("plan", "");
             workInfo.put("empCalendarPlan", "");
             workInfo.put("record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "00", "shiftName", "결근"));
             workInfo.put("appliedRecord", null);
-            workInfo.put("expectedHours", "0.00");
+            workInfo.put("expectedHours", "40.00"); // 기본 주간 예상근로시간
         }
 
         return workInfo;
@@ -338,8 +356,8 @@ public class AttendanceApplyService {
             if (generalApply != null && "승인완료".equals(generalApply.getStatus()) && "휴일근무".equals(generalApply.getApplyType())) {
                 Map<String, String> appliedRecord = new HashMap<>();
                 appliedRecord.put("shiftName", "휴일근무");
-                appliedRecord.put("shiftCode", "14-1"); // 휴일근무 코드
-                appliedRecord.put("workHours", "8"); // 휴일근무는 8시간 기본
+                appliedRecord.put("shiftCode", "14-1");
+                appliedRecord.put("workHours", "8");
                 return appliedRecord;
             }
 
@@ -369,8 +387,11 @@ public class AttendanceApplyService {
 
             log.debug("개선된 일별 예상근로시간 계산 시작: empCode={}, workDate={}", empCode, workDate);
 
-            // 해당 일자의 계획 조회
+            String originalShiftCode = getOriginalShiftCode(empCode, workDate);
             EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
+
+            String planShiftCode = originalShiftCode != null ? originalShiftCode :
+                    (empCalendar != null ? empCalendar.getShiftCode() : null);
 
             // 공휴일 체크
             if (empCalendar != null && "Y".equals(empCalendar.getHolidayYn())) {
@@ -380,8 +401,8 @@ public class AttendanceApplyService {
 
             Duration dailyHours = Duration.ZERO;
 
-            if (empCalendar != null && empCalendar.getShiftCode() != null) {
-                ShiftMaster shift = shiftMasterMapper.findShiftByCode(empCalendar.getShiftCode());
+            if (planShiftCode != null) {
+                ShiftMaster shift = shiftMasterMapper.findShiftByCode(planShiftCode);
                 if (shift != null) {
                     log.debug("근태마스터 조회: date={}, shiftCode={}, shiftName={}", workDate, shift.getShiftCode(), shift.getShiftName());
 
@@ -420,24 +441,19 @@ public class AttendanceApplyService {
                             log.debug("실적 기반 시간 (휴게시간 차감됨): date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
                         } else {
                             dailyHours = WorkHoursCalculator.getTotalWorkTime(shift);
-                            log.debug("계획 기반 시간 (휴게시간 차감됨): date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
+                            log.debug("계획 기준 시간 (휴게시간 차감됨): date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
                         }
                     }
                 }
             }
 
-            // 해당 일자의 일반근태 신청 내역 추가
+            // 해당 일자의 일반근태 신청 내역
             AttendanceApplyGeneral generalApply = attendanceApplyMapper.findGeneralApplyByEmpAndDate(empCode, workDate);
             if (generalApply != null && ("승인완료".equals(generalApply.getStatus()) || "상신".equals(generalApply.getStatus()))) {
                 Duration applyHours = calculateApplyHours(generalApply);
 
                 if ("휴일근무".equals(generalApply.getApplyType())) {
-                    double rawHours = applyHours.toMinutes() / 60.0;
-                    if (rawHours >= 2.0) {
-                        rawHours = rawHours - 0.5;
-                    }
-                    applyHours = Duration.ofMinutes((long)(rawHours * 60));
-
+                    applyHours = calculateHolidayWorkHoursAccurate(generalApply);
                     dailyHours = dailyHours.plus(applyHours);
                 } else {
                     dailyHours = dailyHours.plus(applyHours);
@@ -518,7 +534,7 @@ public class AttendanceApplyService {
                         } else {
                             // 실적이 없으면 계획 시간으로 계산
                             dailyHours = WorkHoursCalculator.getTotalWorkTime(shift);
-                            log.debug("계획 기반 시간: date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
+                            log.debug("계획 기준 시간: date={}, hours={}", workDate, dailyHours.toMinutes() / 60.0);
                         }
                     } else {
                         log.debug("비근무일로 0시간: date={}, shiftName={}", workDate, shift.getShiftName());
@@ -552,7 +568,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 주 52시간 검증용 주간 예상근로시간 계산
+    // 주 52시간 검증용 예상근로시간 계산
     private String calculateWeeklyExpectedHours(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -565,12 +581,12 @@ public class AttendanceApplyService {
 
             log.debug("주 예상근로시간 계산 시작: empCode={}, 주간={} ~ {}", empCode, mondayOfWeek, sundayOfWeek);
 
-            // 주중 7일간 계산
+            // 주중 7일간 계산 - 개선된 메서드 사용
             for (LocalDate date = mondayOfWeek; !date.isAfter(sundayOfWeek); date = date.plusDays(1)) {
                 String dateStr = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-                // 해당 일자의 예상근로시간을 구해서 더하기
-                String dailyHours = calculateDailyExpectedHours(empCode, dateStr);
+                // 해당 일자의 예상근로시간을 구해서 더하기 - 개선된 메서드 사용
+                String dailyHours = calculateDailyExpectedHoursImproved(empCode, dateStr);
                 Duration dayDuration = Duration.ofMinutes((long)(Double.parseDouble(dailyHours) * 60));
                 totalWeekHours = totalWeekHours.plus(dayDuration);
             }
@@ -581,14 +597,18 @@ public class AttendanceApplyService {
             return String.format("%.2f", weeklyHours);
         } catch (Exception e) {
             log.error("주 예상근로시간 계산 실패: empCode={}, workDate={}", empCode, workDate, e);
-            return "0.00";
+            return "40.00"; // 기본 주 40시간
         }
     }
 
-    // 신청 시간 계산 (연장근로, 휴일근로)
+    // 신청 시간 계산
     private Duration calculateApplyHours(AttendanceApplyGeneral apply) {
         try {
             if (apply.getStartTime() != null && apply.getEndTime() != null) {
+                if ("휴일근무".equals(apply.getApplyType())) {
+                    return calculateHolidayWorkHoursAccurate(apply);
+                }
+
                 int startTime = Integer.parseInt(apply.getStartTime());
                 int endTime = Integer.parseInt(apply.getEndTime());
 
@@ -629,6 +649,219 @@ public class AttendanceApplyService {
             log.error("차감 시간 계산 실패", e);
         }
         return Duration.ZERO;
+    }
+
+    private String getOriginalShiftCode(String empCode, String workDate) {
+        try {
+            return attendanceApplyMapper.getOriginalShiftCode(empCode, workDate);
+        } catch (Exception e) {
+            log.error("원래 계획 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
+            return null;
+        }
+    }
+
+    private Duration calculateHolidayWorkHoursAccurate(AttendanceApplyGeneral apply) {
+        try {
+            if (apply.getStartTime() != null && apply.getEndTime() != null) {
+                // 휴일근무 시프트 정보 가져오기 (14-1)
+                ShiftMaster holidayShift = shiftMasterMapper.findShiftByCode("14-1");
+                if (holidayShift != null) {
+                    String startTimeStr = String.format("%04d00", Integer.parseInt(apply.getStartTime()));
+                    String endTimeStr = String.format("%04d00", Integer.parseInt(apply.getEndTime()));
+
+                    LocalDate workDate = LocalDate.parse(apply.getTargetDate(), DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+                    // WorkHoursCalculator.getRealWorkTime 사용 (빈 leavePeriods)
+                    List<Pair<String, String>> emptyLeavePeriods = new ArrayList<>();
+                    Duration workDuration = WorkHoursCalculator.getRealWorkTime(
+                            startTimeStr, endTimeStr, holidayShift, workDate, emptyLeavePeriods);
+
+                    log.debug("휴일근로 정확한 시간 계산: start={}, end={}, duration={}시간",
+                            apply.getStartTime(), apply.getEndTime(), workDuration.toMinutes() / 60.0);
+
+                    return workDuration;
+                }
+            }
+        } catch (Exception e) {
+            log.error("휴일근로 정확한 시간 계산 실패", e);
+        }
+
+        // 기본 계산으로 폴백
+        return calculateApplyHours(apply);
+    }
+
+    public Map<String, Object> calculateRealTimeWeeklyHours(String empCode, String workDate, String startTime, String endTime, String applyType) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            log.debug("실시간 주 52시간 계산 시작: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
+
+            // 해당 주의 기본 근무시간 계산
+            double baseWeeklyHours = calculateCurrentWeeklyHours(empCode, workDate);
+
+            // 신청하려는 시간 계산
+            double requestHours = 0.0;
+            if (startTime != null && endTime != null && !startTime.isEmpty() && !endTime.isEmpty()) {
+                // 조출연장 시간 제한 검증
+                if ("조출연장".equals(applyType)) {
+                    try {
+                        int startTimeInt = Integer.parseInt(startTime.replace(":", ""));
+                        if (startTimeInt >= 730) {
+                            result.put("totalWeeklyHours", baseWeeklyHours);
+                            result.put("requestHours", 0.0);
+                            result.put("isValid", false);
+                            result.put("message", "조출연장은 07:30 이전에만 신청할 수 있습니다.");
+                            return result;
+                        }
+                    } catch (NumberFormatException e) {
+                        log.error("조출연장 시간 파싱 실패: {}", startTime, e);
+                    }
+                }
+
+                // 정확한 시간 계산
+                requestHours = calculateRequestHours(empCode, workDate, startTime, endTime, applyType);
+            }
+
+            // 조퇴/외출/반차는 차감
+            if (Arrays.asList("조퇴", "외근", "외출", "전반차", "후반차").contains(applyType)) {
+                if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
+                    requestHours = -4.0; // 반차는 4시간 차감
+                } else if ("조퇴".equals(applyType)) {
+                    // 조퇴는 시작시간부터 퇴근시간까지 차감
+                    requestHours = calculateEarlyLeaveHours(empCode, workDate, startTime);
+                    requestHours = -requestHours;
+                } else {
+                    requestHours = -requestHours; // 외출은 해당 시간만큼 차감
+                }
+            }
+
+            double totalWeeklyHours = baseWeeklyHours + requestHours;
+            boolean isValid = totalWeeklyHours <= 52.0 && totalWeeklyHours >= 0;
+
+            result.put("totalWeeklyHours", totalWeeklyHours);
+            result.put("requestHours", Math.abs(requestHours));
+            result.put("isValid", isValid);
+            result.put("message", isValid ? "정상" : (totalWeeklyHours > 52.0 ? "주 52시간 초과" : "음수 시간"));
+
+            log.debug("실시간 주 52시간 계산 완료: baseHours={}, requestHours={}, totalHours={}, isValid={}",
+                    baseWeeklyHours, requestHours, totalWeeklyHours, isValid);
+
+        } catch (Exception e) {
+            log.error("실시간 주 52시간 계산 실패: empCode={}, workDate={}", empCode, workDate, e);
+            result.put("totalWeeklyHours", 40.0);
+            result.put("requestHours", 0.0);
+            result.put("isValid", true);
+            result.put("message", "계산 오류");
+        }
+
+        return result;
+    }
+
+    /**
+     * 현재 주간 근무시간 계산 (휴일근로 포함)
+     */
+    private double calculateCurrentWeeklyHours(String empCode, String workDate) {
+        try {
+            LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            LocalDate mondayOfWeek = targetDate.with(DayOfWeek.MONDAY);
+            LocalDate sundayOfWeek = targetDate.with(DayOfWeek.SUNDAY);
+
+            Duration totalWeekHours = Duration.ZERO;
+
+            // 주중 7일간 계산
+            for (LocalDate date = mondayOfWeek; !date.isAfter(sundayOfWeek); date = date.plusDays(1)) {
+                String dateStr = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+                String dailyHours = calculateDailyExpectedHoursImproved(empCode, dateStr);
+                Duration dayDuration = Duration.ofMinutes((long)(Double.parseDouble(dailyHours) * 60));
+                totalWeekHours = totalWeekHours.plus(dayDuration);
+            }
+
+            return totalWeekHours.toMinutes() / 60.0;
+        } catch (Exception e) {
+            log.error("현재 주간 근무시간 계산 실패: empCode={}, workDate={}", empCode, workDate, e);
+            return 40.0; // 기본값
+        }
+    }
+
+    /**
+     * 신청 시간 정확 계산
+     */
+    private double calculateRequestHours(String empCode, String workDate, String startTime, String endTime, String applyType) {
+        try {
+            String originalShiftCode = getOriginalShiftCode(empCode, workDate);
+            if (originalShiftCode == null) {
+                originalShiftCode = "05"; // 기본 주간 근무
+            }
+
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode(originalShiftCode);
+            if (shift != null && "휴일근무".equals(applyType)) {
+                // 휴일근무는 별도 시프트 사용
+                shift = shiftMasterMapper.findShiftByCode("14-1");
+            }
+
+            if (shift != null) {
+                LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+                // 시간 포맷 변환 (HH:MM -> HHMMSS)
+                String formattedStartTime = startTime.replace(":", "") + "00";
+                String formattedEndTime = endTime.replace(":", "") + "00";
+
+                // WorkHoursCalculator.getRealWorkTime 사용 (빈 leavePeriods)
+                List<Pair<String, String>> emptyLeavePeriods = new ArrayList<>();
+                Duration workDuration = WorkHoursCalculator.getRealWorkTime(
+                        formattedStartTime, formattedEndTime, shift, targetDate, emptyLeavePeriods);
+
+                return workDuration.toMinutes() / 60.0;
+            }
+
+            return 0.0;
+        } catch (Exception e) {
+            log.error("신청 시간 정확 계산 실패", e);
+            return 0.0;
+        }
+    }
+
+    private double calculateEarlyLeaveHours(String empCode, String workDate, String startTime) {
+        try {
+            // 해당 날짜의 계획 조회
+            String originalShiftCode = getOriginalShiftCode(empCode, workDate);
+            if (originalShiftCode == null) {
+                originalShiftCode = "05"; // 기본 주간 근무
+            }
+
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode(originalShiftCode);
+            if (shift != null) {
+                // 정상 퇴근시간 조회
+                String workOffHhmm = shift.getWorkOffHhmm();
+                if (workOffHhmm != null) {
+                    // 시작시간부터 퇴근시간까지 계산
+                    String[] startParts = startTime.split(":");
+                    int startMinutes = Integer.parseInt(startParts[0]) * 60 + Integer.parseInt(startParts[1]);
+
+                    int workOffTime = Integer.parseInt(workOffHhmm);
+                    int workOffHour = workOffTime / 100;
+                    int workOffMin = workOffTime % 100;
+                    int workOffMinutes = workOffHour * 60 + workOffMin;
+
+                    if (workOffMinutes > startMinutes) {
+                        return (workOffMinutes - startMinutes) / 60.0;
+                    }
+                }
+            }
+
+            // 기본값: 2시간
+            return 2.0;
+        } catch (Exception e) {
+            log.error("조퇴 시간 계산 실패", e);
+            return 2.0;
+        }
+    }
+
+    public AttendanceApplyGeneral findGeneralApplyByEmpAndDate(String empCode, String workDate) {
+        return attendanceApplyMapper.findGeneralApplyByEmpAndDate(empCode, workDate);
+    }
+
+    public AttendanceApplyEtc findEtcApplyByEmpAndDate(String empCode, String workDate) {
+        return attendanceApplyMapper.findEtcApplyByEmpAndDate(empCode, workDate);
     }
 
     // 부서별 사원 조회 (부서장용)
@@ -799,7 +1032,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 일반근태 신청 유효성 검증 - 요구사항에 맞게 강화
+    // 일반근태 신청 유효성 검증
     public String validateGeneralApply(AttendanceApplyGeneral apply) {
         try {
             String empCode = apply.getEmpCode();
@@ -807,11 +1040,15 @@ public class AttendanceApplyService {
             String applyType = apply.getApplyType();
 
             // 해당 일자의 계획 및 실적 확인
-            EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, targetDate);
-            String planShiftCode = empCalendar != null ? empCalendar.getShiftCode() : null;
+            String originalShiftCode = getOriginalShiftCode(empCode, targetDate);
             String planShiftName = "";
-            if (planShiftCode != null) {
-                planShiftName = shiftMasterMapper.findShiftNameByShiftCode(planShiftCode);
+            if (originalShiftCode != null) {
+                planShiftName = shiftMasterMapper.findShiftNameByShiftCode(originalShiftCode);
+            } else {
+                EmpCalendar empCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, targetDate);
+                if (empCalendar != null && empCalendar.getShiftCode() != null) {
+                    planShiftName = shiftMasterMapper.findShiftNameByShiftCode(empCalendar.getShiftCode());
+                }
             }
 
             // 실적 확인
@@ -902,7 +1139,7 @@ public class AttendanceApplyService {
                 }
             }
 
-            // 주 52시간 초과 검증 (조퇴/외출/반차는 제외)
+            // 주 52시간 초과 검증
             if (!Arrays.asList("조퇴", "외근", "외출", "전반차", "후반차").contains(applyType)) {
                 String weeklyHours = calculateWeeklyExpectedHours(apply.getEmpCode(), apply.getTargetDate());
                 double currentWeekHours = Double.parseDouble(weeklyHours);
@@ -1033,9 +1270,11 @@ public class AttendanceApplyService {
         try {
             log.debug("휴일근로 실적 업데이트 시작: empCode={}, workDate={}", empCode, workDate);
 
-            // 휴일근무 시프트 코드로 실적 업데이트
             String holidayShiftCode = "14-1";
             attendanceApplyMapper.updateAttendanceRecordByShiftCode(empCode, workDate, holidayShiftCode);
+
+
+            attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(empCode, workDate, "휴일근무");
 
             log.debug("휴일근로 실적 업데이트 완료: empCode={}, workDate={}, shiftCode={}", empCode, workDate, holidayShiftCode);
         } catch (Exception e) {
@@ -1051,6 +1290,11 @@ public class AttendanceApplyService {
 
             attendanceApplyMapper.updateAttendanceRecordByShiftCode(empCode, workDate, shiftCode);
 
+            ShiftMaster shift = shiftMasterMapper.findShiftByCode(shiftCode);
+            if (shift != null) {
+                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(empCode, workDate, workDate, shiftCode);
+            }
+
             log.debug("연차/반차 실적만 업데이트 완료: empCode={}, workDate={}, shiftCode={}", empCode, workDate, shiftCode);
         } catch (Exception e) {
             log.error("연차/반차 실적 업데이트 실패: empCode={}, workDate={}, shiftCode={}", empCode, workDate, shiftCode, e);
@@ -1058,14 +1302,15 @@ public class AttendanceApplyService {
         }
     }
 
-    // 일반근태 신청 상신 처리 강화
+    // 일반근태 신청 상신
     @Transactional
     public void submitGeneralApply(String applyGeneralNo, String applicantCode, String isHeader) {
         try {
             log.debug("일반근태 상신 시작: applyGeneralNo={}, applicantCode={}, isHeader={}", applyGeneralNo, applicantCode, isHeader);
 
-            // 전반차, 후반차 승인완료 시 연차 0.5 차감 처리
             AttendanceApplyGeneral apply = attendanceApplyMapper.findGeneralApplyByNo(applyGeneralNo);
+
+            // 전반차, 후반차 승인완료 시 연차 0.5 차감 처리
             if (apply != null && Arrays.asList("전반차", "후반차").contains(apply.getApplyType())) {
                 if ("Y".equals(isHeader)) {
                     // 부서장 자동 승인 시 즉시 연차 차감
@@ -1081,6 +1326,10 @@ public class AttendanceApplyService {
             if ("Y".equals(isHeader)) {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
+
+                if (apply != null) {
+                    attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), apply.getApplyType());
+                }
 
                 // 승인완료 시 실적 업데이트
                 updateAttendanceRecord(applyGeneralNo, "general");
@@ -1118,7 +1367,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 기타근태 신청 상신 처리
+    // 기타근태 신청 상신
     @Transactional
     public void submitEtcApply(String applyEtcNo, String applicantCode, String isHeader) {
         try {
@@ -1132,6 +1381,13 @@ public class AttendanceApplyService {
             if ("Y".equals(isHeader)) {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
+
+                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                        etcApply.getEmpCode(),
+                        etcApply.getTargetStartDate(),
+                        etcApply.getTargetEndDate(),
+                        etcApply.getShiftCode()
+                );
 
                 // 연차 차감 및 실적 업데이트
                 deductAnnualLeaveStable(etcApply);
@@ -1197,7 +1453,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 연차 차감 - USE_DAY 증가 로직 추가
     @Transactional
     private void deductAnnualLeaveStable(AttendanceApplyEtc etcApply) {
         try {
@@ -1221,7 +1476,6 @@ public class AttendanceApplyService {
                                 etcApply.getEmpCode(), deductDays);
 
                         if (deductionResult) {
-                            // USE_DAY 증가 처리 추가
                             annualDetailMapper.updateUseDayIncrease(etcApply.getEmpCode(), deductDays);
 
                             // 차감 후 잔여량 조회하여 로그 기록
