@@ -83,11 +83,13 @@ public interface ApplyHistoryMapper {
             general.APPLY_TYPE AS applyType,
             general.STATUS AS status,
             dept.DEPT_NAME AS deptName,
-            emp.EMP_NAME AS empName
+            emp.EMP_NAME AS empName,
+            hist.APPROVAL_DATE AS approvalDate
         
         FROM HRTATTAPLGENERAL general
         LEFT JOIN ORGDEPTMASTER dept ON general.DEPT_CODE = dept.DEPT_CODE
         LEFT JOIN HRIMASTER emp ON general.EMP_CODE = emp.EMP_CODE
+        LEFT JOIN HRTAPRHIST hist ON general.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
         
         WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
         AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
@@ -114,11 +116,13 @@ public interface ApplyHistoryMapper {
             general.APPLY_TYPE AS applyType,
             general.STATUS AS status,
             dept.DEPT_NAME AS deptName,
-            emp.EMP_NAME AS empName
+            emp.EMP_NAME AS empName,
+            hist.APPROVAL_DATE AS approvalDate
         
         FROM HRTATTAPLGENERAL general
         LEFT JOIN ORGDEPTMASTER dept ON general.DEPT_CODE = dept.DEPT_CODE
         LEFT JOIN HRIMASTER emp ON general.EMP_CODE = emp.EMP_CODE
+        LEFT JOIN HRTAPRHIST hist ON general.APPLY_GENERAL_NO = hist.APPLY_GENERAL_NO
         
         WHERE (general.APPLICANT_CODE = #{empCode} OR general.EMP_CODE = #{empCode})
         AND general.TARGET_DATE BETWEEN #{startDate} AND #{endDate}
@@ -144,11 +148,15 @@ public interface ApplyHistoryMapper {
             etc.REASON AS reason,
             etc.APPLY_DATE_TIME AS applyDateTime,
             dept.DEPT_NAME AS deptName,
-            emp.EMP_NAME AS empName
+            emp.EMP_NAME AS empName,
+            hist.APPROVAL_DATE AS approvalDate
+        
         FROM HRTATTAPLETC etc
         LEFT JOIN ORGDEPTMASTER dept ON etc.DEPT_CODE = dept.DEPT_CODE
         LEFT JOIN HRIMASTER emp ON etc.EMP_CODE = emp.EMP_CODE
         LEFT JOIN HRTSHIFTMASTER shift ON etc.SHIFT_CODE = shift.SHIFT_CODE
+        LEFT JOIN HRTAPRHIST hist ON etc.APPLY_ETC_NO = hist.APPLY_ETC_NO
+        
         WHERE (etc.APPLICANT_CODE = #{empCode} OR etc.EMP_CODE = #{empCode})
         AND etc.TARGET_START_DATE BETWEEN #{startDate} AND #{endDate}
         AND etc.TARGET_END_DATE BETWEEN #{startDate} AND #{endDate}
