@@ -73,7 +73,6 @@ public class WorkHoursCalculator {
         return Duration.between(effectiveStart, effectiveEnd);
     }
 
-
     /* 실적 근무 시간 계산 */
     public static Duration getRealWorkTime(String checkIn, String checkOut,
         ShiftMaster shift, LocalDate workDate,

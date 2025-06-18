@@ -55,7 +55,7 @@ public interface ShiftMasterMapper {
         SELECT SHIFT_NAME
         FROM HRTSHIFTMASTER
         WHERE SHIFT_CODE = (
-            SELECT SHIFT_CODE
+            SELECT SHIFT_CODE_ORIG
             FROM HRTWORKEMPCALENDAR
             WHERE EMP_CODE = #{empCode}
             AND YYYYMMDD = #{date}

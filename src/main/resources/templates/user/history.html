@@ -102,7 +102,8 @@
              data-approval-duty-name=${item.approvalDutyName},
              data-approval-emp-name=${item.approvalEmpName},
              data-approval-emp-code=${item.approvalEmpCode},
-             data-approval-result=${item.approvalResult}"
+             data-approval-result=${item.approvalResult},
+             data-approval-date=${item.approvalDate}"
 
             onclick="showDetails(this.dataset)">
 
@@ -147,7 +148,7 @@
       </div>
       <div class="grid grid-cols-2 gap-4 mb-2">
         <div><strong>신청일</strong>: <span id="applyDate">-</span></div>
-        <div><strong>계획근무</strong>: <span id="applyType">-</span></div>
+        <div><strong>계획근무</strong>: <span id="shiftCodeOrig">-</span></div>
       </div>
     </div>
 
@@ -208,7 +209,7 @@
     </div>
 
     <!-- 결재 정보 -->
-    <div class="border rounded-lg p-4">
+    <div class="border rounded-lg p-4 mb-4">
       <h3 class="text-sm font-semibold text-gray-700 mb-2">결재 정보</h3>
       <table class="min-w-full text-sm border border-gray-300">
         <thead class="bg-gray-200">
@@ -242,7 +243,7 @@
     document.getElementById('targetEmpCodeName').innerText = data.targetEmpCode + '/' + data.targetEmpName;
     document.getElementById('targetDeptName').innerText = data.targetDeptName;
     document.getElementById('applyDate').innerText = formatDate(data.applyDate);
-    document.getElementById('applyType').innerText = data.shiftName || '-';
+    document.getElementById('shiftCodeOrig').innerText = data.shiftName || '-';
 
     // 신청정보[변경] 영역 동적 처리
     const applyType = data.applyType;
@@ -255,10 +256,10 @@
 
     document.getElementById("applyTypeInfo").innerText = "[" + data.applyType + "]";
 
-    if (applyType === "연장근로") {
+    if (applyType === "연장근로" || applyType === "조출연장") {
       document.getElementById("overtimeApplyInfo").classList.remove("hidden");
       document.getElementById("overtimeWorkDate").innerText = formatDate(data.targetDate) || "-";
-      document.getElementById("overTimeReason").innerText = data.reason || "-";
+      document.getElementById("overtimeReason").innerText = data.reason || "-";
       document.getElementById("overtime").innerText = data.overtime || "-";
     } else if (applyType === "휴일근무") {
       document.getElementById("holidayApplyInfo").classList.remove("hidden");
@@ -293,7 +294,7 @@
       <td class="border px-2 py-1 text-center">${data.applicantEmpName}</td>
       <td class="border px-2 py-1 text-center">${data.applicantEmpCode}</td>
       <td class="border px-2 py-1 text-center text-green-600 font-semibold">${data.applyResult}</td>
-      <td class="border px-2 py-1 text-center">-</td>
+      <td class="border px-2 py-1 text-center">${formatDate(data.approvalDate)}</td>
     </tr>`;
 
     html += `
@@ -305,8 +306,8 @@
       <td class="border px-2 py-1 text-center">${data.approvalEmpName}</td>
       <td class="border px-2 py-1 text-center">${data.approvalEmpCode}</td>
       <td class="border px-2 py-1 text-center ${data.approvalResult === '승인완료' ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}">${data.approvalResult}</td>
-      <td class="border px-2 py-1 text-center">-</td>
-    </tr>`
+      <td class="border px-2 py-1 text-center">${formatDate(data.approvalDate)}</td>
+    </tr>`;
     document.getElementById('approvalList').innerHTML = html;
   }
 

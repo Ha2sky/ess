@@ -180,6 +180,8 @@ public class EmpAttService {
 
     /* 휴일근무 */
     public Duration getHolidayWorkHours(String empCode, String ymd) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
+
         AttendanceApplyGeneral holidayWork = attendanceApplyMapper.findApprovedOverTime2(empCode, ymd);
         if (holidayWork == null) return Duration.ZERO;
 
@@ -194,8 +196,15 @@ public class EmpAttService {
         shift.setBreak1EndHhmm(base.getBreak1EndHhmm());
         shift.setBreak2StartHhmm(base.getBreak2StartHhmm());
         shift.setBreak2EndHhmm(base.getBreak2EndHhmm());
-        shift.setWorkOnDayType("N0");
-        shift.setWorkOffDayType("N0");
+        LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
+        LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+        if (parsedWorkOn.isAfter(parsedWorkOff)) {
+            shift.setWorkOnDayType("N0");
+            shift.setWorkOffDayType("N1");
+        } else {
+            shift.setWorkOnDayType("N0");
+            shift.setWorkOffDayType("N0");
+        }
 
         holidayWorkHours = holidayWorkHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
         return holidayWorkHours;
@@ -287,7 +296,6 @@ public class EmpAttService {
                             emp.setTimeItemNames(List.of("지각"));
 
                             emp.setShiftCode(emp.getShiftCodeOrig());
-                            /// ///////////////////////////////////////////////////////////////
                             empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, emp.getShiftCodeOrig());
                         }
                         emp.setShiftCode(cal.getShiftCode());

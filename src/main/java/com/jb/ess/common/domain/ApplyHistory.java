@@ -50,5 +50,5 @@ public class ApplyHistory {
     private String approvalEmpCode;     // 결재자 사번
     private String approvalResult;      // 결재 결과
 
-    private String approvalDate;        // 결재일
+    private String approvalDate;        // 결재일(yyyyMMdd)
 }
