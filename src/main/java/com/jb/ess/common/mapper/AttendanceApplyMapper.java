@@ -39,7 +39,7 @@ public interface AttendanceApplyMapper {
     @Select("SELECT TOP 1 TIME_ITEM_CODE FROM HRTTIMEITEM ORDER BY TIME_ITEM_CODE")
     String getValidTimeItemCode();
 
-    // 일반근태 신청 조회
+    // 🔧 수정: 일반근태 신청 조회 - 신청근무별 완전 분리 처리
     @Select("""
         <script>
         SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
@@ -57,7 +57,14 @@ public interface AttendanceApplyMapper {
                 AND APPLY_TYPE IN ('조퇴', '외근', '외출', '전반차', '후반차')
             </if>
         </if>
-        ORDER BY APPLY_DATE DESC
+        ORDER BY 
+            CASE STATUS
+                WHEN '승인완료' THEN 1
+                WHEN '상신' THEN 2
+                WHEN '저장' THEN 3
+                ELSE 4
+            END,
+            APPLY_DATE DESC
         </script>
     """)
     AttendanceApplyGeneral findGeneralApplyByEmpAndDateWithCategory(@Param("empCode") String empCode,
@@ -70,9 +77,36 @@ public interface AttendanceApplyMapper {
         FROM HRTATTAPLGENERAL 
         WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
         AND STATUS != '삭제'
-        ORDER BY APPLY_DATE DESC
+        ORDER BY 
+            CASE STATUS
+                WHEN '승인완료' THEN 1
+                WHEN '상신' THEN 2
+                WHEN '저장' THEN 3
+                ELSE 4
+            END,
+            APPLY_DATE DESC
     """)
     AttendanceApplyGeneral findGeneralApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
+
+    // 요구사항: 신청근무별 개별 조회 - 신청근무별 분리 관리용
+    @Select("""
+        SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
+        FROM HRTATTAPLGENERAL 
+        WHERE EMP_CODE = #{empCode} AND TARGET_DATE = #{workDate}
+        AND APPLY_TYPE = #{applyType}
+        AND STATUS != '삭제'
+        ORDER BY 
+            CASE STATUS
+                WHEN '승인완료' THEN 1
+                WHEN '상신' THEN 2
+                WHEN '저장' THEN 3
+                ELSE 4
+            END,
+            APPLY_DATE DESC
+    """)
+    AttendanceApplyGeneral findGeneralApplyByEmpAndDateAndType(@Param("empCode") String empCode,
+                                                               @Param("workDate") String workDate,
+                                                               @Param("applyType") String applyType);
 
     // 기존 기타근태 신청 조회 - BETWEEN 사용으로 변경
     @Select("""
@@ -81,7 +115,14 @@ public interface AttendanceApplyMapper {
         WHERE EMP_CODE = #{empCode} 
         AND #{workDate} BETWEEN TARGET_START_DATE AND TARGET_END_DATE
         AND STATUS != '삭제'
-        ORDER BY APPLY_DATE DESC
+        ORDER BY 
+            CASE STATUS
+                WHEN '승인완료' THEN 1
+                WHEN '상신' THEN 2
+                WHEN '저장' THEN 3
+                ELSE 4
+            END,
+            APPLY_DATE DESC
     """)
     AttendanceApplyEtc findEtcApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
@@ -122,21 +163,6 @@ public interface AttendanceApplyMapper {
     """)
     boolean hasHalfDayOrEarlyLeaveApply(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 해당일 휴일근무 8시간 이상 신청 확인 (연장근로 검증용)
-    @Select("""
-        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
-        FROM HRTATTAPLGENERAL 
-        WHERE EMP_CODE = #{empCode} 
-        AND TARGET_DATE = #{workDate}
-        AND STATUS IN ('승인완료', '상신')
-        AND APPLY_TYPE = '휴일근무'
-        AND DATEDIFF(MINUTE, 
-            CAST(STUFF(STUFF(FORMAT(START_TIME, '0000'), 3, 0, ':'), 6, 0, ':') AS TIME),
-            CAST(STUFF(STUFF(FORMAT(END_TIME, '0000'), 3, 0, ':'), 6, 0, ':') AS TIME)
-        ) >= 480
-    """)
-    boolean hasHolidayWorkOver8Hours(@Param("empCode") String empCode, @Param("workDate") String workDate);
-
     // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용) - 함수 사용으로 변경
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
@@ -155,6 +181,12 @@ public interface AttendanceApplyMapper {
                            @Param("workDate") String workDate,
                            @Param("startTime") String startTime,
                            @Param("endTime") String endTime);
+
+    // 요구사항: 조출연장 시간 제한 검증 - 07:30 이전인지 확인
+    @Select("""
+        SELECT CASE WHEN #{startTime} < 730 THEN 1 ELSE 0 END
+    """)
+    boolean isValidEarlyOvertimeTime(@Param("startTime") int startTime);
 
     // 부서별 사원 조회 - 부서장용
     @Select("""
@@ -379,21 +411,6 @@ public interface AttendanceApplyMapper {
     // 기타근태 신청 삭제
     @Delete("DELETE FROM HRTATTAPLETC WHERE APPLY_ETC_NO = #{applyEtcNo}")
     void deleteEtcApply(String applyEtcNo);
-
-    // 실적 업데이트 메서드
-    @Update("""
-        MERGE HRTATTRECORD AS target
-        USING (SELECT #{empCode} AS EMP_CODE, #{workDate} AS WORK_YMD, #{shiftCode} AS SHIFT_CODE) AS source
-        ON target.EMP_CODE = source.EMP_CODE AND target.WORK_YMD = source.WORK_YMD
-        WHEN MATCHED THEN
-            UPDATE SET SHIFT_CODE = source.SHIFT_CODE
-        WHEN NOT MATCHED THEN
-            INSERT (EMP_CODE, WORK_YMD, SHIFT_CODE)
-            VALUES (source.EMP_CODE, source.WORK_YMD, source.SHIFT_CODE);
-    """)
-    void updateAttendanceRecordByShiftCode(@Param("empCode") String empCode,
-                                           @Param("workDate") String workDate,
-                                           @Param("shiftCode") String shiftCode);
 
     @Select("""
         SELECT APPLY_TYPE
