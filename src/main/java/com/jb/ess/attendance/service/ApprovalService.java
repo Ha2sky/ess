@@ -563,7 +563,7 @@ public class ApprovalService {
     }
 
     /**
-     * 일반근태 승인 처리
+     * 🔧 수정: 일반근태 승인 처리 - HRTATTRECORD 테이블 호환성 수정
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
@@ -592,11 +592,17 @@ public class ApprovalService {
 
             String applyType = apply.getApplyType();
             if ("휴일근무".equals(applyType)) {
-                attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
-                log.debug("휴일근무 승인 완료: 실적 변경 (14-1)");
+                // 🔧 수정: HRTATTRECORD 테이블 호환성 - updateAttendanceRecordByShiftCode 제거
+                // ❌ 제거됨: attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
+                // ✅ 교체됨: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE만 업데이트
+                attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
+                log.debug("휴일근무 승인 완료: SHIFT_CODE 업데이트 (14-1)");
             } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
-                deductAnnualLeave(apply.getEmpCode(), new BigDecimal("0.5"));
-                log.debug("전반차/후반차 승인 완료: 연차 차감만 실행 (실적 변경 없음)");
+                // 🔧 수정: 연차 차감 로직 개선 - 정확한 계산
+                deductAnnualLeaveImproved(apply.getEmpCode(), new BigDecimal("0.5"));
+                // SHIFT_CODE 업데이트도 추가
+                attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
+                log.debug("전반차/후반차 승인 완료: 연차 차감 및 SHIFT_CODE 업데이트");
             }
 
             log.info("일반근태 승인 처리 완료: applyGeneralNo={}", applyGeneralNo);
@@ -607,7 +613,7 @@ public class ApprovalService {
     }
 
     /**
-     * 기타근태 승인 처리
+     * 🔧 수정: 기타근태 승인 처리 - HRTATTRECORD 테이블 호환성 수정
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
@@ -637,11 +643,23 @@ public class ApprovalService {
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
-                    deductAnnualLeave(apply.getEmpCode(), BigDecimal.ONE);
-                    log.debug("연차 승인 완료: 연차 차감만 실행 (실적은 동적 계산으로 처리)");
-                } else {
-                    log.debug("기타근태 승인 완료: 실적 변경 없음 (shiftName={})", shiftName);
+                    // 🔧 수정: 연차 차감 로직 개선 - 정확한 계산
+                    deductAnnualLeaveImproved(apply.getEmpCode(), BigDecimal.ONE);
+                    log.debug("연차 승인 완료: 연차 차감 완료");
+                } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
+                    // 🔧 수정: 반차 처리 추가
+                    deductAnnualLeaveImproved(apply.getEmpCode(), new BigDecimal("0.5"));
+                    log.debug("반차 승인 완료: 연차 0.5일 차감 완료");
                 }
+
+                // 🔧 수정: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE 업데이트
+                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                        apply.getEmpCode(),
+                        apply.getTargetStartDate(),
+                        apply.getTargetEndDate(),
+                        apply.getShiftCode()
+                );
+                log.debug("기타근태 승인 완료: SHIFT_CODE 업데이트 (shiftName={})", shiftName);
             }
 
             log.info("기타근태 승인 처리 완료: applyEtcNo={}", applyEtcNo);
@@ -652,23 +670,49 @@ public class ApprovalService {
     }
 
     /**
-     * 연차 차감 메서드
+     * 🔧 수정: 연차 차감 메서드 개선 - 정확한 계산
      */
     @Transactional
-    private void deductAnnualLeave(String empCode, BigDecimal deductDays) {
+    private void deductAnnualLeaveImproved(String empCode, BigDecimal deductDays) {
         try {
             AnnualDetail currentAnnual = annualDetailMapper.findByEmpCode(empCode);
             if (currentAnnual != null) {
-                BigDecimal newBalance = currentAnnual.getBalanceDay().subtract(deductDays);
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                    log.warn("연차 잔여량 부족: empCode={}, 현재잔여={}, 차감요청={}",
-                            empCode, currentAnnual.getBalanceDay(), deductDays);
-                    newBalance = BigDecimal.ZERO;
-                }
+                BigDecimal currentBalance = currentAnnual.getBalanceDay();
+                BigDecimal currentUse = currentAnnual.getUseDay();
 
-                annualDetailMapper.updateBalanceDay(empCode, newBalance);
-                log.debug("연차 차감 완료: empCode={}, 차감일수={}, 기존잔여={}, 신규잔여={}",
-                        empCode, deductDays, currentAnnual.getBalanceDay(), newBalance);
+                log.debug("연차 차감 전 상태: empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
+                        empCode, currentBalance, currentUse, deductDays);
+
+                // 🔧 수정: 정확한 연차 차감 계산
+                boolean deductionResult = annualDetailMapper.updateBalanceDayWithCheck(empCode, deductDays);
+
+                if (deductionResult) {
+                    // 🔧 수정: USE_DAY도 정확히 증가
+                    annualDetailMapper.updateUseDayIncrease(empCode, deductDays);
+
+                    // 차감 후 확인
+                    AnnualDetail updatedAnnual = annualDetailMapper.findByEmpCode(empCode);
+                    log.debug("연차 차감 완료: empCode={}, 차감일수={}, 차감후잔여={}, 차감후사용={}",
+                            empCode, deductDays,
+                            updatedAnnual != null ? updatedAnnual.getBalanceDay() : "조회실패",
+                            updatedAnnual != null ? updatedAnnual.getUseDay() : "조회실패");
+
+                    // 🔧 계산 검증: 16 - 0.5 - 1 = 14.5 가 맞는지 확인
+                    if (updatedAnnual != null) {
+                        BigDecimal expectedBalance = currentBalance.subtract(deductDays);
+                        BigDecimal expectedUse = currentUse.add(deductDays);
+
+                        if (updatedAnnual.getBalanceDay().compareTo(expectedBalance) != 0) {
+                            log.error("연차 차감 계산 오류: 예상잔여={}, 실제잔여={}", expectedBalance, updatedAnnual.getBalanceDay());
+                        }
+                        if (updatedAnnual.getUseDay().compareTo(expectedUse) != 0) {
+                            log.error("연차 사용 계산 오류: 예상사용={}, 실제사용={}", expectedUse, updatedAnnual.getUseDay());
+                        }
+                    }
+                } else {
+                    log.warn("연차 잔여량 부족으로 차감 실패: empCode={}, 요청차감일수={}, 현재잔여={}",
+                            empCode, deductDays, currentBalance);
+                }
             } else {
                 log.warn("연차 정보가 없습니다: empCode={}", empCode);
             }
@@ -676,6 +720,14 @@ public class ApprovalService {
             log.error("연차 차감 실패: empCode={}, deductDays={}", empCode, deductDays, e);
             throw new RuntimeException("연차 차감에 실패했습니다.", e);
         }
+    }
+
+    /**
+     * 연차 차감 메서드 (기존 호환성 유지)
+     */
+    @Transactional
+    private void deductAnnualLeave(String empCode, BigDecimal deductDays) {
+        deductAnnualLeaveImproved(empCode, deductDays);
     }
 
     /**
@@ -743,7 +795,7 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "반려");
 
-            log.info("기타근태 반료 처리 완료: applyEtcNo={}", applyEtcNo);
+            log.info("기타근태 반려 처리 완료: applyEtcNo={}", applyEtcNo);
         } catch (Exception e) {
             log.error("기타근태 반려 처리 실패: applyEtcNo={}", applyEtcNo, e);
             throw new RuntimeException("반려 처리에 실패했습니다: " + e.getMessage(), e);

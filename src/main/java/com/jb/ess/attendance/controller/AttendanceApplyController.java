@@ -179,12 +179,22 @@ public class AttendanceApplyController {
         }
     }
 
-    // 근무계획/실적/예상근로시간 조회 API
+    // 🔧 수정: 근무계획/실적/예상근로시간 조회 API - 캐시 응답 안정화
     @GetMapping("/workInfo/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
         try {
-            return attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
+            log.debug("근무정보 조회 (캐시 안정화): empCode={}, workDate={}", empCode, workDate);
+            Map<String, Object> workInfo = attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
+
+            // 🔧 수정: 예상근로시간 안정화 - 빈 값이나 null 체크
+            Object expectedHours = workInfo.get("expectedHours");
+            if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
+                workInfo.put("expectedHours", "40.00");
+                log.debug("예상근로시간 기본값 설정: 40.00");
+            }
+
+            return workInfo;
         } catch (Exception e) {
             log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
             return Map.of(
@@ -233,7 +243,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 일반근태 신청 저장 API
+    // 🔧 수정: 일반근태 신청 저장 API - 휴일근무 8시간 검증 강화
     @PostMapping("/general")
     @ResponseBody
     public Map<String, Object> saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
@@ -250,6 +260,37 @@ public class AttendanceApplyController {
                 response.put("result", "error");
                 response.put("message", "결근 사원은 근태 신청을 할 수 없습니다.");
                 return response;
+            }
+
+            // 🔧 추가: 연장근로 신청 시 휴일근무 8시간 이상 검증 강화
+            if ("연장".equals(apply.getApplyType()) || "조출연장".equals(apply.getApplyType())) {
+                // 해당 날짜에 휴일근무 신청이 있는지 먼저 확인
+                AttendanceApplyGeneral holidayApply = attendanceApplyService.findGeneralApplyByEmpAndDate(apply.getEmpCode(), apply.getTargetDate());
+                if (holidayApply != null && "휴일근무".equals(holidayApply.getApplyType()) &&
+                        ("승인완료".equals(holidayApply.getStatus()) || "상신".equals(holidayApply.getStatus()))) {
+
+                    // 휴일근무 8시간 이상 검증
+                    if (holidayApply.getStartTime() != null && holidayApply.getEndTime() != null) {
+                        try {
+                            int startTime = Integer.parseInt(holidayApply.getStartTime());
+                            int endTime = Integer.parseInt(holidayApply.getEndTime());
+                            int workMinutes = (endTime / 100 * 60 + endTime % 100) - (startTime / 100 * 60 + startTime % 100);
+
+                            if (workMinutes < 480) { // 8시간 = 480분
+                                response.put("result", "error");
+                                response.put("message", "휴일근무 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다.");
+                                return response;
+                            }
+
+                            log.debug("휴일근무 8시간 검증 통과: empCode={}, workMinutes={}", apply.getEmpCode(), workMinutes);
+                        } catch (NumberFormatException e) {
+                            log.warn("휴일근무 시간 파싱 실패: startTime={}, endTime={}", holidayApply.getStartTime(), holidayApply.getEndTime());
+                            response.put("result", "error");
+                            response.put("message", "휴일근무 시간 정보가 올바르지 않습니다.");
+                            return response;
+                        }
+                    }
+                }
             }
 
             // 유효한 TIME_ITEM_CODE 조회 후 설정
@@ -538,70 +579,68 @@ public class AttendanceApplyController {
         }
     }
 
-    // 신청근무별 기존 신청 조회 API
-    @GetMapping("/getApplyByType/{empCode}/{workDate}/{applyType}")
+    // 🔧 수정: 신청근무별 분리 관리 - 완전 분리 처리 (중복 메서드 통합)
+    @GetMapping("/getApplyByWorkType/{empCode}/{workDate}/{applyType}")
     @ResponseBody
-    public Map<String, Object> getApplyByType(@PathVariable String empCode,
-                                              @PathVariable String workDate,
-                                              @PathVariable String applyType) {
-        Map<String, Object> response = new HashMap<>();
+    public Map<String, Object> getApplyByWorkType(@PathVariable String empCode,
+                                                  @PathVariable String workDate,
+                                                  @PathVariable String applyType) {
         try {
-            log.debug("신청근무별 기존 신청 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
+            log.debug("신청근무별 완전 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
 
-            // 연장근로, 조출연장, 휴일근무, 조퇴, 외출, 전반차, 후반차는 일반근태에서 조회
-            if ("연장".equals(applyType) || "조출연장".equals(applyType) || "휴일근무".equals(applyType) ||
-                    "조퇴".equals(applyType) || "외근".equals(applyType) || "외출".equals(applyType) ||
-                    "전반차".equals(applyType) || "후반차".equals(applyType)) {
+            // 🔧 수정: 서비스에서 완전 분리 처리된 결과 반환
+            Map<String, Object> result = attendanceApplyService.getApplyByWorkType(empCode, workDate, applyType);
 
-                AttendanceApplyGeneral generalApply = attendanceApplyService.findGeneralApplyByEmpAndDate(empCode, workDate);
-                if (generalApply != null && applyType.equals(generalApply.getApplyType())) {
-                    response.put("hasExisting", true);
-                    response.put("applyType", "general");
-                    response.put("applyNo", generalApply.getApplyGeneralNo());
-                    response.put("status", generalApply.getStatus());
-                    response.put("startTime", generalApply.getStartTime());
-                    response.put("endTime", generalApply.getEndTime());
-                    response.put("reason", generalApply.getReason());
-                } else {
-                    response.put("hasExisting", false);
-                    response.put("applyType", "general");
-                }
-            } else {
-                // 연차, 반차 등은 기타근태에서 조회
-                AttendanceApplyEtc etcApply = attendanceApplyService.findEtcApplyByEmpAndDate(empCode, workDate);
-                if (etcApply != null) {
-                    response.put("hasExisting", true);
-                    response.put("applyType", "etc");
-                    response.put("applyNo", etcApply.getApplyEtcNo());
-                    response.put("status", etcApply.getStatus());
-                    response.put("reason", etcApply.getReason());
-                } else {
-                    response.put("hasExisting", false);
-                    response.put("applyType", "etc");
-                }
+            // 🔧 추가: 응답 데이터 안정화
+            if (result == null) {
+                result = new HashMap<>();
+                result.put("hasExisting", false);
+                result.put("applyType", "general");
+                result.put("status", "대기");
+                result.put("startTime", "");
+                result.put("endTime", "");
+                result.put("reason", "");
+                log.debug("서비스 응답이 null - 기본값 설정: applyType={}", applyType);
             }
 
-            return response;
+            log.debug("신청근무별 완전 분리 조회 완료: hasExisting={}, status={}",
+                    result.get("hasExisting"), result.get("status"));
+
+            return result;
         } catch (Exception e) {
-            log.error("신청근무별 기존 신청 조회 실패: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType, e);
-            response.put("hasExisting", false);
-            response.put("message", "조회 중 오류가 발생했습니다.");
-            return response;
+            log.error("신청근무별 완전 분리 조회 실패: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("hasExisting", false);
+            errorResponse.put("applyType", "general");
+            errorResponse.put("status", "대기");
+            errorResponse.put("message", "조회 중 오류가 발생했습니다.");
+            return errorResponse;
         }
     }
 
-    // 예상근로시간 실시간 업데이트 API
+    // 🔧 수정: 예상근로시간 실시간 업데이트 API - 캐시 안정화
     @GetMapping("/updateExpectedHours/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> updateExpectedHours(@PathVariable String empCode, @PathVariable String workDate) {
         try {
-            log.debug("예상근로시간 실시간 업데이트: empCode={}, workDate={}", empCode, workDate);
+            log.debug("예상근로시간 실시간 업데이트 (캐시 안정화): empCode={}, workDate={}", empCode, workDate);
 
             Map<String, Object> workInfo = attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
 
             Map<String, Object> response = new HashMap<>();
-            response.put("expectedHours", workInfo.get("expectedHours"));
+
+            // 🔧 수정: 예상근로시간 안정화 처리
+            Object expectedHours = workInfo.get("expectedHours");
+            if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
+                expectedHours = "40.00";
+                log.debug("예상근로시간 기본값 적용: 40.00");
+            }
+
+            response.put("expectedHours", expectedHours.toString());
             response.put("success", true);
+            response.put("message", "업데이트 완료");
+
+            log.debug("예상근로시간 업데이트 완료 (캐시 안정화): {}", expectedHours);
 
             return response;
         } catch (Exception e) {
@@ -614,46 +653,33 @@ public class AttendanceApplyController {
         }
     }
 
-    // 전반차/후반차 시간 입력 제한 검증 API
+    // 요구사항: 전반차/후반차 시간 입력 차단 검증 API
     @GetMapping("/validateHalfDayApply/{applyType}")
     @ResponseBody
     public Map<String, Object> validateHalfDayApply(@PathVariable String applyType) {
-        Map<String, Object> response = new HashMap<>();
         try {
-            boolean timeInputDisabled = "전반차".equals(applyType) || "후반차".equals(applyType);
-            String message = timeInputDisabled ? "반차는 시간을 입력할 수 없습니다." : "정상";
-
-            response.put("timeInputDisabled", timeInputDisabled);
-            response.put("message", message);
-            response.put("deductHours", timeInputDisabled ? 4.0 : 0.0); // 반차는 4시간 차감
-
-            return response;
+            return attendanceApplyService.validateHalfDayTimeInput(applyType);
         } catch (Exception e) {
             log.error("반차 검증 실패: applyType={}", applyType, e);
-            response.put("timeInputDisabled", false);
-            response.put("message", "검증 중 오류가 발생했습니다.");
-            return response;
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("timeInputDisabled", false);
+            errorResponse.put("message", "검증 중 오류가 발생했습니다.");
+            return errorResponse;
         }
     }
 
-    // 조퇴 시간 입력 제한 검증 API
+    // 요구사항: 조퇴 종료시간 입력 차단 검증 API
     @GetMapping("/validateEarlyLeaveApply/{applyType}")
     @ResponseBody
     public Map<String, Object> validateEarlyLeaveApply(@PathVariable String applyType) {
-        Map<String, Object> response = new HashMap<>();
         try {
-            boolean endTimeDisabled = "조퇴".equals(applyType);
-            String message = endTimeDisabled ? "조퇴는 시작시간만 입력할 수 있습니다." : "정상";
-
-            response.put("endTimeDisabled", endTimeDisabled);
-            response.put("message", message);
-
-            return response;
+            return attendanceApplyService.validateEarlyLeaveTimeInput(applyType);
         } catch (Exception e) {
             log.error("조퇴 검증 실패: applyType={}", applyType, e);
-            response.put("endTimeDisabled", false);
-            response.put("message", "검증 중 오류가 발생했습니다.");
-            return response;
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("endTimeDisabled", false);
+            errorResponse.put("message", "검증 중 오류가 발생했습니다.");
+            return errorResponse;
         }
     }
 }
