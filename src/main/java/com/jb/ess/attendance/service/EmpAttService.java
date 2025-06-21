@@ -131,14 +131,18 @@ public class EmpAttService {
                 workHours = workHours.plus(overtime);
             }
 
-            totalOvertimeHours += overtime.toMinutes() / 60.0;
+            // 실적이 없는경우 연장근로 신청시간으로 계산
+            if (attRecord == null) totalOvertimeHours += overtime.toMinutes() / 60.0;
 
             // 휴일근무
+            AttendanceRecord holidayAttRecord = attRecordMapper.getHolidayAttRecordByEmpCode(empCode, ymd);
             Duration holidayWork = getHolidayWorkHours(empCode, ymd);
             if (!holidayWork.isZero() && !holidayWork.isNegative()) {
                 workHours = workHours.plus(holidayWork);
             }
-            totalHolidayWorkHours += holidayWork.toMinutes() / 60.0;
+
+            // 실적이 없는경우 휴일근무 신청시간으로 계산
+            if (holidayAttRecord == null) totalHolidayWorkHours += holidayWork.toMinutes() / 60.0;
         }
 
         emp.setOverTime(String.format("%.2f", totalOvertimeHours));
@@ -150,6 +154,7 @@ public class EmpAttService {
 
     /* 연장근무 */
     public Duration getOvertimeHours(String empCode, String ymd) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
         List<AttendanceApplyGeneral> overtimes = attendanceApplyMapper.findApprovedOverTimes(empCode, ymd);
         if (overtimes == null || overtimes.isEmpty()) return Duration.ZERO;
 
@@ -169,7 +174,13 @@ public class EmpAttService {
             shift.setBreak2StartHhmm(baseShift.getBreak2StartHhmm());
             shift.setBreak2EndHhmm(baseShift.getBreak2EndHhmm());
             shift.setWorkOnDayType("N0");
-            shift.setWorkOffDayType("N0");
+            LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
+            LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+            if (parsedWorkOn.isAfter(parsedWorkOff)) {
+                shift.setWorkOffDayType("N1");
+            } else {
+                shift.setWorkOffDayType("N0");
+            }
 
             overtimeHours = overtimeHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
         }
@@ -196,13 +207,12 @@ public class EmpAttService {
         shift.setBreak1EndHhmm(base.getBreak1EndHhmm());
         shift.setBreak2StartHhmm(base.getBreak2StartHhmm());
         shift.setBreak2EndHhmm(base.getBreak2EndHhmm());
+        shift.setWorkOnDayType("N0");
         LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
         LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
         if (parsedWorkOn.isAfter(parsedWorkOff)) {
-            shift.setWorkOnDayType("N0");
             shift.setWorkOffDayType("N1");
         } else {
-            shift.setWorkOnDayType("N0");
             shift.setWorkOffDayType("N0");
         }
 
