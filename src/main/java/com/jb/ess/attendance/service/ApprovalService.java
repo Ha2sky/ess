@@ -563,7 +563,7 @@ public class ApprovalService {
     }
 
     /**
-     * 🔧 수정: 일반근태 승인 처리 - HRTATTRECORD 테이블 호환성 수정
+     * 일반근태 승인
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
@@ -592,15 +592,10 @@ public class ApprovalService {
 
             String applyType = apply.getApplyType();
             if ("휴일근무".equals(applyType)) {
-                // 🔧 수정: HRTATTRECORD 테이블 호환성 - updateAttendanceRecordByShiftCode 제거
-                // ❌ 제거됨: attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
-                // ✅ 교체됨: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE만 업데이트
                 attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
                 log.debug("휴일근무 승인 완료: SHIFT_CODE 업데이트 (14-1)");
             } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
-                // 🔧 수정: 연차 차감 로직 개선 - 정확한 계산
                 deductAnnualLeaveImproved(apply.getEmpCode(), new BigDecimal("0.5"));
-                // SHIFT_CODE 업데이트도 추가
                 attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
                 log.debug("전반차/후반차 승인 완료: 연차 차감 및 SHIFT_CODE 업데이트");
             }
@@ -613,7 +608,7 @@ public class ApprovalService {
     }
 
     /**
-     * 🔧 수정: 기타근태 승인 처리 - HRTATTRECORD 테이블 호환성 수정
+     * 기타근태 승인
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
@@ -643,16 +638,13 @@ public class ApprovalService {
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
-                    // 🔧 수정: 연차 차감 로직 개선 - 정확한 계산
                     deductAnnualLeaveImproved(apply.getEmpCode(), BigDecimal.ONE);
                     log.debug("연차 승인 완료: 연차 차감 완료");
                 } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
-                    // 🔧 수정: 반차 처리 추가
                     deductAnnualLeaveImproved(apply.getEmpCode(), new BigDecimal("0.5"));
                     log.debug("반차 승인 완료: 연차 0.5일 차감 완료");
                 }
 
-                // 🔧 수정: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE 업데이트
                 attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
                         apply.getEmpCode(),
                         apply.getTargetStartDate(),
@@ -670,7 +662,7 @@ public class ApprovalService {
     }
 
     /**
-     * 🔧 수정: 연차 차감 메서드 개선 - 정확한 계산
+     * 연차 차감 메서드
      */
     @Transactional
     private void deductAnnualLeaveImproved(String empCode, BigDecimal deductDays) {
@@ -683,11 +675,9 @@ public class ApprovalService {
                 log.debug("연차 차감 전 상태: empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
                         empCode, currentBalance, currentUse, deductDays);
 
-                // 🔧 수정: 정확한 연차 차감 계산
                 boolean deductionResult = annualDetailMapper.updateBalanceDayWithCheck(empCode, deductDays);
 
                 if (deductionResult) {
-                    // 🔧 수정: USE_DAY도 정확히 증가
                     annualDetailMapper.updateUseDayIncrease(empCode, deductDays);
 
                     // 차감 후 확인
@@ -697,7 +687,6 @@ public class ApprovalService {
                             updatedAnnual != null ? updatedAnnual.getBalanceDay() : "조회실패",
                             updatedAnnual != null ? updatedAnnual.getUseDay() : "조회실패");
 
-                    // 🔧 계산 검증: 16 - 0.5 - 1 = 14.5 가 맞는지 확인
                     if (updatedAnnual != null) {
                         BigDecimal expectedBalance = currentBalance.subtract(deductDays);
                         BigDecimal expectedUse = currentUse.add(deductDays);

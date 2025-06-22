@@ -39,7 +39,7 @@ public interface AttendanceApplyMapper {
     @Select("SELECT TOP 1 TIME_ITEM_CODE FROM HRTTIMEITEM ORDER BY TIME_ITEM_CODE")
     String getValidTimeItemCode();
 
-    // 🔧 수정: 일반근태 신청 조회 - 신청근무별 완전 분리 처리
+    // 일반근태 신청 조회
     @Select("""
         <script>
         SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
@@ -88,7 +88,7 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyGeneral findGeneralApplyByEmpAndDate(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 요구사항: 신청근무별 개별 조회 - 신청근무별 분리 관리용
+    // 신청근무별 개별 조회
     @Select("""
         SELECT TOP 1 APPLY_GENERAL_NO, STATUS, REASON, APPLY_TYPE, START_TIME, END_TIME
         FROM HRTATTAPLGENERAL 
@@ -182,7 +182,7 @@ public interface AttendanceApplyMapper {
                            @Param("startTime") String startTime,
                            @Param("endTime") String endTime);
 
-    // 요구사항: 조출연장 시간 제한 검증 - 07:30 이전인지 확인
+    // 조출연장 시간 제한 검증
     @Select("""
         SELECT CASE WHEN #{startTime} < 730 THEN 1 ELSE 0 END
     """)
@@ -347,26 +347,28 @@ public interface AttendanceApplyMapper {
     // 일반근태 결재 이력 생성
     @Insert("""
         INSERT INTO HRTAPRHIST (
-            APPROVAL_NO, APPLY_GENERAL_NO, APPROVER_CODE, APPROVAL_STATUS
+            APPROVAL_NO, APPLY_GENERAL_NO, APPROVER_CODE, APPROVAL_STATUS, APPROVAL_DATE
         ) VALUES (
-            #{approvalNo}, #{applyGeneralNo}, #{approverCode}, '대기'
+            #{approvalNo}, #{applyGeneralNo}, #{approverCode}, #{approvalStatus}, FORMAT(GETDATE(), 'yyyyMMdd')
         )
     """)
     void insertGeneralApprovalHistory(@Param("approvalNo") String approvalNo,
                                       @Param("applyGeneralNo") String applyGeneralNo,
-                                      @Param("approverCode") String approverCode);
+                                      @Param("approverCode") String approverCode,
+                                      @Param("approvalStatus") String approvalStatus);
 
     // 기타근태 결재 이력 생성
     @Insert("""
         INSERT INTO HRTAPRHIST (
-            APPROVAL_NO, APPLY_ETC_NO, APPROVER_CODE, APPROVAL_STATUS
+            APPROVAL_NO, APPLY_ETC_NO, APPROVER_CODE, APPROVAL_STATUS, APPROVAL_DATE
         ) VALUES (
-            #{approvalNo}, #{applyEtcNo}, #{approverCode}, '대기'
+            #{approvalNo}, #{applyEtcNo}, #{approverCode}, #{approvalStatus}, FORMAT(GETDATE(), 'yyyyMMdd')
         )
     """)
     void insertEtcApprovalHistory(@Param("approvalNo") String approvalNo,
                                   @Param("applyEtcNo") String applyEtcNo,
-                                  @Param("approverCode") String approverCode);
+                                  @Param("approverCode") String approverCode,
+                                  @Param("approvalStatus") String approvalStatus);
 
     // 일반근태 결재 이력 삭제
     @Delete("DELETE FROM HRTAPRHIST WHERE APPLY_GENERAL_NO = #{applyGeneralNo}")

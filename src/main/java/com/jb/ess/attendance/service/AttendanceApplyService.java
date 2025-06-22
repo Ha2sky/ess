@@ -45,7 +45,6 @@ public class AttendanceApplyService {
     private final EmpCalendarMapper empCalendarMapper;
     private final ShiftMasterMapper shiftMasterMapper;
 
-    // 🔧 수정: 예상근로시간 캐시 시스템 강화 - 신청근무별 개별 캐시 추가
     private Map<String, String> expectedHoursCache = new HashMap<>();
     private Map<String, String> workTypeSpecificCache = new HashMap<>(); // 신청근무별 개별 캐시
 
@@ -113,16 +112,14 @@ public class AttendanceApplyService {
         return result.stream().anyMatch(dept -> deptCode.equals(dept.getDeptCode()));
     }
 
-    // 🔧 수정: 연차잔여 정보 조회 - 정확한 계산 보장
+    // 연차잔여 정보 조회
     public AnnualDetail getAnnualDetail(String empCode) {
         try {
             AnnualDetail annualDetail = annualDetailMapper.findByEmpCode(empCode);
             if (annualDetail != null) {
-                // 🔧 추가: 조회 시에도 정확한 계산 보장 - 재계산 강제
                 log.debug("연차 조회 정확성 검증: empCode={}, 조회된잔여={}, 조회된사용={}",
                         empCode, annualDetail.getBalanceDay(), annualDetail.getUseDay());
 
-                // 🔧 중요: 조회 시에도 정확한 값 반환 보장
                 AnnualDetail refreshedAnnual = annualDetailMapper.findByEmpCodeForceRefresh(empCode);
                 if (refreshedAnnual != null) {
                     log.debug("연차 강제 재조회: empCode={}, 갱신된잔여={}, 갱신된사용={}",
@@ -162,13 +159,11 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 결근 처리 통일 - 일반근태와 기타근태 동일하게 처리
     public boolean isEmployeeAbsent(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
             LocalDate today = LocalDate.now();
 
-            // 🔧 수정: 미래 날짜는 결근 체크하지 않음 (일반근태와 기타근태 모두 동일)
             if (targetDate.isAfter(today)) {
                 log.debug("미래 날짜는 결근 체크하지 않음 (통일): empCode={}, workDate={}", empCode, workDate);
                 return false;
@@ -236,7 +231,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 근무정보 조회 메서드 - 신청근무별 개별 캐시 강화
     public Map<String, Object> getWorkInfoWithEmpCalendar(String empCode, String workDate) {
         Map<String, Object> workInfo = new HashMap<>();
         try {
@@ -299,7 +293,6 @@ public class AttendanceApplyService {
 
             Map<String, String> appliedRecord = getAppliedRecord(empCode, workDate);
 
-            // 🔧 수정: 휴일근무 후 예상근로시간 연계 - 신청근무별 개별 캐시 강화
             String weeklyExpectedHours = calculateWeeklyExpectedHoursUltraStable(empCode, workDate);
 
             workInfo.put("plan", empCalendarPlan);
@@ -500,7 +493,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 휴일근무 후 예상근로시간 연계 - 울트라 안정화 (신청근무별 개별 캐시)
     private String calculateWeeklyExpectedHoursUltraStable(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -511,14 +503,11 @@ public class AttendanceApplyService {
 
             String baseCacheKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-            // 🔧 울트라 안정화: 휴일근무가 있는지 먼저 확인
             boolean hasHolidayWorkThisWeek = checkHasHolidayWorkThisWeek(empCode, mondayOfWeek, sundayOfWeek);
 
             if (hasHolidayWorkThisWeek) {
-                // 🔧 휴일근무가 있으면 신규 계산 (48시간 달성 가능)
                 log.debug("휴일근무 발견 - 신규 계산 수행: empCode={}", empCode);
             } else {
-                // 🔧 휴일근무가 없으면 캐시 사용 (40시간 기본)
                 if (expectedHoursCache.containsKey(baseCacheKey)) {
                     String cachedHours = expectedHoursCache.get(baseCacheKey);
                     log.debug("휴일근무 없음 - 캐시에서 주 예상근로시간 반환: empCode={}, hours={}", empCode, cachedHours);
@@ -549,7 +538,6 @@ public class AttendanceApplyService {
             double weeklyHours = totalWeekHours.toMinutes() / 60.0;
             String formattedHours = String.format("%.2f", weeklyHours);
 
-            // 🔧 캐시에 저장 - 휴일근무 여부와 관계없이 항상 저장
             expectedHoursCache.put(baseCacheKey, formattedHours);
 
             log.debug("울트라 안정화된 주 예상근로시간 계산 완료: empCode={}, totalHours={}, hasHolidayWork={}",
@@ -562,7 +550,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 추가: 해당 주에 휴일근무가 있는지 확인
+    // 해당 주에 휴일근무가 있는지 확인
     private boolean checkHasHolidayWorkThisWeek(String empCode, LocalDate monday, LocalDate sunday) {
         try {
             // 해당 주에 휴일근무 신청이 있는지 확인
@@ -582,12 +570,12 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 휴일근무 후 예상근로시간 연계 - 캐시 시스템 강화 (기존 호환성 유지)
+    // 휴일근무 후 예상근로시간 연계
     private String calculateWeeklyExpectedHoursWithCacheStable(String empCode, String workDate) {
         return calculateWeeklyExpectedHoursUltraStable(empCode, workDate);
     }
 
-    // 🔧 추가: 새로운 휴일근무 신청이 있는지 확인
+    // 새로운 휴일근무 신청이 있는지 확인
     private boolean checkHasNewHolidayWorkApply(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -597,7 +585,7 @@ public class AttendanceApplyService {
             return checkHasHolidayWorkThisWeek(empCode, mondayOfWeek, sundayOfWeek);
         } catch (Exception e) {
             log.error("휴일근무 신청 확인 실패: empCode={}, workDate={}", empCode, workDate, e);
-            return true; // 오류 시 안전하게 새로 계산
+            return true;
         }
     }
 
@@ -689,12 +677,10 @@ public class AttendanceApplyService {
         }
     }
 
-    // 요구사항: 휴일근무 후 연장근로 신청 시 예상근로시간 연계 - 안정화된 계산
     private String calculateWeeklyExpectedHoursStable(String empCode, String workDate) {
         return calculateWeeklyExpectedHoursUltraStable(empCode, workDate);
     }
 
-    // 요구사항: 휴일근무 후 연장근로 신청 시 예상근로시간 연계 - 48시간 기준 계산
     private String calculateWeeklyExpectedHoursWithHolidayWork(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -760,10 +746,8 @@ public class AttendanceApplyService {
         }
     }
 
-    // 신청 시간 계산 - NumberFormatException 처리 강화
     private Duration calculateApplyHours(AttendanceApplyGeneral apply) {
         try {
-            // 요구사항: NumberFormatException 처리 - 전반차/후반차 빈 문자열 처리
             if (apply.getStartTime() != null && apply.getEndTime() != null &&
                     !apply.getStartTime().trim().isEmpty() && !apply.getEndTime().trim().isEmpty()) {
 
@@ -830,11 +814,9 @@ public class AttendanceApplyService {
 
     private Duration calculateHolidayWorkHoursAccurate(AttendanceApplyGeneral apply) {
         try {
-            // 요구사항: NumberFormatException 처리 강화
             if (apply.getStartTime() != null && apply.getEndTime() != null &&
                     !apply.getStartTime().trim().isEmpty() && !apply.getEndTime().trim().isEmpty()) {
 
-                // 휴일근무 시프트 정보 가져오기 (14-1)
                 ShiftMaster holidayShift = shiftMasterMapper.findShiftByCode("14-1");
                 if (holidayShift != null) {
                     try {
@@ -843,7 +825,6 @@ public class AttendanceApplyService {
 
                         LocalDate workDate = LocalDate.parse(apply.getTargetDate(), DateTimeFormatter.ofPattern("yyyyMMdd"));
 
-                        // WorkHoursCalculator.getRealWorkTime 사용 (빈 leavePeriods)
                         List<Pair<String, String>> emptyLeavePeriods = new ArrayList<>();
                         Duration workDuration = WorkHoursCalculator.getRealWorkTime(
                                 startTimeStr, endTimeStr, holidayShift, workDate, emptyLeavePeriods);
@@ -872,13 +853,12 @@ public class AttendanceApplyService {
         try {
             log.debug("실시간 주 52시간 계산 시작: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
 
-            // 해당 주의 기본 근무시간 계산 - 안정화된 메서드 사용
+            // 해당 주의 기본 근무시간 계산
             double baseWeeklyHours = calculateCurrentWeeklyHoursStable(empCode, workDate);
 
             // 신청하려는 시간 계산
             double requestHours = 0.0;
             if (startTime != null && endTime != null && !startTime.isEmpty() && !endTime.isEmpty()) {
-                // 요구사항: 조출연장 시간 제한 검증 - 매퍼 메서드 사용
                 if ("조출연장".equals(applyType)) {
                     try {
                         int startTimeInt = Integer.parseInt(startTime.replace(":", ""));
@@ -899,7 +879,6 @@ public class AttendanceApplyService {
                 requestHours = calculateRequestHours(empCode, workDate, startTime, endTime, applyType);
             }
 
-            // 요구사항: 조퇴/외출/반차는 차감
             if (Arrays.asList("조퇴", "외근", "외출", "전반차", "후반차").contains(applyType)) {
                 if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
                     requestHours = -4.0; // 반차는 4시간 차감
@@ -1123,7 +1102,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 근태신청종류별 사원 조회 - 신청근무별 완전 분리 처리
     public List<Employee> getEmployeesByDeptWithApplyType(String deptCode, String workDate, String workPlan, String sortBy, String applyTypeCategory) {
         try {
             log.debug("부서별 사원 조회 (근태신청종류별) 시작: deptCode={}, workDate={}, applyTypeCategory={}", deptCode, workDate, applyTypeCategory);
@@ -1134,7 +1112,6 @@ public class AttendanceApplyService {
 
             // 각 사원의 기존 신청 내역 및 실적 정보 조회
             for (Employee emp : employees) {
-                // 🔧 수정: 근태신청종류별 일반근태 신청 내역 조회 - 완전 분리
                 AttendanceApplyGeneral generalApply = attendanceApplyMapper.findGeneralApplyByEmpAndDateWithCategory(emp.getEmpCode(), workDate, applyTypeCategory);
                 if (generalApply != null && !"삭제".equals(generalApply.getStatus())) {
                     emp.setApplyGeneralNo(generalApply.getApplyGeneralNo());
@@ -1251,7 +1228,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 일반근태 신청 유효성 검증 - 휴일근무 8시간 검증 강화
     public String validateGeneralApply(AttendanceApplyGeneral apply) {
         try {
             String empCode = apply.getEmpCode();
@@ -1273,21 +1249,18 @@ public class AttendanceApplyService {
             // 실적 확인
             String actualRecord = calculateActualRecord(empCode, targetDate, planShiftName);
 
-            // 🔧 수정: 연장근로 검증 강화 - 휴일근무 8시간 이상 필수 체크
             if ("연장".equals(applyType) || "조출연장".equals(applyType)) {
                 // 실적이 결근일 경우 신청 불가
                 if ("결근".equals(actualRecord)) {
                     return "실적이 결근일 경우 연장근무를 신청할 수 없습니다.";
                 }
 
-                // 🔧 강화: 실적이 휴일근무일 경우 8시간 이상 신청 여부 필수 확인
                 if ("휴일근무".equals(actualRecord)) {
                     // 해당 날짜에 휴일근무 신청이 있는지 먼저 확인
                     AttendanceApplyGeneral holidayApply = attendanceApplyMapper.findGeneralApplyByEmpAndDate(empCode, targetDate);
                     if (holidayApply != null && "휴일근무".equals(holidayApply.getApplyType()) &&
                             ("승인완료".equals(holidayApply.getStatus()) || "상신".equals(holidayApply.getStatus()))) {
 
-                        // 🔧 강화: 정확한 8시간 이상 검증
                         if (holidayApply.getStartTime() != null && holidayApply.getEndTime() != null) {
                             try {
                                 int startTime = Integer.parseInt(holidayApply.getStartTime());
@@ -1300,7 +1273,7 @@ public class AttendanceApplyService {
 
                                 // 자정 넘어가는 경우 처리
                                 if (workMinutes <= 0) {
-                                    workMinutes += 24 * 60; // 24시간 추가
+                                    workMinutes += 24 * 60; //
                                 }
 
                                 log.debug("휴일근무 8시간 검증 (강화): startTime={}, endTime={}, workMinutes={}",
@@ -1389,7 +1362,6 @@ public class AttendanceApplyService {
                             return "정상근무시간(16:20) 이후에만 연장근무를 신청할 수 있습니다.";
                         }
                     } else if ("조출연장".equals(applyType)) {
-                        // 요구사항: 조출연장은 근무시간(07:30) 이전에만 신청 가능
                         boolean isValidTime = attendanceApplyMapper.isValidEarlyOvertimeTime(startTime);
                         if (!isValidTime) {
                             return "조출연장은 07:30 이전에만 신청할 수 있습니다.";
@@ -1481,7 +1453,6 @@ public class AttendanceApplyService {
                     applyNo, apply.getEmpCode(), apply.getTimeItemCode());
             attendanceApplyMapper.insertGeneralApply(apply);
 
-            // 🔧 수정: 휴일근무 저장 시 예상근로시간 캐시 초기화
             if ("휴일근무".equals(apply.getApplyType())) {
                 clearExpectedHoursCache(apply.getEmpCode(), apply.getTargetDate());
                 log.debug("휴일근무 저장으로 예상근로시간 캐시 초기화: empCode={}, date={}", apply.getEmpCode(), apply.getTargetDate());
@@ -1513,7 +1484,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 추가: 예상근로시간 캐시 초기화
+    // 예상근로시간 캐시 초기화
     private void clearExpectedHoursCache(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -1521,7 +1492,6 @@ public class AttendanceApplyService {
             String cacheKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             expectedHoursCache.remove(cacheKey);
 
-            // 🔧 신청근무별 캐시도 초기화
             workTypeSpecificCache.entrySet().removeIf(entry -> entry.getKey().startsWith(empCode + "_" + workDate));
 
             log.debug("예상근로시간 캐시 초기화 (울트라): cacheKey={}", cacheKey);
@@ -1550,19 +1520,16 @@ public class AttendanceApplyService {
         }
     }
 
-    // ⚠️ 수정됨: 휴일근무 승인완료 시 SHIFT_CODE만 업데이트 (HRTATTRECORD 테이블 업데이트 제거)
+    // 휴일근무 승인완료 시 SHIFT_CODE 업데이트
     @Transactional
     public void updateWorkRecordForHolidayWork(String empCode, String workDate) {
         try {
             log.debug("휴일근로 실적 업데이트 시작: empCode={}, workDate={}", empCode, workDate);
 
-            // ❌ 제거됨: attendanceApplyMapper.updateAttendanceRecordByShiftCode(empCode, workDate, holidayShiftCode);
-            // HRTATTRECORD 테이블에는 SHIFT_CODE 컬럼이 없으므로 해당 호출 제거
-
-            // ✅ 유지: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE만 업데이트
+            // HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE 업데이트
             attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(empCode, workDate, "휴일근무");
 
-            // 🔧 추가: 휴일근무 승인완료 시 예상근로시간 캐시 초기화
+            // 휴일근무 승인완료 시 예상근로시간 캐시 초기화
             clearExpectedHoursCache(empCode, workDate);
 
             log.debug("휴일근로 SHIFT_CODE 업데이트 완료: empCode={}, workDate={}, shiftCode=14-1", empCode, workDate);
@@ -1572,18 +1539,15 @@ public class AttendanceApplyService {
         }
     }
 
-    // ⚠️ 수정됨: 기타근태 승인완료 시 SHIFT_CODE만 업데이트 (HRTATTRECORD 테이블 업데이트 제거)
+    // 기타근태 승인완료 시 SHIFT_CODE 업데이트
     @Transactional
     public void updateWorkRecordForAnnualLeave(String empCode, String workDate, String shiftCode) {
         try {
             log.debug("연차/반차 실적 업데이트 시작: empCode={}, workDate={}, shiftCode={}", empCode, workDate, shiftCode);
 
-            // ❌ 제거됨: attendanceApplyMapper.updateAttendanceRecordByShiftCode(empCode, workDate, shiftCode);
-            // HRTATTRECORD 테이블에는 SHIFT_CODE 컬럼이 없으므로 해당 호출 제거
-
             ShiftMaster shift = shiftMasterMapper.findShiftByCode(shiftCode);
             if (shift != null) {
-                // ✅ 유지: HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE만 업데이트
+                // HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE 업데이트
                 attendanceApplyMapper.updateShiftCodeAfterEtcApproval(empCode, workDate, workDate, shiftCode);
             }
 
@@ -1594,13 +1558,12 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 신청근무별 분리 관리 - 완전 분리 처리
+    // 신청근무별 분리
     public Map<String, Object> getApplyByWorkType(String empCode, String workDate, String applyType) {
         Map<String, Object> result = new HashMap<>();
         try {
             log.debug("신청근무별 완전 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
 
-            // 🔧 수정: 매퍼 메서드 사용하여 해당 신청근무 유형만 조회 - 완전 분리
             AttendanceApplyGeneral existingApply = attendanceApplyMapper.findGeneralApplyByEmpAndDateAndType(empCode, workDate, applyType);
 
             if (existingApply != null && !"삭제".equals(existingApply.getStatus())) {
@@ -1616,7 +1579,6 @@ public class AttendanceApplyService {
                 log.debug("기존 신청 발견 (완전 분리): applyNo={}, status={}, applyType={}",
                         existingApply.getApplyGeneralNo(), existingApply.getStatus(), applyType);
             } else {
-                // 해당 신청근무 유형의 기존 신청이 없는 경우 - 신청 가능한 상태
                 result.put("hasExisting", false);
                 result.put("applyType", "general");
                 result.put("status", "대기");
@@ -1636,11 +1598,9 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 예상근로시간 업데이트 메서드 - 캐시 활용
     public Map<String, Object> updateExpectedHours(String empCode, String workDate) {
         Map<String, Object> result = new HashMap<>();
         try {
-            // 🔧 캐시 시스템을 활용한 예상근로시간 계산
             String expectedHours = calculateWeeklyExpectedHoursUltraStable(empCode, workDate);
 
             result.put("success", true);
@@ -1659,7 +1619,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 조출연장 시간 검증 - 서버측 검증 강화
     public Map<String, Object> validateEarlyOvertimeTime(String startTime) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -1680,7 +1639,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 일반연장 시간 검증 - 서버측 검증 강화
     public Map<String, Object> validateRegularOvertimeTime(String startTime) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -1701,7 +1659,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 요구사항: 전반차/후반차 시간 입력 차단
+    //  전반차/후반차 시간 입력 차단
     public Map<String, Object> validateHalfDayTimeInput(String applyType) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -1723,7 +1681,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 요구사항: 조퇴 종료시간 입력 차단
+    // 조퇴 종료시간 입력 차단
     public Map<String, Object> validateEarlyLeaveTimeInput(String applyType) {
         Map<String, Object> result = new HashMap<>();
         try {
@@ -1755,7 +1713,6 @@ public class AttendanceApplyService {
             // 전반차, 후반차 승인완료 시 연차 0.5 차감 처리
             if (apply != null && Arrays.asList("전반차", "후반차").contains(apply.getApplyType())) {
                 if ("Y".equals(isHeader)) {
-                    // 🔧 수정: 연차 차감 로직 개선 - 정확한 계산
                     BigDecimal deductDays = new BigDecimal("0.5");
                     AnnualDetail currentAnnual = annualDetailMapper.findByEmpCode(apply.getEmpCode());
                     if (currentAnnual != null) {
@@ -1790,7 +1747,12 @@ public class AttendanceApplyService {
                 // 승인완료 시 실적 업데이트
                 updateAttendanceRecord(applyGeneralNo, "general");
 
-                log.debug("부서장 일반근태 자동 승인완료: applyGeneralNo={}", applyGeneralNo);
+                // 부서장 자동승인 시 결재이력 생성
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                String approvalNo = "APR" + timestamp;
+                attendanceApplyMapper.insertGeneralApprovalHistory(approvalNo, applyGeneralNo, applicantCode, "승인");
+
+                log.debug("부서장 일반근태 자동 승인완료: applyGeneralNo={}, approvalNo={}", applyGeneralNo, approvalNo);
             } else {
                 // 일반 사원인 경우 상신 처리
                 attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "상신");
@@ -1813,7 +1775,7 @@ public class AttendanceApplyService {
                 log.debug("결재자 정보: deptCode={}, approverCode={}", deptCode, approverCode);
 
                 // 결재 이력 생성
-                attendanceApplyMapper.insertGeneralApprovalHistory(approvalNo, applyGeneralNo, approverCode);
+                attendanceApplyMapper.insertGeneralApprovalHistory(approvalNo, applyGeneralNo, approverCode, "대기");
                 log.debug("일반근태 상신 완료: applyGeneralNo={}, approvalNo={}, approverCode={}",
                         applyGeneralNo, approvalNo, approverCode);
             }
@@ -1845,11 +1807,16 @@ public class AttendanceApplyService {
                         etcApply.getShiftCode()
                 );
 
-                // 🔧 수정: 연차 차감 및 실적 업데이트 - 정확한 계산
+                // 연차 차감 및 실적 업데이트
                 deductAnnualLeaveUltraImproved(etcApply);
                 updateAttendanceRecord(applyEtcNo, "etc");
 
-                log.debug("부서장 기타근태 자동 승인완료: applyEtcNo={}", applyEtcNo);
+                // 부서장 자동승인 시에도 결재이력 생성
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                String approvalNo = "APR" + timestamp;
+                attendanceApplyMapper.insertEtcApprovalHistory(approvalNo, applyEtcNo, applicantCode, "승인");
+
+                log.debug("부서장 기타근태 자동 승인완료: applyEtcNo={}, approvalNo={}", applyEtcNo, approvalNo);
             } else {
                 // 일반 사원인 경우 상신 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "상신");
@@ -1872,7 +1839,7 @@ public class AttendanceApplyService {
                 log.debug("결재자 정보: deptCode={}, approverCode={}", deptCode, approverCode);
 
                 // 결재 이력 생성
-                attendanceApplyMapper.insertEtcApprovalHistory(approvalNo, applyEtcNo, approverCode);
+                attendanceApplyMapper.insertEtcApprovalHistory(approvalNo, applyEtcNo, approverCode, "대기");
                 log.debug("기타근태 상신 완료: applyEtcNo={}, approvalNo={}, approverCode={}",
                         applyEtcNo, approvalNo, approverCode);
             }
@@ -1881,6 +1848,7 @@ public class AttendanceApplyService {
             throw new RuntimeException("상신에 실패했습니다: " + e.getMessage(), e);
         }
     }
+
 
     @Transactional
     private void updateAttendanceRecord(String applyNo, String applyType) {
@@ -1909,7 +1877,6 @@ public class AttendanceApplyService {
         }
     }
 
-    // 🔧 수정: 연차 차감 로직 울트라 개선 - 조회 시에도 정확한 계산 보장
     @Transactional
     private void deductAnnualLeaveUltraImproved(AttendanceApplyEtc etcApply) {
         try {
@@ -1929,7 +1896,6 @@ public class AttendanceApplyService {
 
                     // 연차 차감이 필요한 경우
                     if (deductDays.compareTo(BigDecimal.ZERO) > 0) {
-                        // 🔧 울트라 개선: 차감 전 잔여량 확인 및 로그
                         AnnualDetail currentAnnual = annualDetailMapper.findByEmpCode(etcApply.getEmpCode());
                         if (currentAnnual != null) {
                             BigDecimal currentBalance = currentAnnual.getBalanceDay();
@@ -1938,33 +1904,27 @@ public class AttendanceApplyService {
                             log.debug("연차 차감 전 상태 (울트라): empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
                                     etcApply.getEmpCode(), currentBalance, currentUse, deductDays);
 
-                            // 🔧 울트라 개선: 트랜잭션 내에서 정확한 차감 처리
                             boolean deductionResult = annualDetailMapper.updateBalanceDayWithCheckUltra(
                                     etcApply.getEmpCode(), deductDays);
 
                             if (deductionResult) {
-                                // 🔧 울트라 개선: 정확한 USE_DAY 증가
                                 annualDetailMapper.updateUseDayIncreaseUltra(etcApply.getEmpCode(), deductDays);
 
-                                // 🔧 울트라 개선: 차감 후 즉시 재조회하여 정확성 검증
                                 AnnualDetail updatedAnnual = annualDetailMapper.findByEmpCodeForceRefresh(etcApply.getEmpCode());
                                 if (updatedAnnual != null) {
                                     log.debug("연차 차감 및 USE_DAY 증가 완료 (울트라): empCode={}, 차감일수={}, 차감후잔여={}, 차감후사용={}",
                                             etcApply.getEmpCode(), deductDays,
                                             updatedAnnual.getBalanceDay(), updatedAnnual.getUseDay());
 
-                                    // 🔧 울트라 검증: 계산 정확성 재확인
                                     BigDecimal expectedBalance = currentBalance.subtract(deductDays);
                                     BigDecimal expectedUse = currentUse.add(deductDays);
 
                                     if (updatedAnnual.getBalanceDay().compareTo(expectedBalance) != 0) {
                                         log.error("연차 차감 계산 오류 (울트라): 예상잔여={}, 실제잔여={}", expectedBalance, updatedAnnual.getBalanceDay());
-                                        // 🔧 울트라 수정: 계산 오류 발생 시 재계산 수행
                                         annualDetailMapper.forceRecalculateAnnual(etcApply.getEmpCode(), expectedBalance, expectedUse);
                                     }
                                     if (updatedAnnual.getUseDay().compareTo(expectedUse) != 0) {
                                         log.error("연차 사용 계산 오류 (울트라): 예상사용={}, 실제사용={}", expectedUse, updatedAnnual.getUseDay());
-                                        // 🔧 울트라 수정: 계산 오류 발생 시 재계산 수행
                                         annualDetailMapper.forceRecalculateAnnual(etcApply.getEmpCode(), expectedBalance, expectedUse);
                                     }
                                 }

@@ -179,7 +179,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 🔧 수정: 근무계획/실적/예상근로시간 조회 API - 캐시 응답 안정화
+    // 근무계획/실적/예상근로시간 조회 API
     @GetMapping("/workInfo/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
@@ -187,7 +187,6 @@ public class AttendanceApplyController {
             log.debug("근무정보 조회 (캐시 안정화): empCode={}, workDate={}", empCode, workDate);
             Map<String, Object> workInfo = attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
 
-            // 🔧 수정: 예상근로시간 안정화 - 빈 값이나 null 체크
             Object expectedHours = workInfo.get("expectedHours");
             if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
                 workInfo.put("expectedHours", "40.00");
@@ -243,7 +242,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 🔧 수정: 일반근태 신청 저장 API - 휴일근무 8시간 검증 강화
+    // 일반근태 신청 저장 API
     @PostMapping("/general")
     @ResponseBody
     public Map<String, Object> saveGeneralApply(@RequestBody AttendanceApplyGeneral apply,
@@ -262,7 +261,6 @@ public class AttendanceApplyController {
                 return response;
             }
 
-            // 🔧 추가: 연장근로 신청 시 휴일근무 8시간 이상 검증 강화
             if ("연장".equals(apply.getApplyType()) || "조출연장".equals(apply.getApplyType())) {
                 // 해당 날짜에 휴일근무 신청이 있는지 먼저 확인
                 AttendanceApplyGeneral holidayApply = attendanceApplyService.findGeneralApplyByEmpAndDate(apply.getEmpCode(), apply.getTargetDate());
@@ -579,7 +577,6 @@ public class AttendanceApplyController {
         }
     }
 
-    // 🔧 수정: 신청근무별 분리 관리 - 완전 분리 처리 (중복 메서드 통합)
     @GetMapping("/getApplyByWorkType/{empCode}/{workDate}/{applyType}")
     @ResponseBody
     public Map<String, Object> getApplyByWorkType(@PathVariable String empCode,
@@ -588,10 +585,8 @@ public class AttendanceApplyController {
         try {
             log.debug("신청근무별 완전 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
 
-            // 🔧 수정: 서비스에서 완전 분리 처리된 결과 반환
             Map<String, Object> result = attendanceApplyService.getApplyByWorkType(empCode, workDate, applyType);
 
-            // 🔧 추가: 응답 데이터 안정화
             if (result == null) {
                 result = new HashMap<>();
                 result.put("hasExisting", false);
@@ -618,7 +613,6 @@ public class AttendanceApplyController {
         }
     }
 
-    // 🔧 수정: 예상근로시간 실시간 업데이트 API - 캐시 안정화
     @GetMapping("/updateExpectedHours/{empCode}/{workDate}")
     @ResponseBody
     public Map<String, Object> updateExpectedHours(@PathVariable String empCode, @PathVariable String workDate) {
@@ -629,7 +623,6 @@ public class AttendanceApplyController {
 
             Map<String, Object> response = new HashMap<>();
 
-            // 🔧 수정: 예상근로시간 안정화 처리
             Object expectedHours = workInfo.get("expectedHours");
             if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
                 expectedHours = "40.00";
