@@ -32,11 +32,21 @@ public interface AttRecordMapper {
 
     @Insert("""
         INSERT INTO HRTATTRECORD (EMP_CODE, WORK_DATE, CHECK_IN_TIME, CHECK_IN_DAY_TYPE,
-                                  CHECK_OUT_TIME, CHECK_OUT_DAY_TYPE)
-        VALUES (#{empCode}, #{workDate}, null, null, null, null)
+                                  CHECK_OUT_TIME, CHECK_OUT_DAY_TYPE, ABSENCE)
+        VALUES (#{empCode}, #{workDate}, null, null, null, null, #{shiftCode})
     """)
     void insertAttRecord(@Param("empCode") String empCode,
-                         @Param("workDate") String workDate);
+                         @Param("workDate") String workDate,
+                         @Param("shiftCode") String shiftCode);
+
+    @Select("""
+        SELECT ABSENCE
+        FROM HRTATTRECORD
+        WHERE EMP_CODE = #{empCode}
+        AND WORK_DATE = #{workDate}
+    """)
+    String getAbsenceByEmpCodeAndWorkDate(@Param("empCode") String empCode,
+                                          @Param("workDate") String workDate);
 
     // 근태기 정보 조회를 위한 메서드
     @Select("""

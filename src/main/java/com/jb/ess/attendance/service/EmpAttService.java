@@ -127,6 +127,7 @@ public class EmpAttService {
 
             // 연장근무
             Duration overtime = getOvertimeHours(empCode, ymd);
+            // 실적이 없는날인 경우 (미래) 예상근무시간에 연장근무시간 포함
             if (!overtime.isZero() && !overtime.isNegative() && attRecord == null) {
                 workHours = workHours.plus(overtime);
             }
@@ -135,6 +136,7 @@ public class EmpAttService {
             // 휴일근무
             AttendanceRecord holidayAttRecord = attRecordMapper.getHolidayAttRecordByEmpCode(empCode, ymd);
             Duration holidayWork = getHolidayWorkHours(empCode, ymd);
+            // 휴일근무 실적이 없는경우 (미래) 예상근무시간에 휴일근무시간 포함
             if (!holidayWork.isZero() && !holidayWork.isNegative() && holidayAttRecord == null) {
                 workHours = workHours.plus(holidayWork);
             }
@@ -277,8 +279,7 @@ public class EmpAttService {
                 // 출근시간 전
                 if (nowDateTime.isBefore(workOnDateTime)) {
                     // 실적이 변경된 경우 (근태 신청)
-                    System.out.println("[DEBUG] nowDateTime");
-                    if (!Objects.equals(cal.getShiftCode(), cal.getShiftCodeOrig())) {
+                    if (!Objects.equals(cal.getShiftCode(), cal.getShiftCodeOrig()) && !Objects.equals(cal.getShiftCode(), "00")) {
                         emp.setShiftCode(cal.getShiftCode());
                         emp.setTimeItemNames(List.of(shiftMasterMapper.findShiftNameByShiftCode(cal.getShiftCode())));
                     }
@@ -289,18 +290,29 @@ public class EmpAttService {
                     if (checkInDateTime == null && checkOutDateTime == null) {
                         if (nowDateTime.isAfter(workOnDateTime)) {
                             // 출근 지났는데 기록 없으면 결근 처리
-                            attRecordMapper.updateAbsenceByEmpCodeAndWorkDate(empCode, workYmd, emp.getShiftCode());
+                            if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd, emp.getShiftCode());
+                            else {
+                                if (!Objects.equals(emp.getShiftCode(), "00")) {
+                                    attRecordMapper.updateAbsenceByEmpCodeAndWorkDate(empCode, workYmd, emp.getShiftCode());
+                                }
+                            }
                             emp.setShiftCode("00");
                             empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, "00");
-                            if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd);
                         } else {
                             emp.setShiftCode(null);
                         }
                     // 출퇴근 기록 있음
                     } else {
                         // 지각 (휴일근무 X)
-                        System.out.println("[DEBUG] 1");
                         if (checkInDateTime != null) {
+                            if (Objects.equals(emp.getShiftCode(), "00")) {
+                                String absence = attRecordMapper.getAbsenceByEmpCodeAndWorkDate(empCode, workYmd);
+                                if (absence != null) {
+                                    workOn = shiftMasterMapper.findWorkOnHourByShiftCode(absence);
+                                    parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
+                                    workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
+                                }
+                            }
                             if (checkInDateTime.isAfter(workOnDateTime)) {
                                 emp.setTimeItemCode("3050");
                                 emp.setTimeItemNames(List.of("지각"));
