@@ -77,9 +77,7 @@ public interface EmpCalendarMapper {
                                          @Param("date") String date);
 
     @Select("""
-        SELECT SHIFT_CODE,
-               SHIFT_CODE_ORIG,
-               HOLIDAY_YN
+        SELECT *
         FROM HRTWORKEMPCALENDAR
         WHERE EMP_CODE = #{empCode}
         AND YYYYMMDD = #{date}
