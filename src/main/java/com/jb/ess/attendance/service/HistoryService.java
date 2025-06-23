@@ -72,6 +72,8 @@ public class HistoryService {
                     applyHistory.getEmpCode(), targetDate));
                 shift.setWorkOnHhmm(applyHistory.getStartTime());
                 shift.setWorkOffHhmm(applyHistory.getEndTime());
+                shift.setWorkOnDayType("N0");
+                shift.setWorkOffDayType("N0");
                 applyHistory.setOvertime(String.format("%.2f", WorkHoursCalculator.getTotalWorkTime(shift).toMinutes() / 60.0));
 
                 // 휴일근로
