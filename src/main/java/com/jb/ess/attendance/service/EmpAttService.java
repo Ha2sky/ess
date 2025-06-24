@@ -249,7 +249,7 @@ public class EmpAttService {
             if (cal == null) {
                 // 근무계획표가 없으면 null 처리
                 emp.setShiftCode(null);
-                // 휴일근무 혹은 배정받은 근무가 없고 휴일인 경우 SHIFT_CODE ("13" or "12") 유지
+                // 휴일근무 혹은 배정받은 근무가 없고 휴일인 경우 SHIFT_CODE ("13" or "12" ...) 유지
             } else if ("Y".equals(cal.getHolidayYn()) && (!Objects.equals(cal.getShiftCode(), "14-1") && !Objects.equals(cal.getShiftCode(), "00"))) {
                 emp.setShiftCode(cal.getShiftCode());
             } else { // 근무계획표가 존재하고 근무일인 경우
@@ -303,8 +303,12 @@ public class EmpAttService {
                     else emp.setShiftCode(null);
                 // 출근시간 후
                 } else {
-                    // 출퇴근 기록 없음
-                    if (checkInDateTime == null && checkOutDateTime == null) {
+                    // 출퇴근 기록 없음 (연차, 휴직, 육아휴직, 산재휴직 제외)
+                    if (checkInDateTime == null && checkOutDateTime == null &&
+                        !Objects.equals(cal.getShiftCode(), "06") &&
+                        !Objects.equals(cal.getShiftCode(), "61") &&
+                        !Objects.equals(cal.getShiftCode(), "64") &&
+                        !Objects.equals(cal.getShiftCode(), "65")) {
                         if (nowDateTime.isAfter(workOnDateTime)) {
                             // 출근 지났는데 기록 없으면 결근 처리
                             if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd, emp.getShiftCode());
