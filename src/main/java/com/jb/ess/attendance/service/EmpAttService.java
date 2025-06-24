@@ -94,8 +94,9 @@ public class EmpAttService {
 
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, ymd);
 
-            // 실적이 있는 경우 (휴일근무 제외)
-            if (attRecord != null && attRecord.getShiftCode() != null && !attRecord.getShiftCode().isEmpty() && !attRecord.getShiftCode().equals("14-1")) {
+            // 실적이 있는 경우 (휴일근무 제외) + 퇴근시간 존재
+            if (attRecord != null && attRecord.getShiftCode() != null && attRecord.getCheckOutTime() != null &&
+                !attRecord.getShiftCode().isEmpty() && !attRecord.getShiftCode().equals("14-1")) {
                 ShiftMaster shift = shiftMasterMapper.findShiftByCode(attRecord.getShiftCode());
 
                 // 결근 제외 (SHIFT_CODE가 00일 경우)
