@@ -89,7 +89,6 @@ public class EmpAttService {
             String shiftCode = empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd);
             if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd))
                     && !("14-1".equals(shiftCode) || "00".equals(shiftCode))) {
-                System.out.println("continue");
                 continue;
             }
 
@@ -128,7 +127,6 @@ public class EmpAttService {
                 }
             }
 
-            System.out.println("[DEBUG] empCode: " + empCode + " / ymd: " + ymd + " / workHours: " + workHours);
             // 연장근무
             Duration overtime = getOvertimeHours(empCode, ymd);
             // 실적이 없는날인 경우 (미래) 예상근무시간에 연장근무시간 포함
@@ -137,18 +135,11 @@ public class EmpAttService {
             }
             totalOvertimeHours += overtime.toMinutes() / 60.0;
 
-            System.out.println("[DEBUG] totalOvertimeHours: " + totalOvertimeHours);
-
             // 휴일근무
-            AttendanceRecord holidayAttRecord = attRecordMapper.getHolidayAttRecordByEmpCode(empCode, ymd);
             Duration holidayWork = getHolidayWorkHours(empCode, ymd);
-            System.out.println("holidayWork = " + holidayWork);
-            System.out.println("holidayAttRecord = " + holidayAttRecord);
             // 휴일근무 실적이 없는경우 (미래) 예상근무시간에 휴일근무시간 포함
             workHours = workHours.plus(holidayWork);
             totalHolidayWorkHours += holidayWork.toMinutes() / 60.0;
-
-            System.out.println("[DEBUG] totalHolidayWorkHours: " + totalHolidayWorkHours);
         }
 
         emp.setOverTime(String.format("%.2f", totalOvertimeHours));
@@ -166,7 +157,12 @@ public class EmpAttService {
 
         Duration overtimeHours = Duration.ZERO;
         String shiftCode = empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd);
-        ShiftMaster baseShift = shiftMasterMapper.findShiftByCode(shiftCode);
+        ShiftMaster baseShift;
+        if (!Objects.equals(shiftCode, "00")) {
+            // 결근이 아닌 경우
+            baseShift = shiftMasterMapper.findShiftByCode(shiftCode);
+            // 결근인 경우 본래의 근태 코드를 사용 ("00" X)
+        } else baseShift = shiftMasterMapper.findShiftByCode(attRecordMapper.getAbsenceByEmpCodeAndWorkDate(empCode, ymd));
 
         for (AttendanceApplyGeneral overtime : overtimes) {
             if (baseShift == null) continue;
@@ -181,12 +177,12 @@ public class EmpAttService {
             shift.setWorkOnDayType("N0");
             LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
             LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+            // 익일 처리
             if (parsedWorkOn.isAfter(parsedWorkOff)) {
                 shift.setWorkOffDayType("N1");
             } else {
                 shift.setWorkOffDayType("N0");
             }
-
             overtimeHours = overtimeHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
         }
 
@@ -215,6 +211,7 @@ public class EmpAttService {
         shift.setWorkOnDayType("N0");
         LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
         LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+        // 익일 처리
         if (parsedWorkOn.isAfter(parsedWorkOff)) {
             shift.setWorkOffDayType("N1");
         } else {
@@ -225,7 +222,7 @@ public class EmpAttService {
         return holidayWorkHours;
     }
 
-
+    // Model에 보낼 empList 세팅
     public List<Employee> setAttendanceInfo(List<Employee> empList, LocalDate weekStart, LocalDate weekEnd, LocalDate workDate) {
         String workYmd = DateUtil.reverseFormatDate(workDate); // yyyyMMdd
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -249,34 +246,35 @@ public class EmpAttService {
             emp.setShiftCodeOrig(cal != null ? cal.getShiftCodeOrig() : null);
 
             if (cal == null) {
+                // 근무계획표가 없으면 null 처리
                 emp.setShiftCode(null);
+                // 휴일근무 혹은 배정받은 근무가 없고 휴일인 경우 SHIFT_CODE ("13" or "12") 유지
             } else if ("Y".equals(cal.getHolidayYn()) && (!Objects.equals(cal.getShiftCode(), "14-1") && !Objects.equals(cal.getShiftCode(), "00"))) {
-                emp.setShiftCode(cal.getShiftCode()); // 휴일인 경우 실적 유지
-            } else {
-                System.out.println("cal: " + cal);
-                // 실근무일인 경우
+                emp.setShiftCode(cal.getShiftCode());
+            } else { // 근무계획표가 존재하고 근무일인 경우
+                // DB에 지정된 근태코드의 출근 시간
                 String workOn = shiftMasterMapper.findWorkOnHourByShiftCode(cal.getShiftCode());
 
                 LocalTime parsedWorkOnTime = null;
                 LocalDateTime workOnDateTime = null;
+
+                // HRTWORKEMPCALENDAR 테이블의 SHIFT_CODE 가 null 인 경우 예외처리
                 if (workOn != null && !workOn.isBlank()) {
                     parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
                     workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
-                    // 이후 로직
                 } else {
                     log.warn("해당 근무조의 시작 시간이 존재하지 않음: shiftCode=" + cal.getShiftCode());
-                    // 예외를 던지거나 기본값 처리
-                    // 예: return 또는 throw new IllegalStateException("Invalid shift time");
                 }
 
-                // 출퇴근 시간 파싱
+                // HRTATTRECORD 테이블 실제 출퇴근 시간 파싱
                 LocalDateTime checkInDateTime = null;
                 LocalDateTime checkOutDateTime = null;
                 try {
                     if (!"-".equals(checkInStr)) {
                         checkInStr = checkInStr.trim();
                         if (checkInStr.length() >= 4) {
-                            String checkInHHmm = checkInStr.substring(0, 4); // 앞 4자리만 자름
+                            // HHmmSS -> HHmm
+                            String checkInHHmm = checkInStr.substring(0, 4);
                             checkInDateTime = LocalDateTime.of(workLocalDate, LocalTime.parse(checkInHHmm, timeFormatter));
                         }
                     }
@@ -284,6 +282,7 @@ public class EmpAttService {
                     if (!"-".equals(checkOutStr)) {
                         checkOutStr = checkOutStr.trim();
                         if (checkOutStr.length() >= 4) {
+                            // HHmmSS -> HHmm
                             String checkOutHHmm = checkOutStr.substring(0, 4);
                             checkOutDateTime = LocalDateTime.of(workLocalDate, LocalTime.parse(checkOutHHmm, timeFormatter));
                         }
