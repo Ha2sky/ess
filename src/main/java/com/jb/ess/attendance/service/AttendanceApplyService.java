@@ -48,8 +48,9 @@ public class AttendanceApplyService {
     private final ShiftMasterMapper shiftMasterMapper;
     private final EmpAttService empAttService;
 
-    private Map<String, String> expectedHoursCache = new HashMap<>();
-    private Map<String, String> workTypeSpecificCache = new HashMap<>();
+    // 🔥 수정: 캐시 관련 변수 제거
+    // private Map<String, String> expectedHoursCache = new HashMap<>();
+    // private Map<String, String> workTypeSpecificCache = new HashMap<>();
 
     // 현재 사용자 정보 조회
     public Employee getCurrentEmployee(String empCode) {
@@ -273,7 +274,7 @@ public class AttendanceApplyService {
 
             Map<String, String> appliedRecord = getAppliedRecord(empCode, workDate);
 
-            // 주간 통일 예상근로시간 계산
+            // 🔥 수정: 캐시 없이 항상 실시간으로 EmpAttService 호출
             String weeklyExpectedHours = calculateWeeklyExpectedHoursFollowEmpAttService(empCode, workDate);
 
             workInfo.put("plan", empCalendarPlan);
@@ -282,7 +283,7 @@ public class AttendanceApplyService {
             workInfo.put("appliedRecord", appliedRecord);
             workInfo.put("expectedHours", weeklyExpectedHours);
 
-            log.debug("근무정보 조회 완료 (주간 통일): empCode={}, workDate={}, plan={}, actual={}, weeklyHours={}",
+            log.debug("근무정보 조회 완료 (캐시 없이 실시간): empCode={}, workDate={}, plan={}, actual={}, weeklyHours={}",
                     empCode, workDate, empCalendarPlan, actualShiftName, weeklyExpectedHours);
         } catch (Exception e) {
             log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
@@ -295,19 +296,20 @@ public class AttendanceApplyService {
         return workInfo;
     }
 
+    // 🔥 수정: 캐시 제거하고 항상 실시간으로 EmpAttService 호출
     private String calculateWeeklyExpectedHoursFollowEmpAttService(String empCode, String workDate) {
         try {
             LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
             LocalDate mondayOfWeek = targetDate.with(DayOfWeek.MONDAY);
             LocalDate sundayOfWeek = targetDate.with(DayOfWeek.SUNDAY);
 
-            String cacheKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_WEEK";
-
-            if (expectedHoursCache.containsKey(cacheKey)) {
-                String cachedHours = expectedHoursCache.get(cacheKey);
-                log.debug("캐시에서 예상근로시간 반환 (주간 통일): empCode={}, workDate={}, hours={}", empCode, workDate, cachedHours);
-                return cachedHours;
-            }
+            // 🔥 수정: 캐시 관련 코드 제거
+            // String cacheKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_WEEK";
+            // if (expectedHoursCache.containsKey(cacheKey)) {
+            //     String cachedHours = expectedHoursCache.get(cacheKey);
+            //     log.debug("캐시에서 예상근로시간 반환 (주간 통일): empCode={}, workDate={}, hours={}", empCode, workDate, cachedHours);
+            //     return cachedHours;
+            // }
 
             Employee dummyEmp = new Employee();
             dummyEmp.setEmpCode(empCode);
@@ -352,10 +354,10 @@ public class AttendanceApplyService {
             double totalWeekHours = totalWeekDuration.toMinutes() / 60.0;
             String formattedHours = String.format("%.2f", totalWeekHours);
 
-            // 주간 단위로 캐시 저장 (모든 날짜에서 동일한 값 사용)
-            expectedHoursCache.put(cacheKey, formattedHours);
+            // 🔥 수정: 캐시 저장 제거
+            // expectedHoursCache.put(cacheKey, formattedHours);
 
-            log.debug("EmpAttService 결과: empCode={}, workDate={}, totalHours={}", empCode, workDate, totalWeekHours);
+            log.debug("EmpAttService 결과 (캐시 없이 실시간): empCode={}, workDate={}, totalHours={}", empCode, workDate, totalWeekHours);
             return formattedHours;
 
         } catch (Exception e) {
@@ -763,15 +765,15 @@ public class AttendanceApplyService {
                                     log.debug("조퇴 시간 오류: 시작시간이 퇴근시간보다 늦음");
                                 }
                             } else {
-                                requestHours = 0.0; //
+                                requestHours = 0.0;
                                 log.debug("조퇴 시간 파싱 실패: 0 차감");
                             }
                         } catch (Exception e) {
                             log.error("조퇴 시간 계산 실패", e);
-                            requestHours = 0.0; //
+                            requestHours = 0.0;
                         }
                     } else {
-                        requestHours = 0.0; //
+                        requestHours = 0.0;
                         log.debug("조퇴 시간 미입력: 0 차감");
                     }
                 } else if ("외출".equals(applyType) || "외근".equals(applyType)) {
@@ -801,15 +803,15 @@ public class AttendanceApplyService {
                                     log.debug("외출/외근 시간 동일: 0 차감");
                                 }
                             } else {
-                                requestHours = 0.0; //
+                                requestHours = 0.0;
                                 log.debug("외출/외근 시간 파싱 실패: 0 차감");
                             }
                         } catch (Exception e) {
                             log.error("외출/외근 시간 계산 실패", e);
-                            requestHours = 0.0; //
+                            requestHours = 0.0;
                         }
                     } else {
-                        requestHours = 0.0; //
+                        requestHours = 0.0;
                         log.debug("외출/외근 시간 미입력: 0 차감");
                     }
                 }
@@ -823,7 +825,7 @@ public class AttendanceApplyService {
             result.put("isValid", isValid);
             result.put("message", isValid ? "정상" : (totalWeeklyHours > 52.0 ? "주 52시간 초과" : "음수 시간"));
 
-            log.debug("실시간 주 52시간 계산 완료 (정확한 시간만): baseHours={}, requestHours={}, totalHours={}, isValid={}",
+            log.debug("실시간 주 52시간 계산 완료 (캐시 없이): baseHours={}, requestHours={}, totalHours={}, isValid={}",
                     baseWeeklyHours, requestHours, totalWeeklyHours, isValid);
 
         } catch (Exception e) {
@@ -837,7 +839,7 @@ public class AttendanceApplyService {
         return result;
     }
 
-    // 주간 통일 계산
+    // 주간 통일 계산 (캐시 없이)
     private double calculateCurrentWeeklyHoursFollowEmpAttService(String empCode, String workDate) {
         try {
             String weeklyHours = calculateWeeklyExpectedHoursFollowEmpAttService(empCode, workDate);
@@ -1228,7 +1230,7 @@ public class AttendanceApplyService {
                 }
             }
 
-            // 주 52시간 초과 검증 - 주간 통일 계산
+            // 주 52시간 초과 검증 - 주간 통일 계산 (캐시 없이)
             if (!Arrays.asList("조퇴", "외근", "외출", "전반차", "후반차").contains(applyType)) {
                 try {
                     double currentWeekHours = calculateCurrentWeeklyHoursFollowEmpAttService(empCode, targetDate);
@@ -1293,7 +1295,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 휴일근무 신청 찾기
+    // 휴일근무 신청 찾기 (캐시 없이)
     private List<AttendanceApplyGeneral> findAllHolidayAppliesByEmpAndDateUltraEnhanced(String empCode, String workDate) {
         return findHolidayWorkAppliesCompletely(empCode, workDate);
     }
@@ -1330,7 +1332,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 일반근태 신청 저장 (주간 캐시 초기화)
+    // 일반근태 신청 저장 (캐시 없이)
     @Transactional
     public void saveGeneralApply(AttendanceApplyGeneral apply) {
         try {
@@ -1345,6 +1347,7 @@ public class AttendanceApplyService {
                     applyNo, apply.getEmpCode(), apply.getTimeItemCode());
             attendanceApplyMapper.insertGeneralApply(apply);
 
+            // 🔥 수정: 캐시 관련 코드 제거 (메서드 호출은 유지하되 빈 동작)
             if ("휴일근무".equals(apply.getApplyType())) {
                 clearWeeklyExpectedHoursCache(apply.getEmpCode(), apply.getTargetDate());
             }
@@ -1373,22 +1376,10 @@ public class AttendanceApplyService {
         }
     }
 
-    // 주간 캐시 초기화
+    // 🔥 수정: 캐시 초기화 메서드를 빈 메서드로 유지 (호출하는 곳이 많으므로)
     private void clearWeeklyExpectedHoursCache(String empCode, String workDate) {
-        try {
-            LocalDate targetDate = LocalDate.parse(workDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
-            LocalDate mondayOfWeek = targetDate.with(DayOfWeek.MONDAY);
-
-            String weekCacheKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "_WEEK";
-            expectedHoursCache.remove(weekCacheKey);
-
-            String baseKey = empCode + "_" + mondayOfWeek.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            expectedHoursCache.entrySet().removeIf(entry -> entry.getKey().startsWith(baseKey));
-
-            log.debug("주간 예상근로시간 캐시 초기화: weekCacheKey={}", weekCacheKey);
-        } catch (Exception e) {
-            log.error("주간 캐시 초기화 실패: empCode={}, workDate={}", empCode, workDate, e);
-        }
+        // 캐시 관련 로직 제거 - 빈 메서드로 유지하여 기존 호출 코드 보호
+        log.debug("캐시 초기화 메서드 호출 (캐시 없음): empCode={}, workDate={}", empCode, workDate);
     }
 
     // 저장된 일반근태 신청 조회
@@ -1411,7 +1402,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 휴일근무 승인완료 시 SHIFT_CODE 업데이트
+    // 휴일근무 승인완료 시 SHIFT_CODE 업데이트 (캐시 없이)
     @Transactional
     public void updateWorkRecordForHolidayWork(String empCode, String workDate) {
         try {
@@ -1419,6 +1410,7 @@ public class AttendanceApplyService {
 
             attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(empCode, workDate, "휴일근무");
 
+            // 🔥 수정: 캐시 초기화 호출 제거하지 않고 유지 (빈 동작)
             clearWeeklyExpectedHoursCache(empCode, workDate);
 
             log.debug("휴일근로 SHIFT_CODE 업데이트 완료: empCode={}, workDate={}, shiftCode=14-1", empCode, workDate);
@@ -1524,7 +1516,7 @@ public class AttendanceApplyService {
         }
     }
 
-    // 일반근태 신청 상신 (조출연장/연장근무 승인완료 시 캐시 초기화)
+    // 일반근태 신청 상신 (캐시 없이)
     @Transactional
     public void submitGeneralApply(String applyGeneralNo, String applicantCode, String isHeader) {
         try {
@@ -1564,10 +1556,10 @@ public class AttendanceApplyService {
                 if (apply != null) {
                     attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), apply.getApplyType());
 
-                    // 조출연장/연장근무 승인완료 시 캐시 강제 초기화
+                    // 🔥 수정: 캐시 초기화 호출은 유지하되 빈 동작 (기존 기능 보호)
                     if ("조출연장".equals(apply.getApplyType()) || "연장".equals(apply.getApplyType())) {
                         clearWeeklyExpectedHoursCache(apply.getEmpCode(), apply.getTargetDate());
-                        log.debug("조출연장/연장근무 승인완료로 캐시 초기화: empCode={}, applyType={}",
+                        log.debug("조출연장/연장근무 승인완료 (캐시 없음): empCode={}, applyType={}",
                                 apply.getEmpCode(), apply.getApplyType());
                     }
                 }
@@ -1725,7 +1717,7 @@ public class AttendanceApplyService {
                             BigDecimal currentUse = currentAnnual.getUseDay().setScale(1, RoundingMode.HALF_UP);
                             BigDecimal deductDaysScaled = deductDays.setScale(1, RoundingMode.HALF_UP);
 
-                            log.debug("연차 차감 전 상태 (울트라): empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
+                            log.debug("연차 차감 전 상태 (캐시 없음): empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
                                     etcApply.getEmpCode(), currentBalance, currentUse, deductDaysScaled);
 
                             boolean deductionResult = annualDetailMapper.updateBalanceDayWithCheckUltra(
@@ -1739,35 +1731,35 @@ public class AttendanceApplyService {
                                     BigDecimal updatedBalance = updatedAnnual.getBalanceDay().setScale(1, RoundingMode.HALF_UP);
                                     BigDecimal updatedUse = updatedAnnual.getUseDay().setScale(1, RoundingMode.HALF_UP);
 
-                                    log.debug("연차 차감 및 USE_DAY 증가 완료 (울트라): empCode={}, 차감일수={}, 차감후잔여={}, 차감후사용={}",
+                                    log.debug("연차 차감 및 USE_DAY 증가 완료 (캐시 없음): empCode={}, 차감일수={}, 차감후잔여={}, 차감후사용={}",
                                             etcApply.getEmpCode(), deductDaysScaled, updatedBalance, updatedUse);
 
                                     BigDecimal expectedBalance = currentBalance.subtract(deductDaysScaled).setScale(1, RoundingMode.HALF_UP);
                                     BigDecimal expectedUse = currentUse.add(deductDaysScaled).setScale(1, RoundingMode.HALF_UP);
 
                                     if (updatedBalance.compareTo(expectedBalance) != 0) {
-                                        log.error("연차 차감 계산 오류 (울트라): 예상잔여={}, 실제잔여={}", expectedBalance, updatedBalance);
+                                        log.error("연차 차감 계산 오류 (캐시 없음): 예상잔여={}, 실제잔여={}", expectedBalance, updatedBalance);
                                         annualDetailMapper.forceRecalculateAnnual(etcApply.getEmpCode(), expectedBalance, expectedUse);
                                     }
                                     if (updatedUse.compareTo(expectedUse) != 0) {
-                                        log.error("연차 사용 계산 오류 (울트라): 예상사용={}, 실제사용={}", expectedUse, updatedUse);
+                                        log.error("연차 사용 계산 오류 (캐시 없음): 예상사용={}, 실제사용={}", expectedUse, updatedUse);
                                         annualDetailMapper.forceRecalculateAnnual(etcApply.getEmpCode(), expectedBalance, expectedUse);
                                     }
                                 }
                             } else {
-                                log.warn("연차 잔여량 부족으로 차감 실패 (울트라): empCode={}, 요청차감일수={}, 현재잔여={}",
+                                log.warn("연차 잔여량 부족으로 차감 실패 (캐시 없음): empCode={}, 요청차감일수={}, 현재잔여={}",
                                         etcApply.getEmpCode(), deductDaysScaled, currentBalance);
                                 throw new RuntimeException("연차 잔여량이 부족합니다. 현재 잔여: " + currentBalance + "일, 요청 차감: " + deductDaysScaled + "일");
                             }
                         } else {
-                            log.error("연차 정보 조회 실패 (울트라): empCode={}", etcApply.getEmpCode());
+                            log.error("연차 정보 조회 실패 (캐시 없음): empCode={}", etcApply.getEmpCode());
                             throw new RuntimeException("연차 정보를 찾을 수 없습니다.");
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            log.error("연차 차감 실패 (울트라): etcApply={}", etcApply, e);
+            log.error("연차 차감 실패 (캐시 없음): etcApply={}", etcApply, e);
             throw new RuntimeException("연차 차감에 실패했습니다: " + e.getMessage(), e);
         }
     }

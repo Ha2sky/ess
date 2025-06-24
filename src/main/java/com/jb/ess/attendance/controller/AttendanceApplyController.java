@@ -519,11 +519,6 @@ public class AttendanceApplyController {
                     // HH:MM 형식을 HHMM으로 변환
                     String timeStr = startTime.replace(":", "");
                     int timeInt = Integer.parseInt(timeStr);
-
-                    if (timeInt >= 730) {
-                        isValid = false;
-                        message = "조출연장은 07:30 이전에만 신청할 수 있습니다.";
-                    }
                 } catch (NumberFormatException e) {
                     isValid = false;
                     message = "시간 형식이 올바르지 않습니다.";
