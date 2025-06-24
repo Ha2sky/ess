@@ -206,6 +206,8 @@
 </div>
 
 <script>
+  $.ajaxSetup({cache: false});
+
   $(document).ready(function() {
       // 전역 변수에 현재 사용자 정보 저장
       const currentUser = {
@@ -223,10 +225,6 @@
       let shiftMasters = [];
       let isEtcSearching = false;
       let isGeneralSearching = false;
-
-      let expectedHoursCache = new Map();
-      let workTypeSpecificCache = new Map(); // 신청근무별 개별 캐시
-      let holidayWorkStatusCache = new Map(); // 휴일근무 상태 캐시
 
       // 신청근무 옵션 정의
       const workTypeOptions = {
@@ -312,9 +310,6 @@
           const selectedType = $(this).val();
 
           $('#generalEmployeeBody').empty();
-          expectedHoursCache.clear();
-          workTypeSpecificCache.clear();
-          holidayWorkStatusCache.clear();
 
           updateWorkTypeOptions(selectedType);
           updateWorkTypeFilter(selectedType);
@@ -465,49 +460,11 @@
                   row.find('.status-field').text('대기');
                   row.removeAttr('data-apply-no');
 
-                  // 예상근로시간은 캐시에서 복원
                   updateExpectedHoursUltraStable(row, empCode, workDate, applyType);
               });
       }
 
       function updateExpectedHoursUltraStable(row, empCode, workDate, applyType) {
-          const workTypeCacheKey = `${empCode}_${workDate}_${applyType}`;
-          const baseCacheKey = `${empCode}_${workDate}`;
-          const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-
-          if (applyType === '휴일근무') {
-              if (expectedHoursCache.has(baseCacheKey)) {
-                  const baseHours = expectedHoursCache.get(baseCacheKey);
-                  row.find('.expected-hours').text(baseHours);
-                  workTypeSpecificCache.set(workTypeCacheKey, baseHours);
-                  return;
-              }
-          }
-
-          const hasHolidayWork = checkHolidayWorkStatus(empCode, workDate);
-
-          if (hasHolidayWork && applyType !== '휴일근무') {
-              // 다른 근무에서 휴일근무가 있으면 그 시간 사용
-              const holidayExpectedHours = holidayWorkStatusCache.get(holidayCacheKey) || expectedHoursCache.get(baseCacheKey) || '40.00';
-              row.find('.expected-hours').text(holidayExpectedHours);
-              workTypeSpecificCache.set(workTypeCacheKey, holidayExpectedHours);
-              return;
-          }
-
-          if (workTypeSpecificCache.has(workTypeCacheKey)) {
-              const cachedHours = workTypeSpecificCache.get(workTypeCacheKey);
-              row.find('.expected-hours').text(cachedHours);
-              return;
-          }
-
-          // 기본 캐시에서 확인
-          if (expectedHoursCache.has(baseCacheKey)) {
-              const cachedHours = expectedHoursCache.get(baseCacheKey);
-              row.find('.expected-hours').text(cachedHours);
-              workTypeSpecificCache.set(workTypeCacheKey, cachedHours);
-              return;
-          }
-
           $.get(`/user/apply/updateExpectedHours/${empCode}/${workDate}`)
               .done(function(response) {
                   if (response.success) {
@@ -516,21 +473,14 @@
                       if (expectedHours === "ERROR" || expectedHours === "error") {
                           row.find('.expected-hours').text("계산실패").addClass('text-red-500');
                           row.find('.expected-hours').attr('title', 'EmpAttService 계산 실패');
-                          console.error('EmpAttService 계산 실패:', empCode);
                           return;
-                      }
-
-                      workTypeSpecificCache.set(workTypeCacheKey, expectedHours);
-                      expectedHoursCache.set(baseCacheKey, expectedHours);
-
-                      // 휴일근무인 경우 상태 캐시에도 저장
-                      if (applyType === '휴일근무') {
-                          holidayWorkStatusCache.set(holidayCacheKey, expectedHours);
                       }
 
                       row.find('.expected-hours').text(expectedHours).removeClass('text-red-500');
                       row.find('.expected-hours').removeAttr('title');
-                      console.log('EmpAttService 활용 예상근로시간 조회 성공:', applyType, expectedHours);
+                  } else {
+                      row.find('.expected-hours').text("계산실패").addClass('text-red-500');
+                      row.find('.expected-hours').attr('title', 'EmpAttService 계산 실패');
                   }
               })
               .fail(function() {
@@ -540,13 +490,6 @@
       }
 
       function checkHolidayWorkStatus(empCode, workDate) {
-          const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-
-          // 캐시에서 먼저 확인
-          if (holidayWorkStatusCache.has(holidayCacheKey)) {
-              return true;
-          }
-
           // 테이블에서 휴일근무 신청 확인
           let hasHolidayWork = false;
           $('#generalEmployeeTable tbody tr').each(function() {
@@ -557,7 +500,6 @@
               if (rowEmpCode === empCode && workType === '휴일근무' &&
                   (status === '승인완료' || status === '저장' || status === '상신')) {
                   hasHolidayWork = true;
-                  holidayWorkStatusCache.set(holidayCacheKey, '48.00');
                   return false; // break
               }
           });
@@ -747,7 +689,7 @@
           if (!time) return;
 
           try {
-        const timeInt = parseInt(time.replace(':', ''));
+              const timeInt = parseInt(time.replace(':', ''));
 
               if (timeInt > 730) {
                   alert('조출연장은 07:30까지만 신청할 수 있습니다.');
@@ -861,9 +803,6 @@
           }
 
           isGeneralSearching = true;
-          expectedHoursCache.clear();
-          workTypeSpecificCache.clear();
-          holidayWorkStatusCache.clear();
 
           const deptCode = $('#generalDeptSelect').val();
           const workDate = $('#generalWorkDate').val();
@@ -1052,18 +991,7 @@
 
                   const recordColor = isAbsent ? 'text-gray-700' : '';
 
-                  const baseCacheKey = `${emp.empCode}_${workDate}`;
-                  const workTypeCacheKey = `${emp.empCode}_${workDate}_${selectedWorkType}`;
-                  if (workInfo.expectedHours) {
-                      expectedHoursCache.set(baseCacheKey, workInfo.expectedHours);
-                      workTypeSpecificCache.set(workTypeCacheKey, workInfo.expectedHours);
-
-                      // 휴일근무인 경우 상태 캐시에도 저장
-                      if (selectedWorkType === '휴일근무') {
-                          const holidayCacheKey = `${emp.empCode}_${workDate}_휴일근무`;
-                          holidayWorkStatusCache.set(holidayCacheKey, workInfo.expectedHours);
-                      }
-                  }
+                  const expectedHours = workInfo.expectedHours || '40.00';
 
                   const row = `
                       <tr data-emp-code="${emp.empCode}" data-apply-no="${applyNo}" data-is-absent="${isAbsent}" data-plan="${workInfo.empCalendarPlan || workInfo.plan || ''}" data-record="${recordDisplay}">
@@ -1089,7 +1017,7 @@
                               <input type="time" class="end-time w-full border rounded px-2 py-1" ${isAbsent ? 'disabled' : ''}>
                           </td>
                           <td class="border border-gray-300 px-4 py-2 ${isLeaveType ? 'hidden' : ''}">
-                              <span class="expected-hours">${workInfo.expectedHours || '40.00'}</span>
+                              <span class="expected-hours">${expectedHours}</span>
                           </td>
                           <td class="border border-gray-300 px-4 py-2">
                               <input type="text" class="reason-field w-full border rounded px-2 py-1" placeholder="사유 입력" ${isAbsent ? 'disabled' : ''}>
@@ -1282,15 +1210,12 @@
               return;
           }
 
-          if (workType === '휴일근무') {
-              // 휴일근무는 실시간 계산하지 않고 기존 값 유지
-              const baseCacheKey = `${empCode}_${workDate}`;
-              const cachedHours = expectedHoursCache.get(baseCacheKey) || '40.00';
-              row.find('.expected-hours').text(cachedHours);
-
-              console.log('휴일근무 중복 방지: 기존 값 유지 =', cachedHours);
+          // 중복 요청 방지를 위한 로딩 상태 체크
+          if (row.data('calculating') === true) {
+              console.log('이미 계산 중인 행 무시:', empCode);
               return;
           }
+          row.data('calculating', true);
 
           // 조퇴외출반차의 경우 별도 처리
           if (applyType === '조퇴외출반차') {
@@ -1305,6 +1230,21 @@
                   } else {
                       row.find('.expected-hours').text('0.00');
                   }
+              } else if (workType === '외출' || workType === '외근') {
+                  if (startTime && endTime) {
+                      const [startHour, startMin] = startTime.split(':').map(Number);
+                      const [endHour, endMin] = endTime.split(':').map(Number);
+                      let startMinutes = startHour * 60 + startMin;
+                      let endMinutes = endHour * 60 + endMin;
+                      if (endMinutes < startMinutes) endMinutes += 24 * 60;
+                      if (endMinutes > startMinutes) {
+                          row.find('.expected-hours').text(`-${((endMinutes - startMinutes) / 60).toFixed(2)}`);
+                      } else {
+                          row.find('.expected-hours').text('0.00');
+                      }
+                  } else {
+                      row.find('.expected-hours').text('0.00');
+                  }
               } else {
                   row.find('.expected-hours').text('0.00');
               }
@@ -1313,33 +1253,12 @@
 
           const isAbsent = row.data('is-absent') === true;
           if (isAbsent) {
-              const workTypeCacheKey = `${empCode}_${workDate}_${workType}`;
-              const baseCacheKey = `${empCode}_${workDate}`;
-              const cachedHours = workTypeSpecificCache.get(workTypeCacheKey) || expectedHoursCache.get(baseCacheKey) || '40.00';
-              row.find('.expected-hours').text(cachedHours);
+              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
               return;
           }
 
           if (!startTime || !endTime) {
-              const hasHolidayWork = checkHolidayWorkStatus(empCode, workDate);
-              if (hasHolidayWork && workType === '연장') {
-                  const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-                  const holidayHours = holidayWorkStatusCache.get(holidayCacheKey) || '48.00';
-                  row.find('.expected-hours').text(holidayHours);
-                  return;
-              }
-
-              const workTypeCacheKey = `${empCode}_${workDate}_${workType}`;
-              const baseCacheKey = `${empCode}_${workDate}`;
-              const cachedHours = workTypeSpecificCache.get(workTypeCacheKey) || expectedHoursCache.get(baseCacheKey);
-
-              if (cachedHours) {
-                  row.find('.expected-hours').text(cachedHours);
-                  row.find('.expected-hours').removeClass('text-red-500 font-bold');
-                  row.find('.expected-hours').removeAttr('title');
-              } else {
-                  updateExpectedHoursUltraStable(row, empCode, workDate, workType);
-              }
+              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
               return;
           }
 
@@ -1350,7 +1269,6 @@
               return;
           }
 
-          // 실시간 주 52시간 검증 API 호출
           $.post('/user/apply/calculateWorkHours', {
               empCode: empCode,
               workDate: workDate,
@@ -1363,33 +1281,17 @@
               const totalHours = response.totalWeeklyHours.toFixed(2);
               expectedHoursSpan.text(totalHours);
 
-              const workTypeCacheKey = `${empCode}_${workDate}_${workType}`;
-              const baseCacheKey = `${empCode}_${workDate}`;
-              workTypeSpecificCache.set(workTypeCacheKey, totalHours);
-              expectedHoursCache.set(baseCacheKey, totalHours);
-
-              // 휴일근무인 경우 상태 캐시에도 저장
-              if (workType === '휴일근무') {
-                  const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-                  holidayWorkStatusCache.set(holidayCacheKey, totalHours);
-              }
-
               if (!response.isValid) {
-                  expectedHoursSpan.addClass('text-red-500 font-bold');
+                  expectedHoursSpan.addClass('text-red-500');
                   expectedHoursSpan.attr('title', response.message);
               } else {
-                  expectedHoursSpan.removeClass('text-red-500 font-bold');
+                  expectedHoursSpan.removeClass('text-red-500');
                   expectedHoursSpan.removeAttr('title');
               }
-
-              console.log('실시간 주 52시간 계산 완료 (휴게시간 차감 포함):', totalHours);
           })
           .fail(function() {
               console.error('실시간 주 52시간 계산 실패');
-              const workTypeCacheKey = `${empCode}_${workDate}_${workType}`;
-              const baseCacheKey = `${empCode}_${workDate}`;
-              const cachedHours = workTypeSpecificCache.get(workTypeCacheKey) || expectedHoursCache.get(baseCacheKey) || '40.00';
-              row.find('.expected-hours').text(cachedHours);
+              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
           });
       }
 
@@ -1416,31 +1318,19 @@
           }
       }
 
-      // 예상근로시간 실시간 업데이트 API 호출
       function updateExpectedHours(empCode, workDate, callback) {
-          const baseCacheKey = `${empCode}_${workDate}`;
-
-          // 캐시에서 먼저 확인
-          if (expectedHoursCache.has(baseCacheKey)) {
-              callback(expectedHoursCache.get(baseCacheKey));
-              return;
-          }
-
           $.get(`/user/apply/updateExpectedHours/${empCode}/${workDate}`)
               .done(function(response) {
                   if (response.success) {
                       const expectedHours = response.expectedHours;
-                      expectedHoursCache.set(baseCacheKey, expectedHours);
                       callback(expectedHours);
                   } else {
                       const defaultHours = '40.00';
-                      expectedHoursCache.set(baseCacheKey, defaultHours);
                       callback(defaultHours);
                   }
               })
               .fail(function() {
                   const defaultHours = '40.00';
-                  expectedHoursCache.set(baseCacheKey, defaultHours);
                   callback(defaultHours);
               });
       }
@@ -1585,7 +1475,6 @@
               });
       }
 
-      // 연차잔여 조회 개선
       function loadAnnualBalanceUltraStable(empCode, row) {
           $.get(`/user/apply/annual/${empCode}`)
               .done(function(annual) {
@@ -1609,7 +1498,6 @@
 
                   const accurateBalance = Math.round(balanceDay * 10) / 10;
                   row.find('.annual-balance').text(accurateBalance.toFixed(1));
-                  console.log('연차잔여 조회 (정확성 개선):', empCode, accurateBalance.toFixed(1));
               })
               .fail(function() {
                   row.find('.annual-balance').text('0.0');
@@ -1652,7 +1540,7 @@
 
               const row = $(this);
               const empCode = row.data('emp-code');
-                            const workSelect = row.find('.work-select').val() || row.find('.work-type-display').text();
+              const workSelect = row.find('.work-select').val() || row.find('.work-type-display').text();
               const startTime = row.find('.start-time').val().replace(':', '');
               const endTime = row.find('.end-time').val().replace(':', '');
               const reason = row.find('.reason-field').val();
@@ -1827,14 +1715,10 @@
                               alert('저장되었습니다.');
                               updateButtonStates();
 
-                              // 휴일근무 저장 시 캐시 및 실적 즉시 갱신
+                              // 휴일근무 저장 시 실적 즉시 갱신
                               if (workSelect === '휴일근무') {
                                   setTimeout(function() {
                                       const workDate = $('#generalWorkDate').val().replace(/-/g, '');
-
-                                      // 휴일근무 상태 캐시 저장
-                                      const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-                                      holidayWorkStatusCache.set(holidayCacheKey, '48.00');
 
                                       // 근무정보 다시 조회하여 실적 업데이트
                                       loadWorkInfo(empCode, workDate, function(updatedWorkInfo) {
@@ -1843,17 +1727,10 @@
                                               row.attr('data-record', updatedWorkInfo.appliedRecord.shiftName);
                                           }
 
-                                          // 예상근로시간 캐시 갱신
+                                          // 예상근로시간 서버에서 다시 받아오기
                                           if (updatedWorkInfo.expectedHours) {
-                                              const baseCacheKey = `${empCode}_${workDate}`;
-                                              const workTypeCacheKey = `${empCode}_${workDate}_휴일근무`;
-
-                                              expectedHoursCache.set(baseCacheKey, updatedWorkInfo.expectedHours);
-                                              workTypeSpecificCache.set(workTypeCacheKey, updatedWorkInfo.expectedHours);
-                                              holidayWorkStatusCache.set(holidayCacheKey, updatedWorkInfo.expectedHours);
-
                                               row.find('.expected-hours').text(updatedWorkInfo.expectedHours);
-                                              console.log('휴일근무 저장 후 예상근로시간 캐시 갱신:', updatedWorkInfo.expectedHours);
+                                              console.log('휴일근무 저장 후 예상근로시간 서버에서 갱신:', updatedWorkInfo.expectedHours);
                                           }
                                       });
                                   }, 500);
@@ -1934,7 +1811,7 @@
                   }
               }
 
-              const data = {
+                            const data = {
                   empCode: empCode,
                   shiftCode: shiftCode,
                   targetStartDate: startDate,
@@ -2117,7 +1994,6 @@
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');
                           updateButtonStates();
 
-                          // 승인완료 시 실적 업데이트
                           if (finalStatus === '승인완료') {
                               const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
                               if (workType === '휴일근무') {
@@ -2125,25 +2001,14 @@
                                       const empCode = row.data('emp-code');
                                       const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
-                                      // 휴일근무 승인완료 후에도 실적을 휴일근무로 유지
-                                      const holidayCacheKey = `${empCode}_${workDate}_휴일근무`;
-                                      holidayWorkStatusCache.set(holidayCacheKey, '48.00');
-
                                       loadWorkInfo(empCode, workDate, function(updatedWorkInfo) {
                                           if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
                                               row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
                                               console.log('휴일근무 승인완료 후 실적 유지:', updatedWorkInfo.appliedRecord.shiftName);
                                           }
                                           if (updatedWorkInfo.expectedHours) {
-                                              const baseCacheKey = `${empCode}_${workDate}`;
-                                              const workTypeCacheKey = `${empCode}_${workDate}_휴일근무`;
-
-                                              expectedHoursCache.set(baseCacheKey, updatedWorkInfo.expectedHours);
-                                              workTypeSpecificCache.set(workTypeCacheKey, updatedWorkInfo.expectedHours);
-                                              holidayWorkStatusCache.set(holidayCacheKey, updatedWorkInfo.expectedHours);
-
                                               row.find('.expected-hours').text(updatedWorkInfo.expectedHours);
-                                              console.log('휴일근무 승인완료 후 예상근로시간 캐시 갱신:', updatedWorkInfo.expectedHours);
+                                              console.log('휴일근무 승인완료 후 예상근로시간 서버에서 갱신:', updatedWorkInfo.expectedHours);
                                           }
                                       });
                                   }, 500);
@@ -2213,7 +2078,7 @@
 
                                   const currentBalance = parseFloat(row.find('.annual-balance').text());
 
-                                  // 정확한 소수점 계산 (16.5 고정값 방지)
+                                  // 정확한 소수점 계산
                                   const newBalance = Math.round((currentBalance - requestDays) * 10) / 10;
 
                                   row.find('.annual-balance').text(newBalance.toFixed(1));
@@ -2353,11 +2218,7 @@
           updateButtonStates();
       });
 
-      // 날짜 변경 시 자동 조회
       $('#generalWorkDate').change(function() {
-          expectedHoursCache.clear();
-          workTypeSpecificCache.clear();
-          holidayWorkStatusCache.clear();
           setTimeout(function() {
               searchGeneralEmployees();
           }, 100);
@@ -2370,9 +2231,6 @@
       });
 
       $('#generalDeptSelect').change(function() {
-          expectedHoursCache.clear();
-          workTypeSpecificCache.clear();
-          holidayWorkStatusCache.clear();
           setTimeout(function() {
               searchGeneralEmployees();
           }, 100);
@@ -2392,8 +2250,6 @@
       });
 
       // 페이지 로드 완료 후 초기화
-      console.log('apply.html 스크립트 로드 완료 - 모든 기능 활성화');
-
       if (!$('#generalEmployeeTable thead th:first-child input[type="checkbox"]').length) {
           $('#generalEmployeeTable thead th:first-child').html('<input type="checkbox" id="selectAllGeneral"> 선택');
       }
