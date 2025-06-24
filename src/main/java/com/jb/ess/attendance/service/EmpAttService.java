@@ -88,16 +88,19 @@ public class EmpAttService {
             // 공휴일 && 휴일근무X 스킵
             String shiftCode = empCalendarMapper.findShiftCodeByEmpCodeAndDate(empCode, ymd);
             if ("Y".equals(empCalendarMapper.getHolidayYnByEmpCodeAndDate(empCode, ymd))
-                    && !"14-1".equals(shiftCode)) continue;
+                    && !("14-1".equals(shiftCode) || "00".equals(shiftCode))) {
+                System.out.println("continue");
+                continue;
+            }
 
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, ymd);
 
-            // 실적이 있는 경우
-            if (attRecord != null && attRecord.getShiftCode() != null && !attRecord.getShiftCode().isEmpty()) {
+            // 실적이 있는 경우 (휴일근무 제외)
+            if (attRecord != null && attRecord.getShiftCode() != null && !attRecord.getShiftCode().isEmpty() && !attRecord.getShiftCode().equals("14-1")) {
                 ShiftMaster shift = shiftMasterMapper.findShiftByCode(attRecord.getShiftCode());
 
                 // 결근 제외 (SHIFT_CODE가 00일 경우)
-                if (shift != null && !"00".equals(shift.getShiftCode())) {
+                if (shift != null && !"00".equals(shift.getShiftCode()) || "14-1".equals(attRecord.getAbsence())) {
                     List<Pair<String, String>> leavePeriods = new ArrayList<>();
                     List<String> timeItemNames = attendanceApplyMapper.findApprovedTimeItemCode(empCode, ymd, "승인완료");
 
@@ -125,20 +128,27 @@ public class EmpAttService {
                 }
             }
 
+            System.out.println("[DEBUG] empCode: " + empCode + " / ymd: " + ymd + " / workHours: " + workHours);
             // 연장근무
             Duration overtime = getOvertimeHours(empCode, ymd);
-            if (!overtime.isZero() && !overtime.isNegative()) {
+            // 실적이 없는날인 경우 (미래) 예상근무시간에 연장근무시간 포함
+            if (!overtime.isZero() && !overtime.isNegative() && attRecord == null) {
                 workHours = workHours.plus(overtime);
             }
-
             totalOvertimeHours += overtime.toMinutes() / 60.0;
 
+            System.out.println("[DEBUG] totalOvertimeHours: " + totalOvertimeHours);
+
             // 휴일근무
+            AttendanceRecord holidayAttRecord = attRecordMapper.getHolidayAttRecordByEmpCode(empCode, ymd);
             Duration holidayWork = getHolidayWorkHours(empCode, ymd);
-            if (!holidayWork.isZero() && !holidayWork.isNegative()) {
-                workHours = workHours.plus(holidayWork);
-            }
+            System.out.println("holidayWork = " + holidayWork);
+            System.out.println("holidayAttRecord = " + holidayAttRecord);
+            // 휴일근무 실적이 없는경우 (미래) 예상근무시간에 휴일근무시간 포함
+            workHours = workHours.plus(holidayWork);
             totalHolidayWorkHours += holidayWork.toMinutes() / 60.0;
+
+            System.out.println("[DEBUG] totalHolidayWorkHours: " + totalHolidayWorkHours);
         }
 
         emp.setOverTime(String.format("%.2f", totalOvertimeHours));
@@ -150,6 +160,7 @@ public class EmpAttService {
 
     /* 연장근무 */
     public Duration getOvertimeHours(String empCode, String ymd) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
         List<AttendanceApplyGeneral> overtimes = attendanceApplyMapper.findApprovedOverTimes(empCode, ymd);
         if (overtimes == null || overtimes.isEmpty()) return Duration.ZERO;
 
@@ -160,7 +171,6 @@ public class EmpAttService {
         for (AttendanceApplyGeneral overtime : overtimes) {
             if (baseShift == null) continue;
 
-            // 새로운 객체로 구성 (공유 객체 보호)
             ShiftMaster shift = new ShiftMaster();
             shift.setWorkOnHhmm(overtime.getStartTime());
             shift.setWorkOffHhmm(overtime.getEndTime());
@@ -169,7 +179,13 @@ public class EmpAttService {
             shift.setBreak2StartHhmm(baseShift.getBreak2StartHhmm());
             shift.setBreak2EndHhmm(baseShift.getBreak2EndHhmm());
             shift.setWorkOnDayType("N0");
-            shift.setWorkOffDayType("N0");
+            LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
+            LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
+            if (parsedWorkOn.isAfter(parsedWorkOff)) {
+                shift.setWorkOffDayType("N1");
+            } else {
+                shift.setWorkOffDayType("N0");
+            }
 
             overtimeHours = overtimeHours.plus(WorkHoursCalculator.getTotalWorkTime(shift));
         }
@@ -196,13 +212,12 @@ public class EmpAttService {
         shift.setBreak1EndHhmm(base.getBreak1EndHhmm());
         shift.setBreak2StartHhmm(base.getBreak2StartHhmm());
         shift.setBreak2EndHhmm(base.getBreak2EndHhmm());
+        shift.setWorkOnDayType("N0");
         LocalTime parsedWorkOn = LocalTime.parse(shift.getWorkOnHhmm(), formatter);
         LocalTime parsedWorkOff = LocalTime.parse(shift.getWorkOffHhmm(), formatter);
         if (parsedWorkOn.isAfter(parsedWorkOff)) {
-            shift.setWorkOnDayType("N0");
             shift.setWorkOffDayType("N1");
         } else {
-            shift.setWorkOnDayType("N0");
             shift.setWorkOffDayType("N0");
         }
 
@@ -235,14 +250,24 @@ public class EmpAttService {
 
             if (cal == null) {
                 emp.setShiftCode(null);
-            } else if ("Y".equals(cal.getHolidayYn()) && !Objects.equals(cal.getShiftCode(), "14-1")) {
+            } else if ("Y".equals(cal.getHolidayYn()) && (!Objects.equals(cal.getShiftCode(), "14-1") && !Objects.equals(cal.getShiftCode(), "00"))) {
                 emp.setShiftCode(cal.getShiftCode()); // 휴일인 경우 실적 유지
             } else {
+                System.out.println("cal: " + cal);
                 // 실근무일인 경우
                 String workOn = shiftMasterMapper.findWorkOnHourByShiftCode(cal.getShiftCode());
 
-                LocalTime parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
-                LocalDateTime workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
+                LocalTime parsedWorkOnTime = null;
+                LocalDateTime workOnDateTime = null;
+                if (workOn != null && !workOn.isBlank()) {
+                    parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
+                    workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
+                    // 이후 로직
+                } else {
+                    log.warn("해당 근무조의 시작 시간이 존재하지 않음: shiftCode=" + cal.getShiftCode());
+                    // 예외를 던지거나 기본값 처리
+                    // 예: return 또는 throw new IllegalStateException("Invalid shift time");
+                }
 
                 // 출퇴근 시간 파싱
                 LocalDateTime checkInDateTime = null;
@@ -271,7 +296,7 @@ public class EmpAttService {
                 // 출근시간 전
                 if (nowDateTime.isBefore(workOnDateTime)) {
                     // 실적이 변경된 경우 (근태 신청)
-                    if (!Objects.equals(cal.getShiftCode(), cal.getShiftCodeOrig())) {
+                    if (!Objects.equals(cal.getShiftCode(), cal.getShiftCodeOrig()) && !Objects.equals(cal.getShiftCode(), "00")) {
                         emp.setShiftCode(cal.getShiftCode());
                         emp.setTimeItemNames(List.of(shiftMasterMapper.findShiftNameByShiftCode(cal.getShiftCode())));
                     }
@@ -282,23 +307,39 @@ public class EmpAttService {
                     if (checkInDateTime == null && checkOutDateTime == null) {
                         if (nowDateTime.isAfter(workOnDateTime)) {
                             // 출근 지났는데 기록 없으면 결근 처리
+                            if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd, emp.getShiftCode());
+                            else {
+                                if (!Objects.equals(emp.getShiftCode(), "00")) {
+                                    attRecordMapper.updateAbsenceByEmpCodeAndWorkDate(empCode, workYmd, emp.getShiftCode());
+                                }
+                            }
                             emp.setShiftCode("00");
                             empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, "00");
-                            if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd);
                         } else {
                             emp.setShiftCode(null);
                         }
                     // 출퇴근 기록 있음
                     } else {
                         // 지각 (휴일근무 X)
-                        if (checkInDateTime != null && checkInDateTime.isAfter(workOnDateTime) && !Objects.equals(emp.getShiftCode(), "14-1")) {
-                            emp.setTimeItemCode("3050");
-                            emp.setTimeItemNames(List.of("지각"));
-
-                            emp.setShiftCode(emp.getShiftCodeOrig());
-                            empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, emp.getShiftCodeOrig());
+                        if (checkInDateTime != null) {
+                            if (Objects.equals(emp.getShiftCode(), "00")) {
+                                String absence = attRecordMapper.getAbsenceByEmpCodeAndWorkDate(empCode, workYmd);
+                                if (absence != null) {
+                                    workOn = shiftMasterMapper.findWorkOnHourByShiftCode(absence);
+                                    parsedWorkOnTime = LocalTime.parse(workOn, timeFormatter);
+                                    workOnDateTime = LocalDateTime.of(workLocalDate, parsedWorkOnTime);
+                                }
+                            }
+                            checkInDateTime = Objects.requireNonNull(checkInDateTime).withNano(0);
+                            workOnDateTime = Objects.requireNonNull(workOnDateTime).withNano(0);
+                            if (checkInDateTime.isAfter(workOnDateTime)) {
+                                emp.setTimeItemCode("3050");
+                                emp.setTimeItemNames(List.of("지각"));
+                            }
+                            emp.setShiftCode(att.getAbsence());
+                            empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, emp.getShiftCode());
                         }
-                        emp.setShiftCode(cal.getShiftCode());
+                        else emp.setShiftCode(cal.getShiftCode());
                     }
                 }
             }

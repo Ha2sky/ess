@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -433,7 +434,7 @@ public class ApprovalService {
     }
 
     /**
-     * 부서명 조회 로직 완전 강화
+     * 부서명 조회 로직
      */
     private String getDepartmentNameEnhanced(Employee emp) {
         if (emp == null) return "-";
@@ -547,6 +548,22 @@ public class ApprovalService {
     }
 
     /**
+     * 승인된 기타근태 문서 조회
+     */
+    public List<AttendanceApplyEtc> getApprovedEtcApprovals(String approverCode, String startDate, String endDate, String empCode) {
+        try {
+            log.debug("승인된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
+                    approverCode, startDate, endDate, empCode);
+            List<AttendanceApplyEtc> result = approvalMapper.findApprovedEtcApprovals(approverCode, startDate, endDate, empCode);
+            log.debug("승인된 기타근태 문서 수: {}", result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("승인된 기타근태 문서 조회 실패", e);
+            return List.of();
+        }
+    }
+
+    /**
      * 반려된 일반근태 문서 조회
      */
     public List<AttendanceApplyGeneral> getRejectedGeneralApprovals(String approverCode, String startDate, String endDate, String applyType, String empCode) {
@@ -563,7 +580,23 @@ public class ApprovalService {
     }
 
     /**
-     * 일반근태 승인 처리
+     * 반려된 기타근태 문서 조회
+     */
+    public List<AttendanceApplyEtc> getRejectedEtcApprovals(String approverCode, String startDate, String endDate, String empCode) {
+        try {
+            log.debug("반려된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
+                    approverCode, startDate, endDate, empCode);
+            List<AttendanceApplyEtc> result = approvalMapper.findRejectedEtcApprovals(approverCode, startDate, endDate, empCode);
+            log.debug("반려된 기타근태 문서 수: {}", result.size());
+            return result;
+        } catch (Exception e) {
+            log.error("반려된 기타근태 문서 조회 실패", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * 일반근태 승인
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
@@ -592,11 +625,12 @@ public class ApprovalService {
 
             String applyType = apply.getApplyType();
             if ("휴일근무".equals(applyType)) {
-                attendanceApplyMapper.updateAttendanceRecordByShiftCode(apply.getEmpCode(), apply.getTargetDate(), "14-1");
-                log.debug("휴일근무 승인 완료: 실적 변경 (14-1)");
+                attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
+                log.debug("휴일근무 승인 완료: SHIFT_CODE 업데이트 (14-1)");
             } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
-                deductAnnualLeave(apply.getEmpCode(), new BigDecimal("0.5"));
-                log.debug("전반차/후반차 승인 완료: 연차 차감만 실행 (실적 변경 없음)");
+                deductAnnualLeaveUltraPrecision(apply.getEmpCode(), new BigDecimal("0.5"));
+                attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
+                log.debug("전반차/후반차 승인 완료: 연차 차감 및 SHIFT_CODE 업데이트");
             }
 
             log.info("일반근태 승인 처리 완료: applyGeneralNo={}", applyGeneralNo);
@@ -607,7 +641,7 @@ public class ApprovalService {
     }
 
     /**
-     * 기타근태 승인 처리
+     * 기타근태 승인
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
@@ -637,11 +671,20 @@ public class ApprovalService {
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
-                    deductAnnualLeave(apply.getEmpCode(), BigDecimal.ONE);
-                    log.debug("연차 승인 완료: 연차 차감만 실행 (실적은 동적 계산으로 처리)");
-                } else {
-                    log.debug("기타근태 승인 완료: 실적 변경 없음 (shiftName={})", shiftName);
+                    deductAnnualLeaveUltraPrecision(apply.getEmpCode(), BigDecimal.ONE);
+                    log.debug("연차 승인 완료: 연차 차감 완료");
+                } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
+                    deductAnnualLeaveUltraPrecision(apply.getEmpCode(), new BigDecimal("0.5"));
+                    log.debug("반차 승인 완료: 연차 0.5일 차감 완료");
                 }
+
+                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                        apply.getEmpCode(),
+                        apply.getTargetStartDate(),
+                        apply.getTargetEndDate(),
+                        apply.getShiftCode()
+                );
+                log.debug("기타근태 승인 완료: SHIFT_CODE 업데이트 (shiftName={})", shiftName);
             }
 
             log.info("기타근태 승인 처리 완료: applyEtcNo={}", applyEtcNo);
@@ -655,27 +698,83 @@ public class ApprovalService {
      * 연차 차감 메서드
      */
     @Transactional
-    private void deductAnnualLeave(String empCode, BigDecimal deductDays) {
+    private void deductAnnualLeaveUltraPrecision(String empCode, BigDecimal deductDays) {
         try {
-            AnnualDetail currentAnnual = annualDetailMapper.findByEmpCode(empCode);
-            if (currentAnnual != null) {
-                BigDecimal newBalance = currentAnnual.getBalanceDay().subtract(deductDays);
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                    log.warn("연차 잔여량 부족: empCode={}, 현재잔여={}, 차감요청={}",
-                            empCode, currentAnnual.getBalanceDay(), deductDays);
-                    newBalance = BigDecimal.ZERO;
-                }
+            // 차감할 일수를 소수점 1자리로 정확히 설정
+            BigDecimal deductDaysScaled = deductDays.setScale(1, RoundingMode.HALF_UP);
 
-                annualDetailMapper.updateBalanceDay(empCode, newBalance);
-                log.debug("연차 차감 완료: empCode={}, 차감일수={}, 기존잔여={}, 신규잔여={}",
-                        empCode, deductDays, currentAnnual.getBalanceDay(), newBalance);
+            // 강제 새로고침으로 정확한 현재 상태 조회
+            AnnualDetail currentAnnual = annualDetailMapper.findByEmpCodeForceRefresh(empCode);
+            if (currentAnnual != null) {
+                // 현재 값들을 소수점 1자리로 정확히 설정
+                BigDecimal currentBalance = currentAnnual.getBalanceDay().setScale(1, RoundingMode.HALF_UP);
+                BigDecimal currentUse = currentAnnual.getUseDay().setScale(1, RoundingMode.HALF_UP);
+
+                log.debug("연차 차감 전 상태 (정밀): empCode={}, 현재잔여={}, 현재사용={}, 차감예정={}",
+                        empCode, currentBalance, currentUse, deductDaysScaled);
+
+                // 울트라 정밀 차감 메서드 사용
+                boolean deductionResult = annualDetailMapper.updateBalanceDayWithCheckUltra(empCode, deductDaysScaled);
+
+                if (deductionResult) {
+                    // 사용일수 증가도 울트라 정밀 메서드 사용
+                    annualDetailMapper.updateUseDayIncreaseUltra(empCode, deductDaysScaled);
+
+                    // 차감 후 즉시 확인 (강제 새로고침)
+                    AnnualDetail updatedAnnual = annualDetailMapper.findByEmpCodeForceRefresh(empCode);
+                    if (updatedAnnual != null) {
+                        BigDecimal updatedBalance = updatedAnnual.getBalanceDay().setScale(1, RoundingMode.HALF_UP);
+                        BigDecimal updatedUse = updatedAnnual.getUseDay().setScale(1, RoundingMode.HALF_UP);
+
+                        log.debug("연차 차감 완료 (정밀): empCode={}, 차감일수={}, 차감후잔여={}, 차감후사용={}",
+                                empCode, deductDaysScaled, updatedBalance, updatedUse);
+
+                        // 예상 값과 실제 값 비교 (소수점 1자리 정밀 비교)
+                        BigDecimal expectedBalance = currentBalance.subtract(deductDaysScaled).setScale(1, RoundingMode.HALF_UP);
+                        BigDecimal expectedUse = currentUse.add(deductDaysScaled).setScale(1, RoundingMode.HALF_UP);
+
+                        if (updatedBalance.compareTo(expectedBalance) != 0) {
+                            log.error("연차 차감 계산 오류 (정밀): 예상잔여={}, 실제잔여={}", expectedBalance, updatedBalance);
+                            // 강제 보정
+                            annualDetailMapper.forceRecalculateAnnual(empCode, expectedBalance, expectedUse);
+                        }
+                        if (updatedUse.compareTo(expectedUse) != 0) {
+                            log.error("연차 사용 계산 오류 (정밀): 예상사용={}, 실제사용={}", expectedUse, updatedUse);
+                            // 강제 보정
+                            annualDetailMapper.forceRecalculateAnnual(empCode, expectedBalance, expectedUse);
+                        }
+                    }
+                } else {
+                    log.warn("연차 잔여량 부족으로 차감 실패 (정밀): empCode={}, 요청차감일수={}, 현재잔여={}",
+                            empCode, deductDaysScaled, currentBalance);
+                    throw new RuntimeException("연차 잔여량이 부족합니다. 현재 잔여: " + currentBalance + "일, 요청 차감: " + deductDaysScaled + "일");
+                }
             } else {
-                log.warn("연차 정보가 없습니다: empCode={}", empCode);
+                log.error("연차 정보 조회 실패 (정밀): empCode={}", empCode);
+                throw new RuntimeException("연차 정보를 찾을 수 없습니다.");
             }
         } catch (Exception e) {
-            log.error("연차 차감 실패: empCode={}, deductDays={}", empCode, deductDays, e);
-            throw new RuntimeException("연차 차감에 실패했습니다.", e);
+            log.error("연차 차감 실패 (정밀): empCode={}, deductDays={}", empCode, deductDays, e);
+            throw new RuntimeException("연차 차감에 실패했습니다: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 연차 차감 메서드 (기존 호환성 유지 + 정밀도 개선)
+     */
+    @Transactional
+    private void deductAnnualLeaveImproved(String empCode, BigDecimal deductDays) {
+        // 새로운 정밀 메서드로 위임
+        deductAnnualLeaveUltraPrecision(empCode, deductDays);
+    }
+
+    /**
+     * 연차 차감 메서드 (기존 호환성 유지)
+     */
+    @Transactional
+    private void deductAnnualLeave(String empCode, BigDecimal deductDays) {
+        // 새로운 정밀 메서드로 위임
+        deductAnnualLeaveUltraPrecision(empCode, deductDays);
     }
 
     /**
@@ -743,7 +842,7 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "반려");
 
-            log.info("기타근태 반료 처리 완료: applyEtcNo={}", applyEtcNo);
+            log.info("기타근태 반려 처리 완료: applyEtcNo={}", applyEtcNo);
         } catch (Exception e) {
             log.error("기타근태 반려 처리 실패: applyEtcNo={}", applyEtcNo, e);
             throw new RuntimeException("반려 처리에 실패했습니다: " + e.getMessage(), e);
@@ -776,38 +875,6 @@ public class ApprovalService {
             return result;
         } catch (Exception e) {
             log.error("기타근태 결재 이력 조회 실패: applyEtcNo={}", applyEtcNo, e);
-            return List.of();
-        }
-    }
-
-    /**
-     * 승인된 기타근태 문서 조회
-     */
-    public List<AttendanceApplyEtc> getApprovedEtcApprovals(String approverCode, String startDate, String endDate, String empCode) {
-        try {
-            log.debug("승인된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
-                    approverCode, startDate, endDate, empCode);
-            List<AttendanceApplyEtc> result = approvalMapper.findApprovedEtcApprovals(approverCode, startDate, endDate, empCode);
-            log.debug("승인된 기타근태 문서 수: {}", result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("승인된 기타근태 문서 조회 실패", e);
-            return List.of();
-        }
-    }
-
-    /**
-     * 반려된 기타근태 문서 조회
-     */
-    public List<AttendanceApplyEtc> getRejectedEtcApprovals(String approverCode, String startDate, String endDate, String empCode) {
-        try {
-            log.debug("반려된 기타근태 문서 조회: approverCode={}, startDate={}, endDate={}, empCode={}",
-                    approverCode, startDate, endDate, empCode);
-            List<AttendanceApplyEtc> result = approvalMapper.findRejectedEtcApprovals(approverCode, startDate, endDate, empCode);
-            log.debug("반려된 기타근태 문서 수: {}", result.size());
-            return result;
-        } catch (Exception e) {
-            log.error("반려된 기타근태 문서 조회 실패", e);
             return List.of();
         }
     }

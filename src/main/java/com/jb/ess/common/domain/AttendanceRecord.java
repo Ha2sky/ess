@@ -12,4 +12,5 @@ public class AttendanceRecord {
     private String checkOutDayType; // 퇴근타입
 
     private String shiftCode;       // 근태코드
+    private String absence;         // 결근전 근태코드
 }

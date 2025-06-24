@@ -143,7 +143,7 @@ public class AttendanceApplyController {
         }
     }
 
-    // 기타근태 날짜 범위 검증 API 추가
+    // 기타근태 날짜 범위 검증 API
     @GetMapping("/validateDateRange")
     @ResponseBody
     public Map<String, Object> validateDateRange(@RequestParam String startDate, @RequestParam String endDate) {
@@ -184,7 +184,16 @@ public class AttendanceApplyController {
     @ResponseBody
     public Map<String, Object> getWorkInfo(@PathVariable String empCode, @PathVariable String workDate) {
         try {
-            return attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
+            log.debug("근무정보 조회 (캐시 안정화): empCode={}, workDate={}", empCode, workDate);
+            Map<String, Object> workInfo = attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
+
+            Object expectedHours = workInfo.get("expectedHours");
+            if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
+                workInfo.put("expectedHours", "40.00");
+                log.debug("예상근로시간 기본값 설정: 40.00");
+            }
+
+            return workInfo;
         } catch (Exception e) {
             log.error("근무정보 조회 실패: empCode={}, workDate={}", empCode, workDate, e);
             return Map.of(
@@ -192,7 +201,7 @@ public class AttendanceApplyController {
                     "empCalendarPlan", "",
                     "record", Map.of("checkInTime", "-", "checkOutTime", "-", "shiftCode", "", "shiftName", ""),
                     "appliedRecord", null,
-                    "expectedHours", "0.00"
+                    "expectedHours", "40.00"  // 주간 예상근로시간 기본값
             );
         }
     }
@@ -250,6 +259,36 @@ public class AttendanceApplyController {
                 response.put("result", "error");
                 response.put("message", "결근 사원은 근태 신청을 할 수 없습니다.");
                 return response;
+            }
+
+            if ("연장".equals(apply.getApplyType()) || "조출연장".equals(apply.getApplyType())) {
+                // 해당 날짜에 휴일근무 신청이 있는지 먼저 확인
+                AttendanceApplyGeneral holidayApply = attendanceApplyService.findGeneralApplyByEmpAndDate(apply.getEmpCode(), apply.getTargetDate());
+                if (holidayApply != null && "휴일근무".equals(holidayApply.getApplyType()) &&
+                        ("승인완료".equals(holidayApply.getStatus()) || "상신".equals(holidayApply.getStatus()))) {
+
+                    // 휴일근무 8시간 이상 검증
+                    if (holidayApply.getStartTime() != null && holidayApply.getEndTime() != null) {
+                        try {
+                            int startTime = Integer.parseInt(holidayApply.getStartTime());
+                            int endTime = Integer.parseInt(holidayApply.getEndTime());
+                            int workMinutes = (endTime / 100 * 60 + endTime % 100) - (startTime / 100 * 60 + startTime % 100);
+
+                            if (workMinutes < 480) { // 8시간 = 480분
+                                response.put("result", "error");
+                                response.put("message", "휴일근무 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다.");
+                                return response;
+                            }
+
+                            log.debug("휴일근무 8시간 검증 통과: empCode={}, workMinutes={}", apply.getEmpCode(), workMinutes);
+                        } catch (NumberFormatException e) {
+                            log.warn("휴일근무 시간 파싱 실패: startTime={}, endTime={}", holidayApply.getStartTime(), holidayApply.getEndTime());
+                            response.put("result", "error");
+                            response.put("message", "휴일근무 시간 정보가 올바르지 않습니다.");
+                            return response;
+                        }
+                    }
+                }
             }
 
             // 유효한 TIME_ITEM_CODE 조회 후 설정
@@ -439,6 +478,201 @@ public class AttendanceApplyController {
         } catch (Exception e) {
             log.error("기타근태 삭제 실패", e);
             return "삭제에 실패했습니다: " + e.getMessage();
+        }
+    }
+
+    // 실시간 주 52시간 검증 API
+    @PostMapping("/calculateWorkHours")
+    @ResponseBody
+    public Map<String, Object> calculateRealTimeWorkHours(@RequestParam String empCode,
+                                                          @RequestParam String workDate,
+                                                          @RequestParam(required = false) String startTime,
+                                                          @RequestParam(required = false) String endTime,
+                                                          @RequestParam String applyType) {
+        try {
+            log.debug("실시간 주 52시간 계산 요청: empCode={}, workDate={}, startTime={}, endTime={}, applyType={}",
+                    empCode, workDate, startTime, endTime, applyType);
+
+            return attendanceApplyService.calculateRealTimeWeeklyHours(empCode, workDate, startTime, endTime, applyType);
+        } catch (Exception e) {
+            log.error("실시간 주 52시간 계산 실패: empCode={}, workDate={}", empCode, workDate, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("totalWeeklyHours", 40.0);
+            errorResponse.put("requestHours", 0.0);
+            errorResponse.put("isValid", true);
+            errorResponse.put("message", "계산 오류");
+            return errorResponse;
+        }
+    }
+
+    // 조출연장 시간 제한 검증 API
+    @PostMapping("/validateEarlyOvertimeTime")
+    @ResponseBody
+    public Map<String, Object> validateEarlyOvertimeTime(@RequestParam String startTime) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            boolean isValid = true;
+            String message = "정상";
+
+            if (startTime != null && !startTime.isEmpty()) {
+                try {
+                    // HH:MM 형식을 HHMM으로 변환
+                    String timeStr = startTime.replace(":", "");
+                    int timeInt = Integer.parseInt(timeStr);
+
+                    if (timeInt >= 730) {
+                        isValid = false;
+                        message = "조출연장은 07:30 이전에만 신청할 수 있습니다.";
+                    }
+                } catch (NumberFormatException e) {
+                    isValid = false;
+                    message = "시간 형식이 올바르지 않습니다.";
+                }
+            }
+
+            response.put("isValid", isValid);
+            response.put("message", message);
+            return response;
+        } catch (Exception e) {
+            log.error("조출연장 시간 검증 실패: startTime={}", startTime, e);
+            response.put("isValid", false);
+            response.put("message", "검증 중 오류가 발생했습니다.");
+            return response;
+        }
+    }
+
+    // 일반연장 시간 제한 검증 API
+    @PostMapping("/validateRegularOvertimeTime")
+    @ResponseBody
+    public Map<String, Object> validateRegularOvertimeTime(@RequestParam String startTime) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            boolean isValid = true;
+            String message = "정상";
+
+            if (startTime != null && !startTime.isEmpty()) {
+                try {
+                    // HH:MM 형식을 HHMM으로 변환
+                    String timeStr = startTime.replace(":", "");
+                    int timeInt = Integer.parseInt(timeStr);
+
+                    if (timeInt < 1620) {
+                        isValid = false;
+                        message = "정상근무시간(16:20) 이후에만 연장근무를 신청할 수 있습니다.";
+                    }
+                } catch (NumberFormatException e) {
+                    isValid = false;
+                    message = "시간 형식이 올바르지 않습니다.";
+                }
+            }
+
+            response.put("isValid", isValid);
+            response.put("message", message);
+            return response;
+        } catch (Exception e) {
+            log.error("일반연장 시간 검증 실패: startTime={}", startTime, e);
+            response.put("isValid", false);
+            response.put("message", "검증 중 오류가 발생했습니다.");
+            return response;
+        }
+    }
+
+    @GetMapping("/getApplyByWorkType/{empCode}/{workDate}/{applyType}")
+    @ResponseBody
+    public Map<String, Object> getApplyByWorkType(@PathVariable String empCode,
+                                                  @PathVariable String workDate,
+                                                  @PathVariable String applyType) {
+        try {
+            log.debug("신청근무별 완전 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
+
+            Map<String, Object> result = attendanceApplyService.getApplyByWorkType(empCode, workDate, applyType);
+
+            if (result == null) {
+                result = new HashMap<>();
+                result.put("hasExisting", false);
+                result.put("applyType", "general");
+                result.put("status", "대기");
+                result.put("startTime", "");
+                result.put("endTime", "");
+                result.put("reason", "");
+                log.debug("서비스 응답이 null - 기본값 설정: applyType={}", applyType);
+            }
+
+            log.debug("신청근무별 완전 분리 조회 완료: hasExisting={}, status={}",
+                    result.get("hasExisting"), result.get("status"));
+
+            return result;
+        } catch (Exception e) {
+            log.error("신청근무별 완전 분리 조회 실패: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("hasExisting", false);
+            errorResponse.put("applyType", "general");
+            errorResponse.put("status", "대기");
+            errorResponse.put("message", "조회 중 오류가 발생했습니다.");
+            return errorResponse;
+        }
+    }
+
+    @GetMapping("/updateExpectedHours/{empCode}/{workDate}")
+    @ResponseBody
+    public Map<String, Object> updateExpectedHours(@PathVariable String empCode, @PathVariable String workDate) {
+        try {
+            log.debug("예상근로시간 실시간 업데이트 (캐시 안정화): empCode={}, workDate={}", empCode, workDate);
+
+            Map<String, Object> workInfo = attendanceApplyService.getWorkInfoWithEmpCalendar(empCode, workDate);
+
+            Map<String, Object> response = new HashMap<>();
+
+            Object expectedHours = workInfo.get("expectedHours");
+            if (expectedHours == null || expectedHours.toString().trim().isEmpty()) {
+                expectedHours = "40.00";
+                log.debug("예상근로시간 기본값 적용: 40.00");
+            }
+
+            response.put("expectedHours", expectedHours.toString());
+            response.put("success", true);
+            response.put("message", "업데이트 완료");
+
+            log.debug("예상근로시간 업데이트 완료 (캐시 안정화): {}", expectedHours);
+
+            return response;
+        } catch (Exception e) {
+            log.error("예상근로시간 실시간 업데이트 실패: empCode={}, workDate={}", empCode, workDate, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("expectedHours", "40.00");
+            errorResponse.put("success", false);
+            errorResponse.put("message", "업데이트 실패");
+            return errorResponse;
+        }
+    }
+
+    // 요구사항: 전반차/후반차 시간 입력 차단 검증 API
+    @GetMapping("/validateHalfDayApply/{applyType}")
+    @ResponseBody
+    public Map<String, Object> validateHalfDayApply(@PathVariable String applyType) {
+        try {
+            return attendanceApplyService.validateHalfDayTimeInput(applyType);
+        } catch (Exception e) {
+            log.error("반차 검증 실패: applyType={}", applyType, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("timeInputDisabled", false);
+            errorResponse.put("message", "검증 중 오류가 발생했습니다.");
+            return errorResponse;
+        }
+    }
+
+    // 요구사항: 조퇴 종료시간 입력 차단 검증 API
+    @GetMapping("/validateEarlyLeaveApply/{applyType}")
+    @ResponseBody
+    public Map<String, Object> validateEarlyLeaveApply(@PathVariable String applyType) {
+        try {
+            return attendanceApplyService.validateEarlyLeaveTimeInput(applyType);
+        } catch (Exception e) {
+            log.error("조퇴 검증 실패: applyType={}", applyType, e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("endTimeDisabled", false);
+            errorResponse.put("message", "검증 중 오류가 발생했습니다.");
+            return errorResponse;
         }
     }
 }

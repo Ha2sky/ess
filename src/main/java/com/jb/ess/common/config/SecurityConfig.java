@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
 @Configuration
 @EnableWebSecurity
@@ -37,25 +38,31 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/admin").hasRole("ADMIN")
-                .requestMatchers("/user").hasRole("USER")
-                .anyRequest().permitAll())
-            .formLogin(login -> login
-                .loginPage("/login")
-                .defaultSuccessUrl("/home", true)
-                .usernameParameter("empCode")
-                .passwordParameter("password")
-                .successHandler(successHandler())
-                .failureUrl("/login?error=true")
-                .failureHandler(customAuthenticationFailureHandler)
-                .permitAll())
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/admin").hasRole("ADMIN")
+                        .requestMatchers("/user").hasRole("USER")
+                        .anyRequest().permitAll())
+                .formLogin(login -> login
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/home", true)
+                        .usernameParameter("empCode")
+                        .passwordParameter("password")
+                        .successHandler(successHandler())
+                        .failureUrl("/login?error=true")
+                        .failureHandler(customAuthenticationFailureHandler)
+                        .permitAll())
 
-            .logout(logout -> logout
-                    .logoutUrl("/logout")
-                    .logoutSuccessUrl("/login?logout=true")
-                    .permitAll());
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout=true")
+                        .permitAll())
+                // 세션 관리 설정
+                .sessionManagement(session -> session
+                                .invalidSessionUrl("/") // 세션 만료 시 이동
+                                .maximumSessions(1) // 중복 로그인 제한
+                                .maxSessionsPreventsLogin(false) // 기존 세션 만료 허용
+                                .expiredUrl("/")); // 기존 세션이 만료되었을 때 리다이렉트할 경로
          /* .logout(logout -> logout
                 .permitAll() */
         return http.build();

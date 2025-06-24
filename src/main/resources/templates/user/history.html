@@ -256,7 +256,7 @@
 
     document.getElementById("applyTypeInfo").innerText = "[" + data.applyType + "]";
 
-    if (applyType === "연장근로" || applyType === "조출연장") {
+    if (applyType === "연장" || applyType === "조출연장") {
       document.getElementById("overtimeApplyInfo").classList.remove("hidden");
       document.getElementById("overtimeWorkDate").innerText = formatDate(data.targetDate) || "-";
       document.getElementById("overtimeReason").innerText = data.reason || "-";
