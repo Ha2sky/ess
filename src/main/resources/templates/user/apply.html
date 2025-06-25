@@ -448,7 +448,6 @@
                   updateExpectedHoursUltraStable(row, empCode, workDate, applyType);
                   validateWorkTimeRestrictionsUltimate(row);
                   updateButtonStates();
-
               })
               .fail(function() {
                   console.error('신청근무별 조회 실패');
@@ -507,7 +506,6 @@
           return hasHolidayWork;
       }
 
-      // 30분 단위 검증
       function validate30MinuteInterval(startTime, endTime, applyType) {
           const restrictedTypes = ['연장', '조출연장', '휴일근무', '조퇴', '외출', '외근'];
 
@@ -516,45 +514,65 @@
           }
 
           try {
-              // 서버의 WorkHoursCalculator와 동일한 로직으로 휴게시간 차감 후 검증
               const startTimeInt = parseInt(startTime.replace(':', ''));
               const endTimeInt = parseInt(endTime.replace(':', ''));
 
               const startMinutes = Math.floor(startTimeInt / 100) * 60 + (startTimeInt % 100);
-              const endMinutes = Math.floor(endTimeInt / 100) * 60 + (endTimeInt % 100);
+              let endMinutes = Math.floor(endTimeInt / 100) * 60 + (endTimeInt % 100);
+
+              // 자정 넘어가는 경우 처리
+              if (endMinutes <= startMinutes) {
+                  endMinutes += 24 * 60;
+              }
 
               let totalMinutes = endMinutes - startMinutes;
 
-              // 자정 넘어가는 경우 처리
-              if (totalMinutes <= 0) {
-                  totalMinutes += 24 * 60;
-              }
-
-              // 휴게시간 차감 (서버와 동일한 로직)
-              let netWorkMinutes = totalMinutes;
-
-              // 휴일근무(14-1)와 주간(05) 시프트의 휴게시간 적용
+              let breakTime = 0;
               if (applyType === '휴일근무') {
-                  // 14-1 시프트: 11:30~12:20 (50분), 16:20~16:50 (30분)
-                  if (totalMinutes > 8 * 60) { // 8시간 초과 시 휴게시간 차감
-                      netWorkMinutes = totalMinutes - 80; // 80분 휴게시간 차감
+                  // 휴일근무(14-1): 오전 휴게시간만 적용 (11:30~12:20 = 50분)
+                  const morningBreakStart = 11 * 60 + 30; // 690분
+                  const morningBreakEnd = 12 * 60 + 20;   // 740분
+
+                  if (startMinutes < morningBreakEnd && endMinutes > morningBreakStart) {
+                      const overlapStart = Math.max(startMinutes, morningBreakStart);
+                      const overlapEnd = Math.min(endMinutes, morningBreakEnd);
+                      breakTime = Math.max(0, overlapEnd - overlapStart);
                   }
+
+                  console.log('휴일근무 휴게시간 계산:', {
+                      시작: startTime, 종료: endTime,
+                      총시간: totalMinutes + '분',
+                      휴게시간: breakTime + '분',
+                      순수시간: (totalMinutes - breakTime) + '분'
+                  });
               } else {
-                  // 주간(05) 시프트: 11:30~12:20 (50분), 16:20~16:50 (30분)
+                  // 일반 근무: 오전 + 오후 휴게시간 (총 80분)
                   if (totalMinutes > 8 * 60) { // 8시간 초과 시 휴게시간 차감
-                      netWorkMinutes = totalMinutes - 80; // 80분 휴게시간 차감
+                      breakTime = 80; // 기본 80분 휴게시간
                   }
               }
 
-              // 휴게시간 차감 후 30분 단위 확인
+              const netWorkMinutes = totalMinutes - breakTime;
+
+              // 30분 단위 확인
               const is30MinuteInterval = netWorkMinutes % 30 === 0 && netWorkMinutes > 0;
 
               if (!is30MinuteInterval) {
-                  console.log('30분 단위 검증 실패 (휴게시간 차감 후):', applyType, '총시간=' + totalMinutes + '분', '순수시간=' + netWorkMinutes + '분');
+                  console.log('30분 단위 검증 실패 (휴게시간 차감 후):', {
+                      신청유형: applyType,
+                      총시간: totalMinutes + '분',
+                      휴게시간: breakTime + '분',
+                      순수시간: netWorkMinutes + '분'
+                  });
                   return false;
               }
 
-              console.log('30분 단위 검증 통과 (휴게시간 차감 후):', applyType, '총시간=' + totalMinutes + '분', '순수시간=' + netWorkMinutes + '분');
+              console.log('30분 단위 검증 통과:', {
+                  신청유형: applyType,
+                  총시간: totalMinutes + '분',
+                  휴게시간: breakTime + '분',
+                  순수시간: netWorkMinutes + '분'
+              });
               return true;
           } catch (e) {
               console.error('30분 단위 검증 오류:', e);
@@ -747,7 +765,6 @@
               const endTime = holidayWorkRow.find('.end-time').val();
 
               if (startTime && endTime) {
-                  // 8시간 이상 검증
                   const startHour = parseInt(startTime.split(':')[0]);
                   const startMin = parseInt(startTime.split(':')[1]);
                   const endHour = parseInt(endTime.split(':')[0]);
@@ -760,30 +777,30 @@
                       totalMinutes += 24 * 60;
                   }
 
-                  // 정확한 휴게시간 차감
-                  let netWorkMinutes = totalMinutes;
+                  let breakTime = 0;
+                  const morningBreakStart = 11 * 60 + 30; // 690분
+                  const morningBreakEnd = 12 * 60 + 20;   // 740분
+                  const workStart = startHour * 60 + startMin;
+                  const workEnd = endHour * 60 + endMin;
 
-                  // 8시간 이상 근무 시 휴게시간 차감
-                  if (totalMinutes >= 8 * 60) {
-                      // 오전 휴게시간 (11:30~12:20 = 50분) 겹침 확인
-                      const morningBreakOverlap = calculateBreakOverlap(startHour * 60 + startMin, endHour * 60 + endMin, 11 * 60 + 30, 12 * 60 + 20);
-
-                      // 오후 휴게시간 (16:20~16:50 = 30분) 겹침 확인
-                      const afternoonBreakOverlap = calculateBreakOverlap(startHour * 60 + startMin, endHour * 60 + endMin, 16 * 60 + 20, 16 * 60 + 50);
-
-                      netWorkMinutes = totalMinutes - morningBreakOverlap - afternoonBreakOverlap;
+                  if (workStart < morningBreakEnd && workEnd > morningBreakStart) {
+                      const overlapStart = Math.max(workStart, morningBreakStart);
+                      const overlapEnd = Math.min(workEnd, morningBreakEnd);
+                      breakTime = Math.max(0, overlapEnd - overlapStart);
                   }
 
-                  if (netWorkMinutes < 480) { // 순수 8시간 = 480분
+                  const netWorkMinutes = totalMinutes - breakTime;
+
+                  if (netWorkMinutes < 480) { // 8시간 = 480분
                       row.find('.start-time, .end-time').prop('disabled', true);
-                      row.find('.start-time').attr('placeholder', '휴일근무 순수 8시간 이상 필요');
-                      row.find('.end-time').attr('placeholder', '휴일근무 순수 8시간 이상 필요');
-                      console.log('휴일근무 순수 8시간 미만으로 연장근로 차단 (정확한 휴게시간 차감):', netWorkMinutes);
+                      row.find('.start-time').attr('placeholder', '휴일근무 8시간 이상 필요');
+                      row.find('.end-time').attr('placeholder', '휴일근무 8시간 이상 필요');
+                      console.log('휴일근무 8시간 미만으로 연장근로 차단:', netWorkMinutes + '분');
                   } else {
                       row.find('.start-time, .end-time').prop('disabled', false);
                       row.find('.start-time').attr('placeholder', '16:20 이후만');
                       row.find('.end-time').attr('placeholder', '종료시간');
-                      console.log('휴일근무 순수 8시간 이상으로 연장근로 허용 (정확한 휴게시간 차감):', netWorkMinutes);
+                      console.log('휴일근무 8시간 이상으로 연장근로 허용:', netWorkMinutes + '분');
                   }
               }
           }
@@ -1197,6 +1214,7 @@
           });
       }
 
+      // 조출연장, 조퇴/외출/반차 예상근로시간 계산
       function calculateRealTimeWeeklyHoursUltimate(row, empCode) {
           const applyType = $('#generalApplyType').val();
           const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
@@ -1205,24 +1223,32 @@
           const workDate = $('#generalWorkDate').val()?.replace(/-/g, '') || '';
 
           if (!empCode || !workDate) {
-              console.warn('empCode 또는 workDate 누락:', { empCode, workDate });
               row.find('.expected-hours').text('40.00');
               return;
           }
 
-          // 중복 요청 방지를 위한 로딩 상태 체크
-          if (row.data('calculating') === true) {
-              console.log('이미 계산 중인 행 무시:', empCode);
+          const requestKey = `${empCode}_${workDate}_${workType}_${startTime}_${endTime}`;
+          if (window.activeCalculations && window.activeCalculations[requestKey]) {
+              console.log('중복 계산 요청 차단:', requestKey);
               return;
           }
-          row.data('calculating', true);
 
-          // 조퇴외출반차의 경우 별도 처리
+          if (!window.activeCalculations) {
+              window.activeCalculations = {};
+          }
+          window.activeCalculations[requestKey] = true;
+
+          if (workType === '휴일근무') {
+              updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
+              delete window.activeCalculations[requestKey];
+              return;
+          }
+
+          // 조퇴외출반차 처리
           if (applyType === '조퇴외출반차') {
               if (workType === '전반차' || workType === '후반차') {
                   row.find('.expected-hours').text('-4.00');
               } else if (workType === '조퇴') {
-                  // 조퇴 시간 계산
                   if (startTime) {
                       calculateEarlyLeaveHours(empCode, workDate, startTime, function(deductHours) {
                           row.find('.expected-hours').text(`-${deductHours.toFixed(2)}`);
@@ -1230,13 +1256,13 @@
                   } else {
                       row.find('.expected-hours').text('0.00');
                   }
-              } else if (workType === '외출' || workType === '외근') {
+              } else if (workType === '외출') {
                   if (startTime && endTime) {
                       const [startHour, startMin] = startTime.split(':').map(Number);
                       const [endHour, endMin] = endTime.split(':').map(Number);
                       let startMinutes = startHour * 60 + startMin;
                       let endMinutes = endHour * 60 + endMin;
-                      if (endMinutes < startMinutes) endMinutes += 24 * 60;
+                      if (endMinutes <= startMinutes) endMinutes += 24 * 60;
                       if (endMinutes > startMinutes) {
                           row.find('.expected-hours').text(`-${((endMinutes - startMinutes) / 60).toFixed(2)}`);
                       } else {
@@ -1245,20 +1271,19 @@
                   } else {
                       row.find('.expected-hours').text('0.00');
                   }
+              } else if (workType === '외근') {
+                  row.find('.expected-hours').text('0.00');
               } else {
                   row.find('.expected-hours').text('0.00');
               }
+              delete window.activeCalculations[requestKey];
               return;
           }
 
-          const isAbsent = row.data('is-absent') === true;
-          if (isAbsent) {
-              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
-              return;
-          }
-
+          // 연장/조출연장만 서버 계산
           if (!startTime || !endTime) {
-              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
+              updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
+              delete window.activeCalculations[requestKey];
               return;
           }
 
@@ -1266,9 +1291,11 @@
           if (!validate30MinuteInterval(startTime, endTime, workType)) {
               alert('연장, 휴일근무, 조퇴, 외출, 외근은 휴게시간을 제외하고 30분 단위로만 신청할 수 있습니다.');
               row.find('.start-time, .end-time').val('');
+              delete window.activeCalculations[requestKey];
               return;
           }
 
+          // 연장/조출연장만 서버 계산 호출
           $.post('/user/apply/calculateWorkHours', {
               empCode: empCode,
               workDate: workDate,
@@ -1279,6 +1306,7 @@
           .done(function(response) {
               const expectedHoursSpan = row.find('.expected-hours');
               const totalHours = response.totalWeeklyHours.toFixed(2);
+
               expectedHoursSpan.text(totalHours);
 
               if (!response.isValid) {
@@ -1288,23 +1316,46 @@
                   expectedHoursSpan.removeClass('text-red-500');
                   expectedHoursSpan.removeAttr('title');
               }
+
+              console.log('예상근로시간 계산 완료 (중복 방지):', {
+                  empCode: empCode,
+                  workType: workType,
+                  결과: totalHours
+              });
           })
           .fail(function() {
-              console.error('실시간 주 52시간 계산 실패');
-              updateExpectedHoursUltraStable(row, empCode, workDate, workType);
+              console.error('예상근로시간 계산 실패');
+              updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
+          })
+          .always(function() {
+              delete window.activeCalculations[requestKey];
           });
       }
 
-      // 조퇴 시간 계산
+      function updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate) {
+          $.get(`/user/apply/updateExpectedHours/${empCode}/${workDate}`)
+              .done(function(response) {
+                  if (response.success) {
+                      const expectedHours = response.expectedHours;
+                      row.find('.expected-hours').text(expectedHours).removeClass('text-red-500');
+                      console.log('휴일근무 EmpAttService 직접 사용:', expectedHours);
+                  } else {
+                      row.find('.expected-hours').text("계산실패").addClass('text-red-500');
+                  }
+              })
+              .fail(function() {
+                  row.find('.expected-hours').text("API실패").addClass('text-red-500');
+              });
+      }
+
+      // 조퇴 시간 정확 계산
       function calculateEarlyLeaveHours(empCode, workDate, startTime, callback) {
-          // 서버에서 조퇴 시간 계산
-          // 임시로 클라이언트에서 계산 (16:20 - 시작시간)
           try {
               const startHour = parseInt(startTime.split(':')[0]);
               const startMin = parseInt(startTime.split(':')[1]);
               const startTotalMin = startHour * 60 + startMin;
 
-              const endTotalMin = 16 * 60 + 20; // 16:20
+              const endTotalMin = 16 * 60 + 20; // 16:20 퇴근시간
 
               if (endTotalMin > startTotalMin) {
                   const diffMin = endTotalMin - startTotalMin;
@@ -1576,7 +1627,6 @@
                           const holidayEndTime = holidayWorkRow.find('.end-time').val();
 
                           if (holidayStartTime && holidayEndTime) {
-                              // 휴게시간 고려한 8시간 검증
                               const startHour = parseInt(holidayStartTime.split(':')[0]);
                               const startMin = parseInt(holidayStartTime.split(':')[1]);
                               const endHour = parseInt(holidayEndTime.split(':')[0]);
@@ -1589,19 +1639,27 @@
                                   totalMinutes += 24 * 60;
                               }
 
-                              // 휴게시간 차감 (14-1 시프트 기준: 11:30~12:20=50분, 16:20~16:50=30분)
-                              let netWorkMinutes = totalMinutes;
-                              if (totalMinutes > 8 * 60) { // 8시간 초과 시 휴게시간 차감
-                                  netWorkMinutes = totalMinutes - 80; // 80분 휴게시간 차감
+                              let breakTime = 0;
+                              const morningBreakStart = 11 * 60 + 30; // 690분
+                              const morningBreakEnd = 12 * 60 + 20;   // 740분
+                              const workStart = startHour * 60 + startMin;
+                              const workEnd = endHour * 60 + endMin;
+
+                              if (workStart < morningBreakEnd && workEnd > morningBreakStart) {
+                                  const overlapStart = Math.max(workStart, morningBreakStart);
+                                  const overlapEnd = Math.min(workEnd, morningBreakEnd);
+                                  breakTime = Math.max(0, overlapEnd - overlapStart);
                               }
 
-                              if (netWorkMinutes < 480) { // 순수 8시간 = 480분
-                                  alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 순수 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다. (현재: ${(netWorkMinutes/60).toFixed(1)}시간)`);
+                              const netWorkMinutes = totalMinutes - breakTime;
+
+                              if (netWorkMinutes < 480) { // 8시간 = 480분
+                                  alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다. (현재: ${(netWorkMinutes/60).toFixed(1)}시간)`);
                                   hasError = true;
                                   return false;
                               }
 
-                              console.log('휴일근무 순수 8시간 검증 통과 (휴게시간 차감):', netWorkMinutes + '분');
+                              console.log('휴일근무 8시간 검증 통과:', netWorkMinutes + '분');
                           } else {
                               alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 시간 정보가 없습니다.`);
                               hasError = true;
@@ -1625,7 +1683,7 @@
                   }
               }
 
-              // 연장근로 검증
+                            // 연장근로 검증
               if (workSelect === '연장' || workSelect === '조출연장') {
                   // 실적이 결근일 경우 신청 불가
                   if (recordShift === '결근') {
@@ -1811,7 +1869,7 @@
                   }
               }
 
-                            const data = {
+              const data = {
                   empCode: empCode,
                   shiftCode: shiftCode,
                   targetStartDate: startDate,
