@@ -108,7 +108,7 @@ public interface AttendanceApplyMapper {
                                                                @Param("workDate") String workDate,
                                                                @Param("applyType") String applyType);
 
-    // 기존 기타근태 신청 조회 - BETWEEN 사용으로 변경
+    // 기존 기타근태 신청 조회
     @Select("""
         SELECT TOP 1 APPLY_ETC_NO, STATUS, REASON, SHIFT_CODE, TARGET_START_DATE, TARGET_END_DATE
         FROM HRTATTAPLETC 
@@ -140,7 +140,7 @@ public interface AttendanceApplyMapper {
     """)
     AttendanceApplyEtc findEtcApplyByNo(String applyEtcNo);
 
-    // 해당일 연차/휴가 신청 확인 (기타근태 - 연장근로 검증용) - BETWEEN 사용으로 변경
+    // 해당일 연차/휴가 신청 확인 (기타근태 - 연장근로 검증용)
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLETC etc
@@ -163,7 +163,7 @@ public interface AttendanceApplyMapper {
     """)
     boolean hasHalfDayOrEarlyLeaveApply(@Param("empCode") String empCode, @Param("workDate") String workDate);
 
-    // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용) - 함수 사용으로 변경
+    // 시간 겹침 확인 (조퇴/외출/반차 중복 검증용)
     @Select("""
         SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
         FROM HRTATTAPLGENERAL 

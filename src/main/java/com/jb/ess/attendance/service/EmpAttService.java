@@ -131,7 +131,7 @@ public class EmpAttService {
             // 연장근무
             Duration overtime = getOvertimeHours(empCode, ymd);
             // 실적이 없는날인 경우 (미래) 예상근무시간에 연장근무시간 포함
-            if (!overtime.isZero() && !overtime.isNegative() && attRecord == null) {
+            if (!overtime.isZero() && !overtime.isNegative()) {
                 workHours = workHours.plus(overtime);
             }
             totalOvertimeHours += overtime.toMinutes() / 60.0;

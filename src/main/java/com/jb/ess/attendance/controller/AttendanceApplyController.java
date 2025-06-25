@@ -253,6 +253,40 @@ public class AttendanceApplyController {
             apply.setApplyDate(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
             apply.setStatus("저장");
 
+            if ("조출연장".equals(apply.getApplyType())) {
+                if (apply.getStartTime() != null && !apply.getStartTime().trim().isEmpty()) {
+                    try {
+                        String timeStr = apply.getStartTime().replace(":", "");
+                        int timeInt = Integer.parseInt(timeStr);
+
+                        if (timeInt > 730) { // 07:30 = 730
+                            response.put("result", "error");
+                            response.put("message", "조출연장은 07:30까지만 신청할 수 있습니다.");
+                            return response;
+                        }
+
+                        if (apply.getEndTime() != null && !apply.getEndTime().trim().isEmpty()) {
+                            String endTimeStr = apply.getEndTime().replace(":", "");
+                            int endTimeInt = Integer.parseInt(endTimeStr);
+
+                            if (endTimeInt > 730) { // 종료시간도 07:30 이후면 오류
+                                response.put("result", "error");
+                                response.put("message", "조출연장은 07:30까지만 신청할 수 있습니다.");
+                                return response;
+                            }
+                        }
+
+                        log.debug("조출연장 07:30 검증 통과: startTime={}, endTime={}",
+                                apply.getStartTime(), apply.getEndTime());
+
+                    } catch (NumberFormatException e) {
+                        response.put("result", "error");
+                        response.put("message", "시간 형식이 올바르지 않습니다.");
+                        return response;
+                    }
+                }
+            }
+
             // 결근 사원 체크
             boolean isAbsent = attendanceApplyService.isEmployeeAbsent(apply.getEmpCode(), apply.getTargetDate());
             if (isAbsent) {
@@ -309,6 +343,11 @@ public class AttendanceApplyController {
             }
 
             attendanceApplyService.saveGeneralApply(apply);
+
+            if ("연장".equals(apply.getApplyType()) || "조출연장".equals(apply.getApplyType())) {
+                log.debug("연장/조출연장 저장 완료 - 예상근로시간 실시간 반영: empCode={}, applyType={}",
+                        apply.getEmpCode(), apply.getApplyType());
+            }
 
             // 휴일근로 신청 후 실적 업데이트 처리
             if ("휴일근무".equals(apply.getApplyType())) {
@@ -490,7 +529,7 @@ public class AttendanceApplyController {
                                                           @RequestParam(required = false) String endTime,
                                                           @RequestParam String applyType) {
         try {
-            log.debug("실시간 주 52시간 계산 요청: empCode={}, workDate={}, startTime={}, endTime={}, applyType={}",
+            log.debug("실시간 주 52시간 계산 요청 (연장/조출연장 누적, 조퇴/반차 차감): empCode={}, workDate={}, startTime={}, endTime={}, applyType={}",
                     empCode, workDate, startTime, endTime, applyType);
 
             return attendanceApplyService.calculateRealTimeWeeklyHours(empCode, workDate, startTime, endTime, applyType);
@@ -512,13 +551,15 @@ public class AttendanceApplyController {
         Map<String, Object> response = new HashMap<>();
         try {
             boolean isValid = true;
-            String message = "정상";
+            String message = "시간 선택 가능 (저장 시점에서 07:30 검증)";
 
             if (startTime != null && !startTime.isEmpty()) {
                 try {
                     // HH:MM 형식을 HHMM으로 변환
                     String timeStr = startTime.replace(":", "");
                     int timeInt = Integer.parseInt(timeStr);
+
+                    log.debug("조출연장 시간 선택 허용: startTime={} (저장 시점에서 07:30 검증 예정)", startTime);
                 } catch (NumberFormatException e) {
                     isValid = false;
                     message = "시간 형식이 올바르지 않습니다.";
@@ -578,7 +619,7 @@ public class AttendanceApplyController {
                                                   @PathVariable String workDate,
                                                   @PathVariable String applyType) {
         try {
-            log.debug("신청근무별 완전 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
+            log.debug("신청근무별 분리 조회: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType);
 
             Map<String, Object> result = attendanceApplyService.getApplyByWorkType(empCode, workDate, applyType);
 
@@ -593,12 +634,12 @@ public class AttendanceApplyController {
                 log.debug("서비스 응답이 null - 기본값 설정: applyType={}", applyType);
             }
 
-            log.debug("신청근무별 완전 분리 조회 완료: hasExisting={}, status={}",
+            log.debug("신청근무별 분리 조회 완료: hasExisting={}, status={}",
                     result.get("hasExisting"), result.get("status"));
 
             return result;
         } catch (Exception e) {
-            log.error("신청근무별 완전 분리 조회 실패: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType, e);
+            log.error("신청근무별 분리 조회 실패: empCode={}, workDate={}, applyType={}", empCode, workDate, applyType, e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("hasExisting", false);
             errorResponse.put("applyType", "general");
@@ -641,10 +682,10 @@ public class AttendanceApplyController {
         }
     }
 
-    // 요구사항: 전반차/후반차 시간 입력 차단 검증 API
-    @GetMapping("/validateHalfDayApply/{applyType}")
+    // 전반차/후반차 시간 입력 차단 검증 API
+    @GetMapping("/validateHalfDayTimeInput/{applyType}")
     @ResponseBody
-    public Map<String, Object> validateHalfDayApply(@PathVariable String applyType) {
+    public Map<String, Object> validateHalfDayTimeInput(@PathVariable String applyType) {
         try {
             return attendanceApplyService.validateHalfDayTimeInput(applyType);
         } catch (Exception e) {
@@ -656,10 +697,10 @@ public class AttendanceApplyController {
         }
     }
 
-    // 요구사항: 조퇴 종료시간 입력 차단 검증 API
-    @GetMapping("/validateEarlyLeaveApply/{applyType}")
+    // 조퇴 종료시간 입력 차단 검증 API
+    @GetMapping("/validateEarlyLeaveTimeInput/{applyType}")
     @ResponseBody
-    public Map<String, Object> validateEarlyLeaveApply(@PathVariable String applyType) {
+    public Map<String, Object> validateEarlyLeaveTimeInput(@PathVariable String applyType) {
         try {
             return attendanceApplyService.validateEarlyLeaveTimeInput(applyType);
         } catch (Exception e) {

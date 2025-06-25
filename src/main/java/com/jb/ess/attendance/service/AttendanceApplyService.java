@@ -349,15 +349,26 @@ public class AttendanceApplyService {
         }
     }
 
+    // 휴일근무 실적 유지 로직 개선
     private String calculateActualRecord(String empCode, String workDate, String originalPlan) {
         try {
-            AttendanceApplyGeneral generalApply = attendanceApplyMapper.findGeneralApplyByEmpAndDate(empCode, workDate);
-            if (generalApply != null && "휴일근무".equals(generalApply.getApplyType()) && "승인완료".equals(generalApply.getStatus())) {
-                log.debug("승인된 휴일근무 우선 확인 (연장근무와 무관): empCode={}, date={}, 실적=휴일근무", empCode, workDate);
+            // DB 상태 우선 확인 (SHIFT_CODE가 14-1이면 휴일근무)
+            EmpCalendar currentCalendar = empCalendarMapper.getCodeAndHolidayByEmpCodeAndDate(empCode, workDate);
+            if (currentCalendar != null && "14-1".equals(currentCalendar.getShiftCode())) {
+                log.debug("DB SHIFT_CODE 14-1 확인 - 휴일근무 실적 유지: empCode={}, date={}", empCode, workDate);
                 return "휴일근무";
             }
 
-            // 승인된 기타근태 신청 확인
+            // 휴일근무 신청 확인 (여러 신청 중 휴일근무 우선 찾기)
+            List<AttendanceApplyGeneral> holidayApplies = findHolidayWorkAppliesCompletely(empCode, workDate);
+            for (AttendanceApplyGeneral holidayApply : holidayApplies) {
+                if ("휴일근무".equals(holidayApply.getApplyType()) && "승인완료".equals(holidayApply.getStatus())) {
+                    log.debug("승인된 휴일근무 우선 확인 (연장근무와 무관): empCode={}, date={}, 실적=휴일근무", empCode, workDate);
+                    return "휴일근무";
+                }
+            }
+
+            // 기타근태 신청 확인
             AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByEmpAndDate(empCode, workDate);
             if (etcApply != null && "승인완료".equals(etcApply.getStatus())) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(etcApply.getShiftCode());
@@ -371,6 +382,7 @@ public class AttendanceApplyService {
                 }
             }
 
+            // 출근 기록 기반 실적 판단
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, workDate);
             if (attRecord != null && attRecord.getCheckInTime() != null) {
                 log.debug("출근 기록 존재: empCode={}, date={}, 실적=원본계획", empCode, workDate);
@@ -1327,10 +1339,39 @@ public class AttendanceApplyService {
         }
     }
 
+    // 조퇴/반차 자동 시간 설정 헬퍼 메서드
+    private void setAutoTimesForLeaveTypes(AttendanceApplyGeneral apply) {
+        String applyType = apply.getApplyType();
+
+        if ("조퇴".equals(applyType)) {
+            // 조퇴: 종료시간을 16:20으로 자동 설정
+            apply.setEndTime("1620");
+            log.debug("조퇴 자동 시간 설정: empCode={}, targetDate={}, startTime={}, endTime=1620",
+                    apply.getEmpCode(), apply.getTargetDate(), apply.getStartTime());
+
+        } else if ("전반차".equals(applyType)) {
+            // 전반차: 07:30~11:30 자동 설정
+            apply.setStartTime("0730");
+            apply.setEndTime("1130");
+            log.debug("전반차 자동 시간 설정: empCode={}, targetDate={}, startTime=0730, endTime=1130",
+                    apply.getEmpCode(), apply.getTargetDate());
+
+        } else if ("후반차".equals(applyType)) {
+            // 후반차: 12:20~16:20 자동 설정
+            apply.setStartTime("1220");
+            apply.setEndTime("1620");
+            log.debug("후반차 자동 시간 설정: empCode={}, targetDate={}, startTime=1220, endTime=1620",
+                    apply.getEmpCode(), apply.getTargetDate());
+        }
+    }
+
     // 일반근태 신청 저장
     @Transactional
     public void saveGeneralApply(AttendanceApplyGeneral apply) {
         try {
+            // 조퇴/반차 자동 시간 설정
+            setAutoTimesForLeaveTypes(apply);
+
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String applyNo = "GEN" + timestamp;
             apply.setApplyGeneralNo(applyNo);
@@ -1338,8 +1379,9 @@ public class AttendanceApplyService {
             Employee targetEmp = attendanceApplyMapper.findEmployeeByEmpCode(apply.getEmpCode());
             apply.setDeptCode(targetEmp.getDeptCode());
 
-            log.debug("일반근태 저장: applyNo={}, empCode={}, timeItemCode={}",
-                    applyNo, apply.getEmpCode(), apply.getTimeItemCode());
+            log.debug("일반근태 저장: applyNo={}, empCode={}, timeItemCode={}, applyType={}, startTime={}, endTime={}",
+                    applyNo, apply.getEmpCode(), apply.getTimeItemCode(), apply.getApplyType(),
+                    apply.getStartTime(), apply.getEndTime());
             attendanceApplyMapper.insertGeneralApply(apply);
 
             if ("휴일근무".equals(apply.getApplyType())) {
@@ -1545,7 +1587,14 @@ public class AttendanceApplyService {
                 attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
 
                 if (apply != null) {
-                    attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), apply.getApplyType());
+                    // 휴일근무만 SHIFT_CODE 업데이트
+                    if ("휴일근무".equals(apply.getApplyType())) {
+                        attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), apply.getApplyType());
+                        log.debug("휴일근무 SHIFT_CODE 업데이트: empCode={}, targetDate={}", apply.getEmpCode(), apply.getTargetDate());
+                    } else {
+                        // 연장/조출연장/조퇴/외출/반차는 SHIFT_CODE 업데이트 안 함
+                        log.debug("일반근태 SHIFT_CODE 업데이트 안 함: applyType={}", apply.getApplyType());
+                    }
 
                     if ("조출연장".equals(apply.getApplyType()) || "연장".equals(apply.getApplyType())) {
                         clearWeeklyExpectedHoursCache(apply.getEmpCode(), apply.getTargetDate());
@@ -1601,17 +1650,25 @@ public class AttendanceApplyService {
             if (etcApply == null) {
                 throw new RuntimeException("신청 정보를 찾을 수 없습니다.");
             }
-
             if ("Y".equals(isHeader)) {
                 // 부서장인 경우 바로 승인완료 처리
                 attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
-                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
-                        etcApply.getEmpCode(),
-                        etcApply.getTargetStartDate(),
-                        etcApply.getTargetEndDate(),
-                        etcApply.getShiftCode()
-                );
+                // 연차만 SHIFT_CODE 업데이트 (반차 제외)
+                if (etcApply.getShiftCode() != null) {
+                    ShiftMaster shift = shiftMasterMapper.findShiftByCode(etcApply.getShiftCode());
+                    if (shift != null && "연차".equals(shift.getShiftName())) {
+                        attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                                etcApply.getEmpCode(),
+                                etcApply.getTargetStartDate(),
+                                etcApply.getTargetEndDate(),
+                                etcApply.getShiftCode()
+                        );
+                        log.debug("연차 SHIFT_CODE 업데이트: empCode={}, shiftCode={}", etcApply.getEmpCode(), etcApply.getShiftCode());
+                    } else {
+                        log.debug("기타근태 SHIFT_CODE 업데이트 안 함: shiftName={}", shift != null ? shift.getShiftName() : "null");
+                    }
+                }
 
                 // 연차 차감 및 실적 업데이트
                 deductAnnualLeaveUltraImproved(etcApply);

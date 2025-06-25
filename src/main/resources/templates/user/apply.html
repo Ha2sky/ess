@@ -226,6 +226,8 @@
       let isEtcSearching = false;
       let isGeneralSearching = false;
 
+      window.activeCalculations = {};
+
       // 신청근무 옵션 정의
       const workTypeOptions = {
           '연장근로': [
@@ -445,7 +447,7 @@
                       console.log('해당 신청근무 타입의 기존 신청 없음 - 신청 가능 상태:', applyType);
                   }
 
-                  updateExpectedHoursUltraStable(row, empCode, workDate, applyType);
+                  calculateRealTimeWeeklyHoursUltimate(row, empCode);
                   validateWorkTimeRestrictionsUltimate(row);
                   updateButtonStates();
               })
@@ -459,7 +461,7 @@
                   row.find('.status-field').text('대기');
                   row.removeAttr('data-apply-no');
 
-                  updateExpectedHoursUltraStable(row, empCode, workDate, applyType);
+                  calculateRealTimeWeeklyHoursUltimate(row, empCode);
               });
       }
 
@@ -539,7 +541,7 @@
                       breakTime = Math.max(0, overlapEnd - overlapStart);
                   }
 
-                  console.log('휴일근무 휴게시간 계산:', {
+                  console.log('휴일근무 전용 휴게시간 계산:', {
                       시작: startTime, 종료: endTime,
                       총시간: totalMinutes + '분',
                       휴게시간: breakTime + '분',
@@ -791,16 +793,16 @@
 
                   const netWorkMinutes = totalMinutes - breakTime;
 
-                  if (netWorkMinutes < 480) { // 8시간 = 480분
+                  if (netWorkMinutes < 480) { // 순수 8시간 = 480분
                       row.find('.start-time, .end-time').prop('disabled', true);
-                      row.find('.start-time').attr('placeholder', '휴일근무 8시간 이상 필요');
-                      row.find('.end-time').attr('placeholder', '휴일근무 8시간 이상 필요');
-                      console.log('휴일근무 8시간 미만으로 연장근로 차단:', netWorkMinutes + '분');
+                      row.find('.start-time').attr('placeholder', '휴일근무 순수 8시간 이상 필요');
+                      row.find('.end-time').attr('placeholder', '휴일근무 순수 8시간 이상 필요');
+                      console.log('휴일근무 순수 8시간 미만으로 연장근로 차단 (전용 휴게시간):', netWorkMinutes + '분');
                   } else {
                       row.find('.start-time, .end-time').prop('disabled', false);
                       row.find('.start-time').attr('placeholder', '16:20 이후만');
                       row.find('.end-time').attr('placeholder', '종료시간');
-                      console.log('휴일근무 8시간 이상으로 연장근로 허용:', netWorkMinutes + '분');
+                      console.log('휴일근무 순수 8시간 이상으로 연장근로 허용 (전용 휴게시간):', netWorkMinutes + '분');
                   }
               }
           }
@@ -1214,7 +1216,6 @@
           });
       }
 
-      // 조출연장, 조퇴/외출/반차 예상근로시간 계산
       function calculateRealTimeWeeklyHoursUltimate(row, empCode) {
           const applyType = $('#generalApplyType').val();
           const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
@@ -1223,18 +1224,15 @@
           const workDate = $('#generalWorkDate').val()?.replace(/-/g, '') || '';
 
           if (!empCode || !workDate) {
+              console.warn('empCode 또는 workDate 누락:', { empCode, workDate });
               row.find('.expected-hours').text('40.00');
               return;
           }
 
           const requestKey = `${empCode}_${workDate}_${workType}_${startTime}_${endTime}`;
-          if (window.activeCalculations && window.activeCalculations[requestKey]) {
+          if (window.activeCalculations[requestKey]) {
               console.log('중복 계산 요청 차단:', requestKey);
               return;
-          }
-
-          if (!window.activeCalculations) {
-              window.activeCalculations = {};
           }
           window.activeCalculations[requestKey] = true;
 
@@ -1244,18 +1242,23 @@
               return;
           }
 
-          // 조퇴외출반차 처리
           if (applyType === '조퇴외출반차') {
               if (workType === '전반차' || workType === '후반차') {
                   row.find('.expected-hours').text('-4.00');
+                  console.log('반차 4시간 차감 적용:', workType);
+                  delete window.activeCalculations[requestKey];
+                  return;
               } else if (workType === '조퇴') {
                   if (startTime) {
                       calculateEarlyLeaveHours(empCode, workDate, startTime, function(deductHours) {
                           row.find('.expected-hours').text(`-${deductHours.toFixed(2)}`);
+                          delete window.activeCalculations[requestKey];
                       });
                   } else {
                       row.find('.expected-hours').text('0.00');
+                      delete window.activeCalculations[requestKey];
                   }
+                  return;
               } else if (workType === '외출') {
                   if (startTime && endTime) {
                       const [startHour, startMin] = startTime.split(':').map(Number);
@@ -1271,16 +1274,26 @@
                   } else {
                       row.find('.expected-hours').text('0.00');
                   }
+                  delete window.activeCalculations[requestKey];
+                  return;
               } else if (workType === '외근') {
                   row.find('.expected-hours').text('0.00');
+                  delete window.activeCalculations[requestKey];
+                  return;
               } else {
                   row.find('.expected-hours').text('0.00');
+                  delete window.activeCalculations[requestKey];
+                  return;
               }
+          }
+
+          const isAbsent = row.data('is-absent') === true;
+          if (isAbsent) {
+              updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
               delete window.activeCalculations[requestKey];
               return;
           }
 
-          // 연장/조출연장만 서버 계산
           if (!startTime || !endTime) {
               updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
               delete window.activeCalculations[requestKey];
@@ -1295,7 +1308,6 @@
               return;
           }
 
-          // 연장/조출연장만 서버 계산 호출
           $.post('/user/apply/calculateWorkHours', {
               empCode: empCode,
               workDate: workDate,
@@ -1317,14 +1329,16 @@
                   expectedHoursSpan.removeAttr('title');
               }
 
-              console.log('예상근로시간 계산 완료 (중복 방지):', {
+              console.log('서버 계산 완료:', {
                   empCode: empCode,
                   workType: workType,
+                  시작시간: startTime,
+                  종료시간: endTime,
                   결과: totalHours
               });
           })
           .fail(function() {
-              console.error('예상근로시간 계산 실패');
+              console.error('실시간 주 52시간 계산 실패');
               updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
           })
           .always(function() {
@@ -1653,13 +1667,13 @@
 
                               const netWorkMinutes = totalMinutes - breakTime;
 
-                              if (netWorkMinutes < 480) { // 8시간 = 480분
-                                  alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다. (현재: ${(netWorkMinutes/60).toFixed(1)}시간)`);
+                              if (netWorkMinutes < 480) { // 순수 8시간 = 480분
+                                  alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 순수 8시간 이상 신청한 경우에만 연장근무를 신청할 수 있습니다. (현재: ${(netWorkMinutes/60).toFixed(1)}시간)`);
                                   hasError = true;
                                   return false;
                               }
 
-                              console.log('휴일근무 8시간 검증 통과:', netWorkMinutes + '분');
+                              console.log('휴일근무 순수 8시간 검증 통과 (전용 휴게시간):', netWorkMinutes + '분');
                           } else {
                               alert(`${row.find('td:eq(2)').text()} 사원: 휴일근무 시간 정보가 없습니다.`);
                               hasError = true;
@@ -1683,7 +1697,7 @@
                   }
               }
 
-                            // 연장근로 검증
+              // 연장근로 검증
               if (workSelect === '연장' || workSelect === '조출연장') {
                   // 실적이 결근일 경우 신청 불가
                   if (recordShift === '결근') {
