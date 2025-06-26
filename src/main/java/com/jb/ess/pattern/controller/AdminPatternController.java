@@ -205,7 +205,7 @@ public class AdminPatternController {
                                 @RequestParam Map<String, String> shiftCodes) {
 
         // 선택된 yyyyMM (예: "2025-06" or "202506")
-        YearMonth selectedMonth = YearMonth.parse(selectedMonthStr.replace("-", ""));
+        YearMonth selectedMonth = YearMonth.parse(selectedMonthStr);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
         // 수정된 캘린더 리스트 생성

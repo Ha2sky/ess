@@ -309,19 +309,15 @@ public class EmpAttService {
                         !Objects.equals(cal.getShiftCode(), "61") &&
                         !Objects.equals(cal.getShiftCode(), "64") &&
                         !Objects.equals(cal.getShiftCode(), "65")) {
-                        if (nowDateTime.isAfter(workOnDateTime)) {
-                            // 출근 지났는데 기록 없으면 결근 처리
-                            if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd, emp.getShiftCode());
-                            else {
-                                if (!Objects.equals(emp.getShiftCode(), "00")) {
-                                    attRecordMapper.updateAbsenceByEmpCodeAndWorkDate(empCode, workYmd, emp.getShiftCode());
-                                }
+                        // 출근 지났는데 기록 없으면 결근 처리
+                        if (att == null) attRecordMapper.insertAttRecord(empCode, workYmd, emp.getShiftCode());
+                        else {
+                            if (!Objects.equals(emp.getShiftCode(), "00")) {
+                                attRecordMapper.updateAbsenceByEmpCodeAndWorkDate(empCode, workYmd, emp.getShiftCode());
                             }
-                            emp.setShiftCode("00");
-                            empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, "00");
-                        } else {
-                            emp.setShiftCode(null);
                         }
+                        emp.setShiftCode("00");
+                        empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, "00");
                     // 출퇴근 기록 있음
                     } else {
                         // 지각 (휴일근무 X)
