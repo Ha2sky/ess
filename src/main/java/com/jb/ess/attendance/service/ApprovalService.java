@@ -596,7 +596,7 @@ public class ApprovalService {
     }
 
     /**
-     * 일반근태 승인
+     * 일반근태 승인 시 SHIFT_CODE 업데이트 개선
      */
     @Transactional
     public void approveGeneralApply(String applyGeneralNo, String approverCode) {
@@ -623,14 +623,17 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateGeneralApplyStatus(applyGeneralNo, "승인완료");
 
+            // 승인완료 시에만 SHIFT_CODE 업데이트
             String applyType = apply.getApplyType();
             if ("휴일근무".equals(applyType)) {
                 attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
                 log.debug("휴일근무 승인 완료: SHIFT_CODE 업데이트 (14-1)");
             } else if ("전반차".equals(applyType) || "후반차".equals(applyType)) {
-                deductAnnualLeaveUltraPrecision(apply.getEmpCode(), new BigDecimal("0.5"));
-                attendanceApplyMapper.updateShiftCodeAfterGeneralApproval(apply.getEmpCode(), apply.getTargetDate(), applyType);
-                log.debug("전반차/후반차 승인 완료: 연차 차감 및 SHIFT_CODE 업데이트");
+                // 반차는 SHIFT_CODE 업데이트 안 함
+                log.debug("전반차/후반차 승인 완료: 연차 차감은 AttendanceApplyService에서 처리됨");
+            } else {
+                // 연장/조출연장/조퇴/외출/외근은 SHIFT_CODE 업데이트 안 함
+                log.debug("일반근태 승인 완료: SHIFT_CODE 업데이트 안 함 (applyType={})", applyType);
             }
 
             log.info("일반근태 승인 처리 완료: applyGeneralNo={}", applyGeneralNo);
@@ -641,7 +644,7 @@ public class ApprovalService {
     }
 
     /**
-     * 기타근태 승인
+     * 기타근태 승인 시 SHIFT_CODE 업데이트 개선
      */
     @Transactional
     public void approveEtcApply(String applyEtcNo, String approverCode) {
@@ -668,23 +671,35 @@ public class ApprovalService {
 
             attendanceApplyMapper.updateEtcApplyStatus(applyEtcNo, "승인완료");
 
+            // 승인완료 시에만 SHIFT_CODE 업데이트
             if (apply.getShiftCode() != null) {
                 String shiftName = shiftMasterMapper.findShiftNameByShiftCode(apply.getShiftCode());
                 if ("연차".equals(shiftName)) {
+                    // 연차 차감
                     deductAnnualLeaveUltraPrecision(apply.getEmpCode(), BigDecimal.ONE);
-                    log.debug("연차 승인 완료: 연차 차감 완료");
-                } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
-                    deductAnnualLeaveUltraPrecision(apply.getEmpCode(), new BigDecimal("0.5"));
-                    log.debug("반차 승인 완료: 연차 0.5일 차감 완료");
-                }
 
-                attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
-                        apply.getEmpCode(),
-                        apply.getTargetStartDate(),
-                        apply.getTargetEndDate(),
-                        apply.getShiftCode()
-                );
-                log.debug("기타근태 승인 완료: SHIFT_CODE 업데이트 (shiftName={})", shiftName);
+                    // 연차는 SHIFT_CODE 업데이트 수행
+                    attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                            apply.getEmpCode(),
+                            apply.getTargetStartDate(),
+                            apply.getTargetEndDate(),
+                            apply.getShiftCode()
+                    );
+                } else if ("전반차".equals(shiftName) || "후반차".equals(shiftName)) {
+                    // 반차 차감
+                    deductAnnualLeaveUltraPrecision(apply.getEmpCode(), new BigDecimal("0.5"));
+
+                    log.debug("반차 승인 완료: 연차 0.5일 차감 완료");
+                } else {
+                    // 기타 근태는 SHIFT_CODE 업데이트만 수행
+                    attendanceApplyMapper.updateShiftCodeAfterEtcApproval(
+                            apply.getEmpCode(),
+                            apply.getTargetStartDate(),
+                            apply.getTargetEndDate(),
+                            apply.getShiftCode()
+                    );
+                    log.debug("기타근태 승인 완료: SHIFT_CODE 업데이트 (shiftName={})", shiftName);
+                }
             }
 
             log.info("기타근태 승인 처리 완료: applyEtcNo={}", applyEtcNo);

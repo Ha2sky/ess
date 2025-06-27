@@ -349,11 +349,6 @@ public class AttendanceApplyController {
                         apply.getEmpCode(), apply.getApplyType());
             }
 
-            // 휴일근로 신청 후 실적 업데이트 처리
-            if ("휴일근무".equals(apply.getApplyType())) {
-                attendanceApplyService.updateWorkRecordForHolidayWork(apply.getEmpCode(), apply.getTargetDate());
-            }
-
             // 저장된 데이터 조회 및 반환
             AttendanceApplyGeneral savedApply = attendanceApplyService.getSavedGeneralApply(apply.getApplyGeneralNo());
             response.put("result", "success");
@@ -397,11 +392,6 @@ public class AttendanceApplyController {
             }
 
             attendanceApplyService.saveEtcApply(apply);
-
-            // 연차/반차 신청 후 실적 업데이트
-            if (apply.getShiftCode() != null) {
-                attendanceApplyService.updateWorkRecordForAnnualLeave(apply.getEmpCode(), apply.getTargetStartDate(), apply.getShiftCode());
-            }
 
             // 저장된 데이터 조회 및 반환
             AttendanceApplyEtc savedApply = attendanceApplyService.getSavedEtcApply(apply.getApplyEtcNo());

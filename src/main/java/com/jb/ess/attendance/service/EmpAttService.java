@@ -92,6 +92,15 @@ public class EmpAttService {
                 continue;
             }
 
+            // 연차 처리
+            AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByEmpAndDate(empCode, ymd);
+            if (etcApply != null && "승인완료".equals(etcApply.getStatus())) {
+                String etcShiftName = shiftMasterMapper.findShiftNameByShiftCode(etcApply.getShiftCode());
+                if ("연차".equals(etcShiftName)) {
+                    continue;
+                }
+            }
+
             AttendanceRecord attRecord = attRecordMapper.getAttRecordByEmpCode(empCode, ymd);
 
             // 실적이 있는 경우 (휴일근무 제외) + 퇴근시간 존재
