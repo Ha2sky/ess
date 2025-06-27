@@ -248,17 +248,30 @@
 
       // 탭 전환 기능
       $('.tab-button').click(function() {
-        $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
-        $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
+          $('.tab-button').removeClass('active bg-blue-500 text-white').addClass('bg-gray-300 text-gray-700');
+          $(this).removeClass('bg-gray-300 text-gray-700').addClass('active bg-blue-500 text-white');
 
-        $('.tab-panel').addClass('hidden');
+          $('.tab-panel').addClass('hidden');
 
-        if (this.id === 'generalTab') {
-          $('#generalPanel').removeClass('hidden');
-        } else {
-          $('#etcPanel').removeClass('hidden');
-        }
+          if (this.id === 'generalTab') {
+              $('#generalPanel').removeClass('hidden');
+              // 일반근태탭 이동 시 예상근로시간 새로고침
+              setTimeout(function() {
+                  if (currentUser.deptCode && $('#generalWorkDate').val()) {
+                      searchGeneralEmployees();
+                  }
+              }, 100);
+          } else {
+              $('#etcPanel').removeClass('hidden');
+              // 기타근태탭 이동 시 자동 조회
+              setTimeout(function() {
+                  if (currentUser.deptCode && $('#etcWorkDate').val()) {
+                      searchEtcEmployees();
+                  }
+              }, 100);
+          }
       });
+
 
       // URL 쿼리 파라미터에서 'tab' 값 읽기
       function getQueryParam(name) {
@@ -635,13 +648,6 @@
 
               startTimeInput.css({'background-color': '', 'cursor': ''});
               endTimeInput.css({'background-color': '', 'cursor': ''});
-
-              startTimeInput.off('input.earlyOvertime').on('input.earlyOvertime', function() {
-                  validateEarlyOvertimeTimeUltimate($(this).val(), row);
-              });
-              endTimeInput.off('input.earlyOvertime').on('input.earlyOvertime', function() {
-                  validateEarlyOvertimeTimeUltimate($(this).val(), row);
-              });
           }
           else if (workType === '연장') {
               startTimeInput.prop('disabled', false).prop('readonly', false);
@@ -2066,25 +2072,25 @@
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');
                           updateButtonStates();
 
+                          // 부서장 승인완료 시 모든 근태 예상근로시간 즉시 업데이트
                           if (finalStatus === '승인완료') {
-                              const workType = row.find('.work-select').val() || row.find('.work-type-display').text();
-                              if (workType === '휴일근무') {
-                                  setTimeout(function() {
-                                      const empCode = row.data('emp-code');
-                                      const workDate = $('#generalWorkDate').val().replace(/-/g, '');
+                              setTimeout(function() {
+                                  const empCode = row.data('emp-code');
+                                  const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
-                                      loadWorkInfo(empCode, workDate, function(updatedWorkInfo) {
-                                          if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
-                                              row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
-                                              console.log('휴일근무 승인완료 후 실적 유지:', updatedWorkInfo.appliedRecord.shiftName);
-                                          }
-                                          if (updatedWorkInfo.expectedHours) {
-                                              row.find('.expected-hours').text(updatedWorkInfo.expectedHours);
-                                              console.log('휴일근무 승인완료 후 예상근로시간 서버에서 갱신:', updatedWorkInfo.expectedHours);
-                                          }
-                                      });
-                                  }, 500);
-                              }
+                                  // 모든 승인완료된 근태에 대해 실적 및 예상근로시간 업데이트
+                                  loadWorkInfo(empCode, workDate, function(updatedWorkInfo) {
+                                      if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
+                                          row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
+                                          row.attr('data-record', updatedWorkInfo.appliedRecord.shiftName);
+                                          console.log('승인완료 후 실적 업데이트:', updatedWorkInfo.appliedRecord.shiftName);
+                                      }
+                                      if (updatedWorkInfo.expectedHours) {
+                                          row.find('.expected-hours').text(updatedWorkInfo.expectedHours);
+                                          console.log('승인완료 후 예상근로시간 즉시 업데이트:', updatedWorkInfo.expectedHours);
+                                      }
+                                  });
+                              }, 500);
                           }
                       } else {
                           alert('상신 실패: ' + response);
@@ -2163,8 +2169,25 @@
                               }
                           }
 
+                          // 기타근태 승인완료 시 일반근태탭 예상근로시간도 업데이트
+                          if (finalStatus === '승인완료') {
+                              setTimeout(function() {
+                                  const empCode = row.data('emp-code');
+                                  const workDate = $('#etcWorkDate').val().replace(/-/g, '');
+
+                                  // 실적 업데이트
+                                  loadWorkInfo(empCode, workDate, function(updatedWorkInfo) {
+                                      if (updatedWorkInfo.appliedRecord && updatedWorkInfo.appliedRecord.shiftName) {
+                                          row.find('td:eq(6)').text(updatedWorkInfo.appliedRecord.shiftName);
+                                          console.log('기타근태 승인완료 후 실적 업데이트:', updatedWorkInfo.appliedRecord.shiftName);
+                                      }
+                                  });
+                              }, 500);
+                          }
+
                           alert(currentUser.isHeader === 'Y' ? '자동 승인완료되었습니다.' : '상신되었습니다.');
                           updateButtonStates();
+
                       } else {
                           alert('상신 실패: ' + response);
                       }
