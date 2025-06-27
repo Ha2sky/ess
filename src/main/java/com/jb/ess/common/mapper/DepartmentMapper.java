@@ -133,4 +133,7 @@ public interface DepartmentMapper {
         )
     """)
     String findDeptNameByEmpCode(String empCode);
+
+    @Select("SELECT DEPT_LEADER FROM ORGDEPTMASTER WHERE DEPT_NAME = #{deptName}")
+    String findDeptLeaderByDeptName(String deptName);
 }

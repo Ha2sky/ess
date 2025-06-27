@@ -125,9 +125,7 @@ public class HistoryService {
 
             // 결재 정보
             // 신청자 == 대상자 && 부서장 X
-            if (Objects.equals(applyHistory.getApplyEmpCode(), applyHistory.getEmpCode()) && Objects.equals(
-                employeeMapper.findIsHeader(
-                    applyHistory.getApplyEmpCode()).getIsHeader(), "N")) {
+            if (Objects.equals(applyHistory.getApplyEmpCode(), applyHistory.getEmpCode())) {
 
                 // 상신자
                 applyHistory.setApplicantDeptName(applyHistory.getApplyDeptName());
@@ -138,7 +136,7 @@ public class HistoryService {
 
                 // 결재자
                 applyHistory.setApprovalDeptName(applyHistory.getApplicantDeptName());
-                String approvalEmpCode = departmentMapper.findDepartmentLeader(applyHistory.getApprovalDeptName());
+                String approvalEmpCode = departmentMapper.findDeptLeaderByDeptName(applyHistory.getApprovalDeptName());
                 applyHistory.setApprovalDutyName(employeeMapper.findDutyNameByEmpCode(approvalEmpCode));
                 applyHistory.setApprovalEmpName(employeeMapper.findEmpNameByEmpCode(approvalEmpCode));
                 applyHistory.setApprovalEmpCode(approvalEmpCode);

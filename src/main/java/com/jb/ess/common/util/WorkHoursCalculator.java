@@ -147,6 +147,7 @@ public class WorkHoursCalculator {
     // 휴게시간 차감
     private static Duration subtractBreakTime(Duration original, ShiftMaster shift,
         LocalDate date, LocalDateTime inTime, LocalDateTime outTime) {
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HHmm");
         Duration result = original;
 
@@ -156,7 +157,7 @@ public class WorkHoursCalculator {
         };
 
         for (String[] br : breaks) {
-            if (br[0] != null && br[1] != null) {
+            if (isValidTime(br[0]) && isValidTime(br[1])) {
                 LocalTime brStart = LocalTime.parse(br[0], formatter);
                 LocalTime brEnd = LocalTime.parse(br[1], formatter);
                 LocalDateTime brStartTime = LocalDateTime.of(date, brStart);
@@ -169,6 +170,11 @@ public class WorkHoursCalculator {
         }
 
         return result;
+    }
+
+    // 보조 메서드 추가
+    private static boolean isValidTime(String timeStr) {
+        return timeStr != null && !timeStr.isBlank();
     }
 
     // 구간 겹침 계산
