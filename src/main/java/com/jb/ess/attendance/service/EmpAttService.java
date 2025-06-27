@@ -351,8 +351,16 @@ public class EmpAttService {
                                 emp.setTimeItemCode("3050");
                                 emp.setTimeItemNames(List.of("지각"));
                             }
-                            emp.setShiftCode(att.getAbsence());
-                            empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, emp.getShiftCode());
+                            // 승인완료된 기타근태가 있으면 실적 보정하지 않음
+                            AttendanceApplyEtc approvedEtc = attendanceApplyMapper.findEtcApplyByEmpAndDate(empCode, workYmd);
+                            if (approvedEtc != null && "승인완료".equals(approvedEtc.getStatus())) {
+                                // 승인완료된 기타근태가 있으면 SHIFT_CODE 유지
+                                emp.setShiftCode(cal.getShiftCode());
+                            } else {
+                                // 기타근태 신청이 없으면 실제 출근 기록으로 설정
+                                emp.setShiftCode(att.getAbsence());
+                                empCalendarMapper.updateShiftCodeByEmpCodeAndDate(empCode, workYmd, emp.getShiftCode());
+                            }
                         }
                         else emp.setShiftCode(cal.getShiftCode());
                     }
