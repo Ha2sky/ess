@@ -422,7 +422,7 @@
               const empCode = row.data('emp-code');
               const workDate = $('#generalWorkDate').val().replace(/-/g, '');
 
-              // 신청근무별 분리
+              // 🔥 모든 신청근무 타입에 대해 동일한 로직 사용 (타입별 개별 신청 가능)
               loadApplyByTypeUltraComplete(empCode, workDate, selectedWorkType, row);
           });
       }
@@ -1242,11 +1242,17 @@
           }
           window.activeCalculations[requestKey] = true;
 
-          if (workType === '휴일근무') {
-              updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
+          // 휴일근무, 연장근로는 서버에서만 계산
+          if (workType === '휴일근무' || workType === '연장' || workType === '조출연장') {
+              // 시간이 입력되어 있지 않으면 서버에서 계산
+              if (!startTime || !endTime) {
+                  updateExpectedHoursDirectFromEmpAttService(row, empCode, workDate);
+              }
+              // 시간이 입력되어 있어도 기존 값 유지
               delete window.activeCalculations[requestKey];
               return;
           }
+
 
           if (applyType === '조퇴외출반차') {
               if (workType === '전반차' || workType === '후반차') {
