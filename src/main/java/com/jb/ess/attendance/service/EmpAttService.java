@@ -92,11 +92,17 @@ public class EmpAttService {
                 continue;
             }
 
-            // 연차 처리
+            // 기타근태 처리
             AttendanceApplyEtc etcApply = attendanceApplyMapper.findEtcApplyByEmpAndDate(empCode, ymd);
             if (etcApply != null && "승인완료".equals(etcApply.getStatus())) {
                 String etcShiftName = shiftMasterMapper.findShiftNameByShiftCode(etcApply.getShiftCode());
+
                 if ("연차".equals(etcShiftName)) {
+                    continue;
+                } else if (Arrays.asList("휴직", "육아휴직", "산재휴직").contains(etcShiftName)) {
+                    continue;
+                } else {
+                    workHours = workHours.plus(Duration.ofHours(8));
                     continue;
                 }
             }
