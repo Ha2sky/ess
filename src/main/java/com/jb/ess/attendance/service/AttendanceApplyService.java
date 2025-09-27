@@ -1291,7 +1291,7 @@ public class AttendanceApplyService {
                     Duration applyHours = calculateApplyHours(apply);
                     double applyHoursDecimal = applyHours.toMinutes() / 60.0;
 
-                    if (currentWeekHours + applyHoursDecimal > 52.0) {
+                    if (currentWeekHours + applyHoursDecimal >= 52.0) {
                         return "주 52시간을 초과할 수 없습니다. (현재: " + String.format("%.2f", currentWeekHours) + "시간)";
                     }
                 } catch (Exception e) {
